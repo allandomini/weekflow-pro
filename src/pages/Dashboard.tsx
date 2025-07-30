@@ -1,13 +1,30 @@
+import { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CalendarDays, CheckSquare, DollarSign, Users, Plus } from "lucide-react";
 import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts } = useApp();
+  const { tasks, projects, accounts, contacts, addTask, updateTask } = useApp();
+
+  const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    description: "",
+    projectId: "",
+    startTime: "",
+    endTime: "",
+    isRoutine: false
+  });
 
   const today = new Date();
   const weekStart = startOfWeek(today, { weekStartsOn: 1 });
@@ -28,6 +45,40 @@ export default function Dashboard() {
     return projects.find(p => p.id === projectId);
   };
 
+  const handleCreateTask = () => {
+    setTaskForm({
+      title: "",
+      description: "",
+      projectId: "",
+      startTime: "",
+      endTime: "",
+      isRoutine: false
+    });
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleSaveTask = () => {
+    if (!taskForm.title.trim()) return;
+
+    const taskData = {
+      title: taskForm.title,
+      description: taskForm.description,
+      projectId: taskForm.projectId || undefined,
+      date: new Date(),
+      startTime: taskForm.startTime || undefined,
+      endTime: taskForm.endTime || undefined,
+      isRoutine: taskForm.isRoutine,
+      completed: false
+    };
+
+    addTask(taskData);
+    setIsTaskDialogOpen(false);
+  };
+
+  const handleToggleTask = (taskId: string, completed: boolean) => {
+    updateTask(taskId, { completed });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -38,7 +89,7 @@ export default function Dashboard() {
             {format(today, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <Button variant="gradient" className="animate-glow">
+        <Button variant="gradient" onClick={handleCreateTask} className="animate-glow">
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
         </Button>
@@ -176,15 +227,18 @@ export default function Dashboard() {
                           : 'bg-card border-border hover:bg-accent/50'
                       }`}
                     >
-                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                        task.completed 
-                          ? 'bg-success border-success' 
-                          : 'border-muted-foreground'
-                      }`}>
+                      <button 
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                          task.completed 
+                            ? 'bg-success border-success' 
+                            : 'border-muted-foreground hover:border-primary'
+                        }`}
+                        onClick={() => handleToggleTask(task.id, !task.completed)}
+                      >
                         {task.completed && (
                           <CheckSquare className="w-3 h-3 text-success-foreground" />
                         )}
-                      </div>
+                      </button>
                       <div className="flex-1">
                         <div className={`font-medium ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                           {task.title}
@@ -214,6 +268,90 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog para Nova Tarefa */}
+      <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Tarefa</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="title">Título</Label>
+              <Input
+                id="title"
+                value={taskForm.title}
+                onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Digite o título da tarefa"
+              />
+            </div>
+            <div>
+              <Label htmlFor="description">Descrição</Label>
+              <Textarea
+                id="description"
+                value={taskForm.description}
+                onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Descrição opcional"
+              />
+            </div>
+            <div>
+              <Label htmlFor="project">Projeto</Label>
+              <Select
+                value={taskForm.projectId}
+                onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um projeto" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum projeto</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="startTime">Hora de Início</Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={taskForm.startTime}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, startTime: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label htmlFor="endTime">Hora de Fim</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={taskForm.endTime}
+                  onChange={(e) => setTaskForm(prev => ({ ...prev, endTime: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="isRoutine"
+                checked={taskForm.isRoutine}
+                onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, isRoutine: !!checked }))}
+              />
+              <Label htmlFor="isRoutine">Tarefa de rotina</Label>
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button onClick={handleSaveTask} className="flex-1">
+                Criar Tarefa
+              </Button>
+              <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
