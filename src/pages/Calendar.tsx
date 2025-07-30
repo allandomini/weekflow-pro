@@ -414,13 +414,13 @@ export default function Calendar() {
               <Label htmlFor="project">Projeto</Label>
               <Select
                 value={taskForm.projectId}
-                onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value }))}
+                onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value === "none" ? "" : value }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione um projeto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum projeto</SelectItem>
+                  <SelectItem value="none">Nenhum projeto</SelectItem>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
