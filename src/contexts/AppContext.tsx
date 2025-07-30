@@ -82,16 +82,46 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedContacts = localStorage.getItem('contacts');
     const savedContactGroups = localStorage.getItem('contactGroups');
 
-    if (savedProjects) setProjects(JSON.parse(savedProjects));
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
-    if (savedNotes) setNotes(JSON.parse(savedNotes));
-    if (savedTodoLists) setTodoLists(JSON.parse(savedTodoLists));
-    if (savedAccounts) setAccounts(JSON.parse(savedAccounts));
-    if (savedTransactions) setTransactions(JSON.parse(savedTransactions));
-    if (savedDebts) setDebts(JSON.parse(savedDebts));
-    if (savedGoals) setGoals(JSON.parse(savedGoals));
-    if (savedContacts) setContacts(JSON.parse(savedContacts));
-    if (savedContactGroups) setContactGroups(JSON.parse(savedContactGroups));
+    if (savedProjects) setProjects(JSON.parse(savedProjects, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedTasks) setTasks(JSON.parse(savedTasks, (key, value) => {
+      if (key === 'date' || key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedNotes) setNotes(JSON.parse(savedNotes, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedTodoLists) setTodoLists(JSON.parse(savedTodoLists, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedAccounts) setAccounts(JSON.parse(savedAccounts, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedTransactions) setTransactions(JSON.parse(savedTransactions, (key, value) => {
+      if (key === 'date' || key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedDebts) setDebts(JSON.parse(savedDebts, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedGoals) setGoals(JSON.parse(savedGoals, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedContacts) setContacts(JSON.parse(savedContacts, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
+    if (savedContactGroups) setContactGroups(JSON.parse(savedContactGroups, (key, value) => {
+      if (key.includes('Date') || key.includes('At')) return new Date(value);
+      return value;
+    }));
   }, []);
 
   // Save to localStorage whenever data changes

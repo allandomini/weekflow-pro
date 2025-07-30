@@ -17,8 +17,6 @@ const items = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Calendário", url: "/calendar", icon: Calendar },
   { title: "Projetos", url: "/projects", icon: FolderOpen },
-  { title: "Tarefas", url: "/tasks", icon: ClipboardList },
-  { title: "Notas", url: "/notes", icon: StickyNote },
   { title: "Finanças", url: "/finances", icon: Wallet },
   { title: "Network", url: "/network", icon: Users },
 ];
