@@ -31,7 +31,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-      className="border-r border-border bg-card/30 backdrop-blur-sm"
+      className="border-r border-border bg-black backdrop-blur-sm"
       collapsible="icon"
     >
       <SidebarContent>
