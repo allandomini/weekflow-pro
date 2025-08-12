@@ -73,7 +73,8 @@ export default function Network() {
       whatsapp: "",
       skills: "",
       notes: "",
-      projectIds: []
+      projectIds: [],
+      attachments: []
     });
     setIsContactDialogOpen(true);
   };

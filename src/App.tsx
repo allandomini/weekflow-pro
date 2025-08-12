@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import ProjectDetail from "./pages/ProjectDetail";
 import Clockify from "./pages/Clockify";
 import Plaky from "./pages/Plaky";
+import { GeminiChat } from "./components/GeminiChat";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <GeminiChat />
           </Layout>
         </BrowserRouter>
       </TooltipProvider>
