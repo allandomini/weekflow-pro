@@ -1,0 +1,27 @@
+/* Dark Calendar Style */
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #000;
+  color: #fff;
+}
+
+.sidebar {
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
+.sidebar-menu-item {
+  color: #ccc;
+}
+
+.calendar {
+  background-color: #1a1a1a;
+  color: #fff;
+}
+
+.calendar-day {
+  border: 1px solid #333;
+  color: #fff;
+}
+
+/* Additional styles for Dark Calendar */

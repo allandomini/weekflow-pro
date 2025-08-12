@@ -1,0 +1,24 @@
+/* Kaiko Pro Style */
+@font-face {
+  font-family: 'Kaiko Pro';
+  src: url('/path-to-kaiko-pro-font.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+}
+
+body {
+  font-family: 'Kaiko Pro', sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.sidebar {
+  background-color: #eaeaea;
+  color: #333;
+}
+
+.sidebar-menu-item {
+  font-weight: bold;
+}
+
+/* Additional styles for Kaiko Pro */

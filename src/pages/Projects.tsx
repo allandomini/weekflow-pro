@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,11 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { FolderOpen, Plus, Edit, Trash2, CheckSquare, StickyNote } from "lucide-react";
-import { Project } from "@/types";
+import { FolderOpen, Plus, Edit, Trash2, CheckSquare, StickyNote, ListChecks, BadgeDollarSign } from "lucide-react";
+import { Project, TodoList, Note } from "@/types";
 
 export default function Projects() {
-  const { projects, tasks, notes, addProject, updateProject, deleteProject } = useApp();
+  const navigate = useNavigate();
+  const { 
+    projects, tasks, notes, todoLists, receivables,
+    addProject, updateProject, deleteProject,
+    addNote, deleteNote, addTodoList, updateTodoList, addReceivable
+  } = useApp();
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState({
@@ -83,6 +89,68 @@ export default function Projects() {
     "#06B6D4", "#84CC16", "#F97316", "#EC4899", "#6366F1"
   ];
 
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [activeProjectForNote, setActiveProjectForNote] = useState<Project | null>(null);
+  const [noteForm, setNoteForm] = useState({ title: "", content: "" });
+
+  const [todoInputByList, setTodoInputByList] = useState<Record<string, string>>({});
+
+  const [receivableDialogOpen, setReceivableDialogOpen] = useState(false);
+  const [activeProjectForReceivable, setActiveProjectForReceivable] = useState<Project | null>(null);
+  const [receivableForm, setReceivableForm] = useState({ name: "", amount: "", dueDate: "" });
+
+  const getProjectTodoLists = (projectId: string) => todoLists.filter(l => l.projectId === projectId);
+  const getProjectNotes = (projectId: string) => notes.filter(n => n.projectId === projectId);
+  const getProjectReceivables = (projectId: string) => receivables.filter(r => r.projectId === projectId);
+
+  const ensureTodoList = (project: Project): TodoList => {
+    const lists = getProjectTodoLists(project.id);
+    if (lists.length > 0) return lists[0];
+    const newList: Omit<TodoList, 'id' | 'createdAt' | 'updatedAt'> = {
+      title: `Checklist - ${project.name}`,
+      items: [],
+      projectId: project.id,
+    };
+    addTodoList(newList);
+    // naive: return a placeholder; UI will refresh via state update
+    return { ...(newList as any), id: 'temp', createdAt: new Date(), updatedAt: new Date() } as TodoList;
+  };
+
+  const handleAddTodoItem = (list: TodoList) => {
+    const text = (todoInputByList[list.id] || '').trim();
+    if (!text) return;
+    const newItem = { id: Date.now().toString(), text, completed: false, createdAt: new Date() };
+    updateTodoList(list.id, { items: [...list.items, newItem] });
+    setTodoInputByList(prev => ({ ...prev, [list.id]: '' }));
+  };
+
+  const handleToggleTodoItem = (list: TodoList, itemId: string) => {
+    const nextItems = list.items.map(i => i.id === itemId ? { ...i, completed: !i.completed } : i);
+    updateTodoList(list.id, { items: nextItems });
+  };
+
+  const handleCreateNote = () => {
+    if (!activeProjectForNote || !noteForm.title.trim()) return;
+    addNote({ title: noteForm.title, content: noteForm.content, projectId: activeProjectForNote.id });
+    setNoteForm({ title: '', content: '' });
+    setNoteDialogOpen(false);
+    setActiveProjectForNote(null);
+  };
+
+  const handleCreateReceivableForProject = () => {
+    if (!activeProjectForReceivable || !receivableForm.name.trim() || !receivableForm.amount || !receivableForm.dueDate) return;
+    addReceivable({
+      name: receivableForm.name,
+      amount: parseFloat(receivableForm.amount),
+      dueDate: new Date(receivableForm.dueDate),
+      projectId: activeProjectForReceivable.id,
+      description: undefined,
+    });
+    setReceivableForm({ name: '', amount: '', dueDate: '' });
+    setReceivableDialogOpen(false);
+    setActiveProjectForReceivable(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -134,6 +202,13 @@ export default function Projects() {
                       <CardTitle className="text-lg">{project.name}</CardTitle>
                     </div>
                     <div className="flex gap-1">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => navigate(`/projects/${project.id}`)}
+                      >
+                        Abrir
+                      </Button>
                       <Button 
                         variant="ghost" 
                         size="sm"
@@ -204,6 +279,102 @@ export default function Projects() {
                         {stats.completionRate === 100 ? 'Concluído' : 'Em andamento'}
                       </Badge>
                     </div>
+
+                    {/* Mixed Content: Tasks + Notes + Todo + Finance */}
+                    <div className="space-y-4 pt-2">
+                      {/* Tasks (read-only list) */}
+                      <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-2">Tarefas</h4>
+                        <div className="space-y-1">
+                          {tasks.filter(t => t.projectId === project.id).slice(0,5).map(t => (
+                            <div key={t.id} className="text-sm flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${t.completed ? 'bg-success' : 'bg-warning'}`} />
+                              <span className={t.completed ? 'line-through text-muted-foreground' : ''}>{t.title}</span>
+                            </div>
+                          ))}
+                          {tasks.filter(t => t.projectId === project.id).length === 0 && (
+                            <p className="text-sm text-muted-foreground">Sem tarefas</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Notes */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Notas</h4>
+                          <Button size="sm" variant="outline" onClick={() => { setActiveProjectForNote(project); setNoteDialogOpen(true); }}>
+                            <StickyNote className="w-4 h-4 mr-1" /> Nova Nota
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {getProjectNotes(project.id).slice(0,3).map(n => (
+                            <div key={n.id} className="text-sm">
+                              <span className="font-medium">{n.title}</span>
+                            </div>
+                          ))}
+                          {getProjectNotes(project.id).length === 0 && (
+                            <p className="text-sm text-muted-foreground">Sem notas</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Todo List */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Checklist</h4>
+                          <Button size="sm" variant="outline" onClick={() => ensureTodoList(project)}>
+                            <ListChecks className="w-4 h-4 mr-1" /> Criar/Usar Lista
+                          </Button>
+                        </div>
+                        {getProjectTodoLists(project.id).slice(0,1).map(list => (
+                          <div key={list.id} className="space-y-2">
+                            <div className="flex gap-2">
+                              <Input 
+                                placeholder="Novo item"
+                                value={todoInputByList[list.id] || ''}
+                                onChange={(e) => setTodoInputByList(prev => ({ ...prev, [list.id]: e.target.value }))}
+                              />
+                              <Button size="sm" onClick={() => handleAddTodoItem(list)}>Adicionar</Button>
+                            </div>
+                            <div className="space-y-1">
+                              {list.items.slice(0,5).map(item => (
+                                <button key={item.id} className="text-left w-full text-sm flex items-center gap-2" onClick={() => handleToggleTodoItem(list, item.id)}>
+                                  <span className={`w-3 h-3 rounded border ${item.completed ? 'bg-success border-success' : 'border-border'}`} />
+                                  <span className={item.completed ? 'line-through text-muted-foreground' : ''}>{item.text}</span>
+                                </button>
+                              ))}
+                              {list.items.length === 0 && (
+                                <p className="text-sm text-muted-foreground">Sem itens</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {getProjectTodoLists(project.id).length === 0 && (
+                          <p className="text-sm text-muted-foreground">Nenhuma lista. Clique em "Criar/Usar Lista".</p>
+                        )}
+                      </div>
+
+                      {/* Finance (Receivables) */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-muted-foreground">Financeiro (A Receber)</h4>
+                          <Button size="sm" variant="outline" onClick={() => { setActiveProjectForReceivable(project); setReceivableDialogOpen(true); }}>
+                            <BadgeDollarSign className="w-4 h-4 mr-1" /> Novo
+                          </Button>
+                        </div>
+                        <div className="space-y-1">
+                          {getProjectReceivables(project.id).slice(0,3).map(r => (
+                            <div key={r.id} className="text-sm flex items-center gap-2">
+                              <span className={`w-2 h-2 rounded-full ${r.status === 'received' ? 'bg-success' : 'bg-warning'}`} />
+                              <span>{r.name} • {r.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                            </div>
+                          ))}
+                          {getProjectReceivables(project.id).length === 0 && (
+                            <p className="text-sm text-muted-foreground">Sem lançamentos</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -264,6 +435,56 @@ export default function Projects() {
               <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
                 Cancelar
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nova Nota */}
+      <Dialog open={noteDialogOpen} onOpenChange={setNoteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nova Nota {activeProjectForNote ? `- ${activeProjectForNote.name}` : ''}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="noteTitle">Título</Label>
+              <Input id="noteTitle" value={noteForm.title} onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))} />
+            </div>
+            <div>
+              <Label htmlFor="noteContent">Conteúdo</Label>
+              <Textarea id="noteContent" value={noteForm.content} onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))} />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button className="flex-1" onClick={handleCreateNote}>Criar Nota</Button>
+              <Button variant="outline" onClick={() => setNoteDialogOpen(false)}>Cancelar</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Novo A Receber do Projeto */}
+      <Dialog open={receivableDialogOpen} onOpenChange={setReceivableDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo A Receber {activeProjectForReceivable ? `- ${activeProjectForReceivable.name}` : ''}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="recName">Nome</Label>
+              <Input id="recName" value={receivableForm.name} onChange={(e) => setReceivableForm(prev => ({ ...prev, name: e.target.value }))} />
+            </div>
+            <div>
+              <Label htmlFor="recAmount">Valor</Label>
+              <Input id="recAmount" type="number" step="0.01" value={receivableForm.amount} onChange={(e) => setReceivableForm(prev => ({ ...prev, amount: e.target.value }))} />
+            </div>
+            <div>
+              <Label htmlFor="recDate">Vencimento</Label>
+              <Input id="recDate" type="date" value={receivableForm.dueDate} onChange={(e) => setReceivableForm(prev => ({ ...prev, dueDate: e.target.value }))} />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button className="flex-1" onClick={handleCreateReceivableForProject}>Criar</Button>
+              <Button variant="outline" onClick={() => setReceivableDialogOpen(false)}>Cancelar</Button>
             </div>
           </div>
         </DialogContent>

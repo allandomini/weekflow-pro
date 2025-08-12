@@ -7,7 +7,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Users, 
   Plus, 
@@ -43,13 +45,15 @@ export default function Network() {
 
   const [contactForm, setContactForm] = useState({
     name: "",
+    avatarUrl: "",
     email: "",
     phone: "",
     linkedin: "",
     whatsapp: "",
     skills: "",
     notes: "",
-    projectIds: [] as string[]
+    projectIds: [] as string[],
+    attachments: [] as { name: string; url: string }[],
   });
 
   const [groupForm, setGroupForm] = useState({
@@ -62,6 +66,7 @@ export default function Network() {
     setEditingContact(null);
     setContactForm({
       name: "",
+      avatarUrl: "",
       email: "",
       phone: "",
       linkedin: "",
@@ -77,13 +82,15 @@ export default function Network() {
     setEditingContact(contact);
     setContactForm({
       name: contact.name,
+      avatarUrl: contact.avatarUrl || "",
       email: contact.email || "",
       phone: contact.phone || "",
       linkedin: contact.linkedin || "",
       whatsapp: contact.whatsapp || "",
       skills: contact.skills.join(", "),
       notes: contact.notes || "",
-      projectIds: contact.projectIds
+      projectIds: contact.projectIds,
+      attachments: contact.attachments || []
     });
     setIsContactDialogOpen(true);
   };
@@ -98,6 +105,7 @@ export default function Network() {
 
     const contactData = {
       name: contactForm.name,
+      avatarUrl: contactForm.avatarUrl || undefined,
       email: contactForm.email || undefined,
       phone: contactForm.phone || undefined,
       linkedin: contactForm.linkedin || undefined,
@@ -105,7 +113,8 @@ export default function Network() {
       skills: skillsArray,
       notes: contactForm.notes || undefined,
       projectIds: contactForm.projectIds,
-      groupIds: editingContact?.groupIds || []
+      groupIds: editingContact?.groupIds || [],
+      attachments: contactForm.attachments,
     };
 
     if (editingContact) {
@@ -251,13 +260,19 @@ export default function Network() {
                 <Card key={contact.id} className="shadow-elegant hover:shadow-glow transition-all duration-300">
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-lg">{contact.name}</CardTitle>
-                        {contact.notes && (
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {contact.notes}
-                          </p>
-                        )}
+                      <div className="flex items-start gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={contact.avatarUrl} alt={contact.name} />
+                          <AvatarFallback>{contact.name?.charAt(0).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <CardTitle className="text-lg">{contact.name}</CardTitle>
+                          {contact.notes && (
+                            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                              {contact.notes}
+                            </p>
+                          )}
+                        </div>
                       </div>
                       <div className="flex gap-1">
                         <Button 
@@ -430,9 +445,12 @@ export default function Network() {
                             const contact = getContactById(memberId);
                             return contact ? (
                               <div key={memberId} className="flex items-center gap-2 text-sm">
-                                <div className="w-6 h-6 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-xs">
-                                  {contact.name.charAt(0).toUpperCase()}
-                                </div>
+                                <Avatar className="h-6 w-6">
+                                  <AvatarImage src={contact.avatarUrl} alt={contact.name} />
+                                  <AvatarFallback className="text-xs">
+                                    {contact.name.charAt(0).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
                                 <span>{contact.name}</span>
                               </div>
                             ) : null;
@@ -445,10 +463,12 @@ export default function Network() {
                         </div>
                       )}
 
-                      <Button variant="outline" size="sm" className="w-full">
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Gerenciar Membros
-                      </Button>
+                      <Dialog>
+                        <Button variant="outline" size="sm" className="w-full" onClick={() => handleEditGroup(group)}>
+                          <UserPlus className="w-4 h-4 mr-2" />
+                          Gerenciar Membros
+                        </Button>
+                      </Dialog>
                     </div>
                   </CardContent>
                 </Card>
@@ -467,6 +487,43 @@ export default function Network() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 max-h-[500px] overflow-y-auto">
+            <div>
+              <Label htmlFor="contactAvatar">Foto do Perfil</Label>
+              <div className="flex items-center gap-4 mt-2">
+                <Avatar className="h-14 w-14">
+                  <AvatarImage src={contactForm.avatarUrl} alt={contactForm.name} />
+                  <AvatarFallback>
+                    {contactForm.name?.charAt(0)?.toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="contactAvatar"
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = () => {
+                        const result = typeof reader.result === 'string' ? reader.result : '';
+                        setContactForm(prev => ({ ...prev, avatarUrl: result }));
+                      };
+                      reader.readAsDataURL(file);
+                    }}
+                  />
+                  {contactForm.avatarUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setContactForm(prev => ({ ...prev, avatarUrl: "" }))}
+                    >
+                      Remover
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div>
               <Label htmlFor="contactName">Nome Completo *</Label>
               <Input
@@ -541,6 +598,38 @@ export default function Network() {
               />
             </div>
 
+            <div>
+              <Label htmlFor="contactAttachments">Anexos (imagens, vídeos, documentos)</Label>
+              <Input
+                id="contactAttachments"
+                type="file"
+                multiple
+                accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length === 0) return;
+                  const readers = files.map(file => new Promise<{name:string; url:string}>((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve({ name: file.name, url: typeof reader.result === 'string' ? reader.result : '' });
+                    reader.readAsDataURL(file);
+                  }));
+                  Promise.all(readers).then(list => {
+                    setContactForm(prev => ({ ...prev, attachments: [...prev.attachments, ...list] }));
+                  });
+                }}
+              />
+              {contactForm.attachments.length > 0 && (
+                <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {contactForm.attachments.map((att, idx) => (
+                    <div key={`${att.name}-${idx}`} className="flex items-center justify-between p-2 rounded border text-xs">
+                      <span className="truncate mr-2" title={att.name}>{att.name}</span>
+                      <Button variant="ghost" size="sm" onClick={() => setContactForm(prev => ({ ...prev, attachments: prev.attachments.filter((_,i)=>i!==idx) }))}>Remover</Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveContact} className="flex-1">
                 {editingContact ? 'Salvar Alterações' : 'Criar Contato'}
@@ -581,6 +670,36 @@ export default function Network() {
                 placeholder="Descrição opcional do grupo"
                 rows={3}
               />
+            </div>
+
+            <div>
+              <Label>Membros do Grupo</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto">
+                {contacts.map((c) => {
+                  const isSelected = groupForm.memberIds.includes(c.id);
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className={`flex items-center justify-between p-2 rounded border text-sm ${isSelected ? 'bg-accent' : 'bg-card hover:bg-accent/50'}`}
+                      onClick={() => {
+                        setGroupForm(prev => ({
+                          ...prev,
+                          memberIds: isSelected
+                            ? prev.memberIds.filter(id => id !== c.id)
+                            : [...prev.memberIds, c.id]
+                        }));
+                      }}
+                    >
+                      <span>{c.name}</span>
+                      {isSelected && <span className="text-xs">Selecionado</span>}
+                    </button>
+                  );
+                })}
+                {contacts.length === 0 && (
+                  <p className="text-sm text-muted-foreground col-span-full">Nenhum contato para adicionar</p>
+                )}
+              </div>
             </div>
 
             <div className="flex gap-3 pt-4">

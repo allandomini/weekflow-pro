@@ -9,26 +9,33 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarDays, CheckSquare, DollarSign, Users, Plus } from "lucide-react";
-import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval } from "date-fns";
+import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock } from "lucide-react";
+import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addDays, addMonths, addYears } from "date-fns";
+import { Task } from "@/types";
 import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, addTask, updateTask } = useApp();
+  const { tasks, projects, accounts, contacts, addTask, updateTask, deleteTask } = useApp();
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
     projectId: "",
     startTime: "",
     endTime: "",
-    isRoutine: false
+    isRoutine: false,
+    repeatUnit: "day" as "day" | "week" | "month" | "year",
+    repeatCount: 7,
+    repeatAlways: false,
   });
 
   const today = new Date();
-  const weekStart = startOfWeek(today, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(today, { weekStartsOn: 1 });
+  const [currentWeekDate, setCurrentWeekDate] = useState<Date>(today);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   const todayTasks = tasks.filter(task => isToday(task.date));
@@ -46,13 +53,17 @@ export default function Dashboard() {
   };
 
   const handleCreateTask = () => {
+    setEditingTask(null);
     setTaskForm({
       title: "",
       description: "",
       projectId: "",
       startTime: "",
       endTime: "",
-      isRoutine: false
+      isRoutine: false,
+      repeatUnit: "day",
+      repeatCount: 7,
+      repeatAlways: false,
     });
     setIsTaskDialogOpen(true);
   };
@@ -60,36 +71,105 @@ export default function Dashboard() {
   const handleSaveTask = () => {
     if (!taskForm.title.trim()) return;
 
-    const taskData = {
+    const baseData = {
       title: taskForm.title,
       description: taskForm.description,
       projectId: taskForm.projectId || undefined,
-      date: new Date(),
       startTime: taskForm.startTime || undefined,
       endTime: taskForm.endTime || undefined,
       isRoutine: taskForm.isRoutine,
-      completed: false
-    };
+    } as const;
 
-    addTask(taskData);
+    if (editingTask) {
+      updateTask(editingTask.id, { ...baseData });
+    } else {
+      const baseDate = selectedDate || new Date();
+      if (!taskForm.isRoutine) {
+        addTask({
+          ...baseData,
+          date: baseDate,
+          completed: false,
+        });
+      } else {
+        const getOccurrences = () => {
+          if (taskForm.repeatAlways) {
+            switch (taskForm.repeatUnit) {
+              case "day":
+                return 60;
+              case "week":
+                return 26;
+              case "month":
+                return 12;
+              case "year":
+                return 5;
+              default:
+                return 12;
+            }
+          }
+          return Math.max(1, Number(taskForm.repeatCount) || 1);
+        };
+
+        const occurrences = getOccurrences();
+        for (let i = 0; i < occurrences; i++) {
+          let date = baseDate;
+          if (i > 0) {
+            if (taskForm.repeatUnit === "day") date = addDays(baseDate, i);
+            if (taskForm.repeatUnit === "week") date = addWeeks(baseDate, i);
+            if (taskForm.repeatUnit === "month") date = addMonths(baseDate, i);
+            if (taskForm.repeatUnit === "year") date = addYears(baseDate, i);
+          }
+          addTask({
+            ...baseData,
+            date,
+            completed: false,
+          });
+        }
+      }
+    }
+
     setIsTaskDialogOpen(false);
+    setEditingTask(null);
   };
 
   const handleToggleTask = (taskId: string, completed: boolean) => {
     updateTask(taskId, { completed });
   };
 
+  const handleEditTask = (task: Task) => {
+    setEditingTask(task);
+    setTaskForm({
+      title: task.title,
+      description: task.description || "",
+      projectId: task.projectId || "",
+      startTime: task.startTime || "",
+      endTime: task.endTime || "",
+      isRoutine: task.isRoutine,
+      repeatUnit: "day",
+      repeatCount: 7,
+      repeatAlways: false,
+    });
+    setIsTaskDialogOpen(true);
+  };
+
+  const handleDeleteTask = (taskId: string) => {
+    deleteTask(taskId);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between animate-fade-in-left">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-3xl font-bold text-foreground transition-colors duration-200">Dashboard</h1>
+          <p className="text-muted-foreground transition-colors duration-200">
             {format(today, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
           </p>
         </div>
-        <Button variant="gradient" onClick={handleCreateTask} className="animate-glow">
+        <Button 
+          variant="default" 
+          onClick={handleCreateTask} 
+          className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
+        >
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
         </Button>
@@ -97,55 +177,55 @@ export default function Dashboard() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
+        <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '100ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tarefas Hoje</CardTitle>
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-foreground">Tarefas Hoje</CardTitle>
+            <CheckSquare className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-primary">{completedToday.length}/{todayTasks.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-primary transition-colors duration-200">{completedToday.length}/{todayTasks.length}</div>
+            <p className="text-xs text-muted-foreground transition-colors duration-200">
               {todayTasks.length > 0 ? `${Math.round((completedToday.length / todayTasks.length) * 100)}% completo` : 'Nenhuma tarefa'}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
+        <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '200ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Projetos Ativos</CardTitle>
-            <CalendarDays className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-foreground">Projetos Ativos</CardTitle>
+            <CalendarDays className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-accent">{projects.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-accent transition-colors duration-200">{projects.length}</div>
+            <p className="text-xs text-muted-foreground transition-colors duration-200">
               Projetos em andamento
             </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
+        <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '300ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-foreground">Saldo Total</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-success">
+            <div className="text-2xl font-bold text-success transition-colors duration-200">
               {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground transition-colors duration-200">
               {accounts.length} conta{accounts.length !== 1 ? 's' : ''}
             </p>
           </CardContent>
         </Card>
 
-        <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
+        <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '400ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Contatos</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium text-foreground">Contatos</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-warning">{contacts.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl font-bold text-warning transition-colors duration-200">{contacts.length}</div>
+            <p className="text-xs text-muted-foreground transition-colors duration-200">
               Total de contatos
             </p>
           </CardContent>
@@ -154,111 +234,151 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Calendário Semanal */}
-        <Card className="shadow-elegant">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-primary" />
+        <Card className="modern-card animate-fade-in-left hover:shadow-medium transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <CalendarDays className="w-5 h-5 text-primary transition-colors duration-200" />
               Calendário Semanal
             </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCurrentWeekDate(prev => subWeeks(prev, 1))}
+                aria-label="Semana anterior"
+                className="transition-all duration-200 hover:scale-105 active:scale-95"
+              >
+                ←
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setCurrentWeekDate(prev => addWeeks(prev, 1))}
+                aria-label="Próxima semana"
+                className="transition-all duration-200 hover:scale-105 active:scale-95"
+              >
+                →
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-2">
-              {weekDays.map((day, index) => {
-                const dayTasks = getTasksForDay(day);
-                const isCurrentDay = isToday(day);
-                
-                return (
-                  <div 
-                    key={index} 
-                    className={`p-3 rounded-lg border ${
-                      isCurrentDay 
-                        ? 'bg-primary text-primary-foreground border-primary shadow-md' 
-                        : 'bg-card border-border hover:bg-accent/50'
-                    } transition-colors`}
-                  >
-                    <div className="text-center">
-                      <div className={`text-xs font-medium ${isCurrentDay ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
-                        {format(day, 'EEE', { locale: ptBR })}
-                      </div>
-                      <div className={`text-lg font-bold ${isCurrentDay ? 'text-primary-foreground' : 'text-foreground'}`}>
-                        {format(day, 'd')}
-                      </div>
-                      {dayTasks.length > 0 && (
-                        <div className="mt-1">
-                          <Badge 
-                            variant={isCurrentDay ? "secondary" : "default"} 
-                            className="text-xs px-1 py-0"
-                          >
-                            {dayTasks.length}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
+            <div className="grid grid-cols-7 gap-1">
+              {weekDays.map((day, index) => (
+                <div
+                  key={day.toISOString()}
+                  className={`
+                    p-2 text-center rounded-lg transition-all duration-200 cursor-pointer
+                    ${isToday(day) 
+                      ? 'bg-primary text-primary-foreground shadow-soft scale-105' 
+                      : 'hover:bg-muted hover:scale-105'
+                    }
+                    ${selectedDate?.toDateString() === day.toDateString() 
+                      ? 'ring-2 ring-primary/20 bg-accent' 
+                      : ''
+                    }
+                  `}
+                  onClick={() => setSelectedDate(day)}
+                >
+                  <div className="text-xs font-medium text-muted-foreground">
+                    {format(day, 'EEE', { locale: ptBR })}
                   </div>
-                );
-              })}
+                  <div className="text-lg font-semibold">
+                    {format(day, 'd')}
+                  </div>
+                  <div className="text-xs">
+                    {getTasksForDay(day).length} tarefa{getTasksForDay(day).length !== 1 ? 's' : ''}
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
         {/* Tarefas de Hoje */}
-        <Card className="shadow-elegant">
+        <Card className="modern-card animate-fade-in-right hover:shadow-medium transition-all duration-300">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-accent" />
-              Tarefas de Hoje
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <CheckSquare className="w-5 h-5 text-success transition-colors duration-200" />
+              {selectedDate ? `Tarefas de ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })}` : 'Tarefas de Hoje'}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {todayTasks.length === 0 ? (
-                <p className="text-muted-foreground text-center py-4">
-                  Nenhuma tarefa para hoje
+              {(selectedDate ? getTasksForDay(selectedDate) : todayTasks).length === 0 ? (
+                <p className="text-muted-foreground text-center py-4 transition-colors duration-200">
+                  Nenhuma tarefa para este dia
                 </p>
               ) : (
-                todayTasks.map((task) => {
+                [...(selectedDate ? getTasksForDay(selectedDate) : todayTasks)].sort((a, b) => {
+                  const aKey = a.startTime || '';
+                  const bKey = b.startTime || '';
+                  return aKey.localeCompare(bKey);
+                }).map((task, index) => {
                   const project = getProjectById(task.projectId);
                   return (
                     <div 
                       key={task.id} 
-                      className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
-                        task.completed 
+                      className={`
+                        flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01] hover:shadow-soft
+                        ${task.completed 
                           ? 'bg-success/10 border-success/20' 
                           : 'bg-card border-border hover:bg-accent/50'
-                      }`}
+                        }
+                      `}
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
-                      <button 
-                        className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                          task.completed 
-                            ? 'bg-success border-success' 
-                            : 'border-muted-foreground hover:border-primary'
-                        }`}
-                        onClick={() => handleToggleTask(task.id, !task.completed)}
-                      >
-                        {task.completed && (
-                          <CheckSquare className="w-3 h-3 text-success-foreground" />
-                        )}
-                      </button>
+                      <Checkbox
+                        checked={task.completed}
+                        onCheckedChange={(checked) => handleToggleTask(task.id, !!checked)}
+                        className="transition-all duration-200 hover:scale-110"
+                      />
                       <div className="flex-1">
-                        <div className={`font-medium ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                        <div className={`font-medium transition-all duration-200 ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                           {task.title}
                         </div>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-2">
                           {project && (
                             <Badge 
                               variant="outline" 
                               style={{ backgroundColor: project.color + '20', borderColor: project.color }}
-                              className="text-xs"
+                              className="text-xs transition-all duration-200 hover:scale-105"
                             >
                               {project.name}
                             </Badge>
                           )}
-                          {task.startTime && (
-                            <span className="text-xs text-muted-foreground">
-                              {task.startTime} {task.endTime && `- ${task.endTime}`}
-                            </span>
+                          {(task.startTime || task.endTime) && (
+                            <Badge variant="secondary" className="text-xs transition-all duration-200 hover:scale-105">
+                              <Clock className="w-3 h-3 mr-1" />
+                              {task.startTime && task.endTime 
+                                ? `${task.startTime} - ${task.endTime}`
+                                : task.startTime || task.endTime
+                              }
+                            </Badge>
                           )}
                         </div>
+                        {task.description && (
+                          <p className={`text-sm mt-2 transition-all duration-200 ${task.completed ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                            {task.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditTask(task)}
+                          className="transition-all duration-200 hover:scale-110 hover:bg-accent"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="text-destructive transition-all duration-200 hover:scale-110 hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     </div>
                   );
@@ -268,42 +388,43 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-
       {/* Dialog para Nova Tarefa */}
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
-        <DialogContent>
+        <DialogContent className="animate-scale-in">
           <DialogHeader>
-            <DialogTitle>Nova Tarefa</DialogTitle>
+            <DialogTitle className="text-foreground">Nova Tarefa</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Título</Label>
+              <Label htmlFor="title" className="text-foreground">Título</Label>
               <Input
                 id="title"
                 value={taskForm.title}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
                 placeholder="Digite o título da tarefa"
+                className="modern-input"
               />
             </div>
             <div>
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description" className="text-foreground">Descrição</Label>
               <Textarea
                 id="description"
                 value={taskForm.description}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
                 placeholder="Descrição opcional"
+                className="modern-input"
               />
             </div>
             <div>
-              <Label htmlFor="project">Projeto</Label>
+              <Label htmlFor="project" className="text-foreground">Projeto</Label>
               <Select
                 value={taskForm.projectId}
                 onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value === "none" ? "" : value }))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="modern-input">
                   <SelectValue placeholder="Selecione um projeto" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="modern-dropdown">
                   <SelectItem value="none">Nenhum projeto</SelectItem>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
@@ -315,21 +436,23 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startTime">Hora de Início</Label>
+                <Label htmlFor="startTime" className="text-foreground">Hora de Início</Label>
                 <Input
                   id="startTime"
                   type="time"
                   value={taskForm.startTime}
                   onChange={(e) => setTaskForm(prev => ({ ...prev, startTime: e.target.value }))}
+                  className="modern-input"
                 />
               </div>
               <div>
-                <Label htmlFor="endTime">Hora de Fim</Label>
+                <Label htmlFor="endTime" className="text-foreground">Hora de Fim</Label>
                 <Input
                   id="endTime"
                   type="time"
                   value={taskForm.endTime}
                   onChange={(e) => setTaskForm(prev => ({ ...prev, endTime: e.target.value }))}
+                  className="modern-input"
                 />
               </div>
             </div>
@@ -338,14 +461,63 @@ export default function Dashboard() {
                 id="isRoutine"
                 checked={taskForm.isRoutine}
                 onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, isRoutine: !!checked }))}
+                className="transition-all duration-200 hover:scale-110"
               />
-              <Label htmlFor="isRoutine">Tarefa de rotina</Label>
+              <Label htmlFor="isRoutine" className="text-foreground">Tarefa de rotina</Label>
             </div>
+            {taskForm.isRoutine && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-foreground block mb-1">Frequência</Label>
+                  <Select
+                    value={taskForm.repeatUnit}
+                    onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
+                  >
+                    <SelectTrigger className="modern-input">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="modern-dropdown">
+                      <SelectItem value="day">Dia</SelectItem>
+                      <SelectItem value="week">Semana</SelectItem>
+                      <SelectItem value="month">Mês</SelectItem>
+                      <SelectItem value="year">Ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-foreground block mb-1">Quantidade</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={taskForm.repeatCount}
+                    onChange={(e) => setTaskForm(prev => ({ ...prev, repeatCount: Number(e.target.value) }))}
+                    className="modern-input"
+                    disabled={taskForm.repeatAlways}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    id="repeatAlways"
+                    checked={taskForm.repeatAlways}
+                    onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
+                    className="transition-all duration-200 hover:scale-110"
+                  />
+                  <Label htmlFor="repeatAlways" className="text-foreground">Sempre</Label>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleSaveTask} className="flex-1">
+              <Button 
+                onClick={handleSaveTask} 
+                className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
+              >
                 Criar Tarefa
               </Button>
-              <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsTaskDialogOpen(false)}
+                className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
+              >
                 Cancelar
               </Button>
             </div>

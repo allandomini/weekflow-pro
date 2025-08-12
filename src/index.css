@@ -8,90 +8,91 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 220 15% 97%;
-    --foreground: 220 9% 15%;
+    /* Modern Light Theme - Based on the image */
+    --background: 0 0% 96%; /* #F5F5F5 - Light gray background */
+    --foreground: 0 0% 13%; /* #212121 - Dark gray text */
 
-    --card: 0 0% 100%;
-    --card-foreground: 220 9% 15%;
+    --card: 0 0% 100%; /* #FFFFFF - White cards */
+    --card-foreground: 0 0% 13%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 9% 15%;
+    --popover-foreground: 0 0% 13%;
 
-    --primary: 221 83% 53%;
-    --primary-foreground: 220 15% 97%;
-    --primary-glow: 221 83% 65%;
+    --primary: 0 0% 0%; /* #000000 - Black primary */
+    --primary-foreground: 0 0% 100%; /* #FFFFFF - White text on black */
+    --primary-glow: 0 0% 20%;
 
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 220 9% 15%;
+    --secondary: 0 0% 94%; /* #F0F0F0 - Light gray secondary */
+    --secondary-foreground: 0 0% 13%;
 
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%; /* #737373 - Medium gray text */
 
-    --accent: 212 95% 64%;
-    --accent-foreground: 220 15% 97%;
+    --accent: 0 0% 90%; /* #E5E5E5 - Accent gray */
+    --accent-foreground: 0 0% 13%;
 
     --success: 142 76% 36%;
-    --success-foreground: 220 15% 97%;
+    --success-foreground: 0 0% 100%;
 
     --warning: 38 92% 50%;
-    --warning-foreground: 220 15% 97%;
+    --warning-foreground: 0 0% 100%;
 
     --destructive: 0 84% 60%;
-    --destructive-foreground: 220 15% 97%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 221 83% 53%;
+    --border: 0 0% 91%; /* #E8E8E8 - Very light gray borders */
+    --input: 0 0% 94%; /* #F0F0F0 - Input background */
+    --ring: 0 0% 0%;
 
-    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
-    --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
-    --shadow-elegant: 0 10px 30px -10px hsl(var(--primary) / 0.15);
-    --shadow-glow: 0 0 40px hsl(var(--primary-glow) / 0.2);
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 0%), hsl(0 0% 20%));
+    --gradient-subtle: linear-gradient(180deg, hsl(0 0% 96%), hsl(0 0% 94%));
+    --shadow-elegant: 0 1px 3px 0 hsl(0 0% 0% / 0.1), 0 1px 2px -1px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
 
-    --radius: 0.75rem;
+    --radius: 0.5rem; /* Smaller radius for modern look */
 
     --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 13%;
+    --sidebar-primary: 0 0% 0%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 13%;
+    --sidebar-border: 0 0% 91%;
+    --sidebar-ring: 0 0% 0%;
 
-    --sidebar-foreground: 220 9% 15%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    /* New modern theme variables */
+    --table-header-bg: 0 0% 94%;
+    --table-row-alt: 0 0% 98%;
+    --table-row-hover: 0 0% 96%;
+    --toggle-active: 0 0% 0%;
+    --toggle-inactive: 0 0% 94%;
+    --toggle-track: 0 0% 91%;
+    --button-secondary: 0 0% 94%;
+    --button-secondary-hover: 0 0% 90%;
+    --tab-active: 0 0% 94%;
+    --tab-inactive: 0 0% 100%;
+    --search-bg: 0 0% 94%;
+    --dropdown-bg: 0 0% 100%;
+    --dropdown-shadow: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -2px hsl(0 0% 0% / 0.05);
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
@@ -104,6 +105,71 @@ All colors MUST be HSL.
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  /* Domini Horus dark gray minimalist theme */
+  .domini-dark {
+    --background: 220 7% 8%;
+    --foreground: 220 9% 92%;
+    --card: 220 7% 10%;
+    --card-foreground: 220 9% 92%;
+    --popover: 220 7% 8%;
+    --popover-foreground: 220 9% 92%;
+    --primary: 0 0% 92%;
+    --primary-foreground: 220 8% 10%;
+    --primary-glow: 0 0% 100%;
+    --secondary: 220 6% 14%;
+    --secondary-foreground: 220 9% 92%;
+    --muted: 220 5% 16%;
+    --muted-foreground: 220 5% 62%;
+    --accent: 220 7% 22%;
+    --accent-foreground: 220 9% 92%;
+    --success: 142 40% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 60% 48%;
+    --warning-foreground: 220 9% 92%;
+    --destructive: 0 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 6% 20%;
+    --input: 220 6% 20%;
+    --ring: 220 8% 28%;
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 92%), hsl(0 0% 100% / 0.9));
+    --gradient-subtle: linear-gradient(180deg, hsl(220 7% 8%), hsl(220 6% 12%));
+    --shadow-elegant: 0 10px 30px -10px hsl(0 0% 0% / 0.4);
+    --shadow-glow: 0 0 40px hsl(0 0% 100% / 0.06);
+    --radius: 0.75rem;
+    --sidebar-background: 220 7% 9%;
+    --sidebar-foreground: 220 9% 88%;
+    --sidebar-primary: 0 0% 92%;
+    --sidebar-primary-foreground: 220 8% 10%;
+    --sidebar-accent: 220 7% 16%;
+    --sidebar-accent-foreground: 220 9% 92%;
+    --sidebar-border: 220 6% 18%;
+    --sidebar-ring: 220 8% 28%;
+  }
+}
+
+/* Toast style similar to reference image (dark bar with accent line) */
+.modern-toast {
+  @apply border border-border bg-card text-foreground shadow-lg relative overflow-hidden;
+}
+.modern-toast::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: linear-gradient(90deg, hsl(var(--warning)) 0%, hsl(var(--success)) 50%, hsl(var(--destructive)) 100%);
+  opacity: 0.6;
+}
+
+/* Custom close button for modern toast */
+.modern-toast [data-radix-toast-close] {
+  @apply hover:bg-secondary/50 hover:scale-110 transition-all duration-200;
+}
+
+.modern-toast [data-radix-toast-close] svg {
+  @apply text-foreground/70 hover:text-foreground transition-colors duration-200;
 }
 
 @layer base {
@@ -113,5 +179,335 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+/* Modern component styles */
+@layer components {
+  .modern-card {
+    @apply bg-card border border-border rounded-lg shadow-sm transition-all duration-200 hover:shadow-md;
+  }
+
+  .modern-button {
+    @apply transition-all duration-200 ease-out transform hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .modern-input {
+    @apply transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  }
+
+  .modern-table {
+    @apply w-full border-collapse;
+  }
+
+  .modern-table th {
+    @apply bg-[hsl(var(--table-header-bg))] text-foreground font-medium text-sm px-4 py-3 text-left border-b border-border;
+  }
+
+  .modern-table td {
+    @apply px-4 py-3 border-b border-border transition-colors duration-150;
+  }
+
+  .modern-table tr:nth-child(even) {
+    @apply bg-[hsl(var(--table-row-alt))];
+  }
+
+  .modern-table tr:hover {
+    @apply bg-[hsl(var(--table-row-hover))];
+  }
+
+  .modern-toggle {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out;
+  }
+
+  .modern-toggle[data-state="checked"] {
+    @apply bg-[hsl(var(--toggle-active))];
+  }
+
+  .modern-toggle[data-state="unchecked"] {
+    @apply bg-[hsl(var(--toggle-track))];
+  }
+
+  .modern-toggle-thumb {
+    @apply pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out;
+  }
+
+  .modern-toggle[data-state="checked"] .modern-toggle-thumb {
+    @apply translate-x-5;
+  }
+
+  .modern-tab {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer;
+  }
+
+  .modern-tab[data-state="active"] {
+    @apply bg-[hsl(var(--tab-active))] text-foreground;
+  }
+
+  .modern-tab[data-state="inactive"] {
+    @apply bg-[hsl(var(--tab-inactive))] text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--tab-active))];
+  }
+
+  .modern-dropdown {
+    @apply bg-[hsl(var(--dropdown-bg))] border border-border rounded-lg shadow-[hsl(var(--dropdown-shadow))] p-2;
+  }
+
+  .modern-search {
+    @apply bg-[hsl(var(--search-bg))] border border-border rounded-lg px-3 py-2 text-sm transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary;
+  }
+
+  .modern-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-all duration-200;
+  }
+
+  .modern-badge.primary {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .modern-badge.secondary {
+    @apply bg-secondary text-secondary-foreground;
+  }
+
+  .modern-badge.success {
+    @apply bg-success text-success-foreground;
+  }
+
+  .modern-badge.warning {
+    @apply bg-warning text-warning-foreground;
+  }
+
+  .modern-badge.destructive {
+    @apply bg-destructive text-destructive-foreground;
+  }
+
+  /* Additional modern styles */
+  .modern-toast {
+    @apply bg-card border border-border shadow-md rounded-lg;
+  }
+
+  .btn-modern {
+    @apply transition-all duration-200 ease-out transform hover:scale-[1.02] active:scale-[0.98] focus:ring-2 focus:ring-primary/20;
+  }
+
+  .card-modern {
+    @apply bg-card border border-border rounded-lg shadow-sm transition-all duration-300 hover:shadow-md hover:scale-[1.01];
+  }
+
+  .input-modern {
+    @apply bg-input border border-border rounded-lg px-3 py-2 text-sm transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary focus:scale-[1.01];
+  }
+
+  .table-modern {
+    @apply w-full border-collapse;
+  }
+
+  .table-modern th {
+    @apply bg-[hsl(var(--table-header-bg))] text-foreground font-medium text-sm px-4 py-3 text-left border-b border-border transition-colors duration-150;
+  }
+
+  .table-modern td {
+    @apply px-4 py-3 border-b border-border transition-colors duration-150;
+  }
+
+  .table-modern tr:nth-child(even) {
+    @apply bg-[hsl(var(--table-row-alt))];
+  }
+
+  .table-modern tr:hover {
+    @apply bg-[hsl(var(--table-row-hover))] scale-[1.01] transition-all duration-200;
+  }
+
+  .toggle-modern {
+    @apply relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out;
+  }
+
+  .toggle-modern[data-state="checked"] {
+    @apply bg-[hsl(var(--toggle-active))];
+  }
+
+  .toggle-modern[data-state="unchecked"] {
+    @apply bg-[hsl(var(--toggle-track))];
+  }
+
+  .toggle-thumb-modern {
+    @apply pointer-events-none block h-5 w-5 rounded-full bg-white shadow-lg ring-0 transition-transform duration-200 ease-in-out;
+  }
+
+  .toggle-modern[data-state="checked"] .toggle-thumb-modern {
+    @apply translate-x-5;
+  }
+
+  .tab-modern {
+    @apply px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer;
+  }
+
+  .tab-modern[data-state="active"] {
+    @apply bg-[hsl(var(--tab-active))] text-foreground shadow-sm;
+  }
+
+  .tab-modern[data-state="inactive"] {
+    @apply bg-[hsl(var(--tab-inactive))] text-muted-foreground hover:text-foreground hover:bg-[hsl(var(--tab-active))] hover:scale-105;
+  }
+
+  .dropdown-modern {
+    @apply bg-[hsl(var(--dropdown-bg))] border border-border rounded-lg shadow-[hsl(var(--dropdown-shadow))] p-2;
+  }
+
+  .search-modern {
+    @apply bg-[hsl(var(--search-bg))] border border-border rounded-lg px-3 py-2 text-sm transition-all duration-200 focus:ring-2 focus:ring-primary/20 focus:border-primary focus:scale-[1.01];
+  }
+
+  .badge-modern {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium transition-all duration-200 hover:scale-105;
+  }
+
+  .badge-modern.primary {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  .badge-modern.secondary {
+    @apply bg-secondary text-secondary-foreground;
+  }
+
+  .badge-modern.success {
+    @apply bg-success text-success-foreground;
+  }
+
+  .badge-modern.warning {
+    @apply bg-warning text-warning-foreground;
+  }
+
+  .badge-modern.destructive {
+    @apply bg-destructive text-destructive-foreground;
+  }
+
+  /* Loading states */
+  .loading-shimmer {
+    @apply relative overflow-hidden bg-muted rounded;
+  }
+
+  .loading-shimmer::after {
+    @apply absolute inset-0 -translate-x-full;
+    content: '';
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--muted-foreground) / 0.1),
+      transparent
+    );
+    animation: shimmer 2s infinite;
+  }
+
+  /* Focus states */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary/20 focus:ring-offset-2 focus:ring-offset-background;
+  }
+
+  /* Hover effects */
+  .hover-lift {
+    @apply transition-all duration-200 hover:translate-y-[-2px] hover:shadow-md;
+  }
+
+  .hover-glow {
+    @apply transition-all duration-200 hover:shadow-glow;
+  }
+
+  /* Responsive utilities */
+  @media (max-width: 640px) {
+    .mobile-optimized {
+      @apply text-sm px-3 py-2;
+    }
+    
+    .mobile-card {
+      @apply p-4;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .tablet-optimized {
+      @apply text-base px-4 py-3;
+    }
+  }
+
+  /* Dark mode enhancements */
+  .dark .modern-card {
+    @apply bg-card/80 backdrop-blur-sm;
+  }
+
+  .dark .modern-input {
+    @apply bg-input/80 backdrop-blur-sm;
+  }
+
+  /* Animation utilities */
+  .animate-on-scroll {
+    @apply opacity-0 translate-y-4 transition-all duration-500;
+  }
+
+  .animate-on-scroll.animate-in {
+    @apply opacity-100 translate-y-0;
+  }
+
+  /* Custom scrollbar for modern browsers */
+  .modern-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) hsl(var(--muted));
+  }
+
+  .modern-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .modern-scrollbar::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  .modern-scrollbar::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    transition: background-color 0.2s ease;
+  }
+
+  .modern-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+
+  /* Print styles */
+  @media print {
+    .modern-card {
+      @apply shadow-none border border-border;
+    }
+    
+    .modern-button {
+      @apply hidden;
+    }
   }
 }

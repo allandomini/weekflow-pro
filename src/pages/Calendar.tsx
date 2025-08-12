@@ -21,14 +21,19 @@ import {
   isSameDay,
   isSameMonth,
   addMonths,
-  subMonths
+  subMonths,
+  addWeeks,
+  subWeeks,
+  addDays,
+  addYears
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Task } from "@/types";
 
 export default function Calendar() {
   const { tasks, projects, addTask, updateTask, deleteTask } = useApp();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
+  const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -38,17 +43,20 @@ export default function Calendar() {
     projectId: "",
     startTime: "",
     endTime: "",
-    isRoutine: false
+    isRoutine: false,
+    repeatUnit: "day" as "day" | "week" | "month" | "year",
+    repeatCount: 7,
+    repeatAlways: false,
   });
 
   // Calendário semanal
-  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
   // Calendário mensal
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
+  const monthStart = startOfMonth(currentMonthDate);
+  const monthEnd = endOfMonth(currentMonthDate);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const weeks = eachWeekOfInterval({ start: calendarStart, end: calendarEnd });
@@ -74,7 +82,10 @@ export default function Calendar() {
       projectId: "",
       startTime: "",
       endTime: "",
-      isRoutine: false
+      isRoutine: false,
+      repeatUnit: "day",
+      repeatCount: 7,
+      repeatAlways: false,
     });
     setIsTaskDialogOpen(true);
   };
@@ -87,7 +98,10 @@ export default function Calendar() {
       projectId: task.projectId || "",
       startTime: task.startTime || "",
       endTime: task.endTime || "",
-      isRoutine: task.isRoutine
+      isRoutine: task.isRoutine,
+      repeatUnit: "day",
+      repeatCount: 7,
+      repeatAlways: false,
     });
     setIsTaskDialogOpen(true);
   };
@@ -109,7 +123,40 @@ export default function Calendar() {
     if (editingTask) {
       updateTask(editingTask.id, taskData);
     } else {
-      addTask(taskData);
+      if (!taskForm.isRoutine) {
+        addTask(taskData);
+      } else {
+        const baseDate = selectedDate || new Date();
+        const getOccurrences = () => {
+          if (taskForm.repeatAlways) {
+            switch (taskForm.repeatUnit) {
+              case "day":
+                return 60; // próximos 60 dias
+              case "week":
+                return 26; // próximas 26 semanas (~6 meses)
+              case "month":
+                return 12; // próximos 12 meses
+              case "year":
+                return 5; // próximos 5 anos
+              default:
+                return 12;
+            }
+          }
+          return Math.max(1, Number(taskForm.repeatCount) || 1);
+        };
+
+        const occurrences = getOccurrences();
+        for (let i = 0; i < occurrences; i++) {
+          let date = baseDate;
+          if (i > 0) {
+            if (taskForm.repeatUnit === "day") date = addDays(baseDate, i);
+            if (taskForm.repeatUnit === "week") date = addWeeks(baseDate, i);
+            if (taskForm.repeatUnit === "month") date = addMonths(baseDate, i);
+            if (taskForm.repeatUnit === "year") date = addYears(baseDate, i);
+          }
+          addTask({ ...taskData, date });
+        }
+      }
     }
 
     setIsTaskDialogOpen(false);
@@ -146,13 +193,33 @@ export default function Calendar() {
         {/* Calendário Semanal */}
         <Card className="shadow-elegant">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="w-5 h-5 text-primary" />
-              Visão Semanal
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {format(weekStart, "d MMM", { locale: ptBR })} - {format(weekEnd, "d MMM yyyy", { locale: ptBR })}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarDays className="w-5 h-5 text-primary" />
+                  Visão Semanal
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {format(weekStart, "d MMM", { locale: ptBR })} - {format(weekEnd, "d MMM yyyy", { locale: ptBR })}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentWeekDate(prev => subWeeks(prev, 1))}
+                >
+                  ←
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCurrentWeekDate(prev => addWeeks(prev, 1))}
+                >
+                  →
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-7 gap-2">
@@ -223,21 +290,21 @@ export default function Calendar() {
                   Visão Mensal
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {format(currentDate, "MMMM yyyy", { locale: ptBR })}
+                   {format(currentMonthDate, "MMMM yyyy", { locale: ptBR })}
                 </p>
               </div>
               <div className="flex gap-2">
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+                  onClick={() => setCurrentMonthDate(prev => subMonths(prev, 1))}
                 >
                   ←
                 </Button>
                 <Button 
                   variant="outline" 
                   size="sm"
-                  onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+                  onClick={() => setCurrentMonthDate(prev => addMonths(prev, 1))}
                 >
                   →
                 </Button>
@@ -253,49 +320,43 @@ export default function Calendar() {
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
-              {weeks.map((week) => 
-                eachDayOfInterval({ start: week, end: endOfWeek(week, { weekStartsOn: 1 }) })
-                  .map((day) => {
-                    const dayTasks = getTasksForDay(day);
-                    const isToday = isSameDay(day, new Date());
-                    const isCurrentMonth = isSameMonth(day, currentDate);
-                    const isSelected = selectedDate && isSameDay(day, selectedDate);
-                    
-                    return (
-                      <div 
-                        key={day.toISOString()}
-                        onClick={() => handleDateClick(day)}
-                        className={`p-2 rounded cursor-pointer transition-all min-h-[60px] ${
-                          isSelected 
-                            ? 'bg-accent border border-accent-foreground' 
-                            : isToday 
-                              ? 'bg-primary text-primary-foreground' 
-                              : isCurrentMonth 
-                                ? 'bg-card hover:bg-accent/50' 
-                                : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        <div className={`text-sm font-medium ${
-                          isToday ? 'text-primary-foreground' : 
-                          isCurrentMonth ? 'text-foreground' : 'text-muted-foreground'
-                        }`}>
-                          {format(day, 'd')}
-                        </div>
-                        {dayTasks.length > 0 && (
-                          <div className="mt-1">
-                            <div className={`w-2 h-2 rounded-full ${
-                              dayTasks.some(t => !t.completed) ? 'bg-warning' : 'bg-success'
-                            }`} />
-                          </div>
-                        )}
+              {eachDayOfInterval({ start: monthStart, end: monthEnd }).map((day) => {
+                const dayTasks = getTasksForDay(day);
+                const isToday = isSameDay(day, new Date());
+                const isSelected = selectedDate && isSameDay(day, selectedDate);
+                
+                return (
+                  <div 
+                    key={day.toISOString()}
+                    onClick={() => handleDateClick(day)}
+                    className={`p-2 rounded cursor-pointer transition-all min-h-[60px] ${
+                      isSelected 
+                        ? 'bg-accent border border-accent-foreground' 
+                        : isToday 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-card hover:bg-accent/50'
+                    }`}
+                  >
+                    <div className={`text-sm font-medium ${
+                      isToday ? 'text-primary-foreground' : 'text-foreground'
+                    }`}>
+                      {format(day, 'd')}
+                    </div>
+                    {dayTasks.length > 0 && (
+                      <div className="mt-1">
+                        <div className={`w-2 h-2 rounded-full ${
+                          dayTasks.some(t => !t.completed) ? 'bg-warning' : 'bg-success'
+                        }`} />
                       </div>
-                    );
-                  })
-              )}
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
       </div>
+      
 
       {/* Tarefas do Dia Selecionado */}
       {selectedDate && (
@@ -457,6 +518,45 @@ export default function Calendar() {
               />
               <Label htmlFor="isRoutine">Tarefa de rotina</Label>
             </div>
+            {taskForm.isRoutine && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="block mb-1">Frequência</Label>
+                  <Select
+                    value={taskForm.repeatUnit}
+                    onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="day">Dia</SelectItem>
+                      <SelectItem value="week">Semana</SelectItem>
+                      <SelectItem value="month">Mês</SelectItem>
+                      <SelectItem value="year">Ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="block mb-1">Quantidade</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={taskForm.repeatCount}
+                    onChange={(e) => setTaskForm(prev => ({ ...prev, repeatCount: Number(e.target.value) }))}
+                    disabled={taskForm.repeatAlways}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox
+                    id="repeatAlways"
+                    checked={taskForm.repeatAlways}
+                    onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
+                  />
+                  <Label htmlFor="repeatAlways">Sempre</Label>
+                </div>
+              </div>
+            )}
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveTask} className="flex-1">
                 {editingTask ? 'Salvar Alterações' : 'Criar Tarefa'}
