@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,13 +9,23 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock } from "lucide-react";
+import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock, Sparkles, TrendingUp, AlertCircle, CheckCircle, Calendar, Zap } from "lucide-react";
 import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addDays, addMonths, addYears } from "date-fns";
 import { Task } from "@/types";
 import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, addTask, updateTask, deleteTask } = useApp();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useApp();
+
+  // Stephany's AI Recommendations
+  const [recommendations, setRecommendations] = useState<Array<{
+    id: string;
+    title: string;
+    description: string;
+    type: 'productivity' | 'finance' | 'tasks' | 'projects';
+    priority: 'high' | 'medium' | 'low';
+    action?: string;
+  }>>([]);
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -41,6 +51,109 @@ export default function Dashboard() {
   const todayTasks = tasks.filter(task => isToday(task.date));
   const completedToday = todayTasks.filter(task => task.completed);
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+
+  const generateStephanyRecommendations = () => {
+    const newRecommendations = [];
+    
+    // Task analysis
+    const overdueTasks = tasks.filter(task => 
+      !task.completed && new Date(task.date) < new Date()
+    );
+    
+    if (overdueTasks.length > 0) {
+      newRecommendations.push({
+        id: 'overdue-tasks',
+        title: `📅 ${overdueTasks.length} tarefas em atraso`,
+        description: 'Stephany sugere priorizar essas tarefas para melhorar sua produtividade.',
+        type: 'tasks' as const,
+        priority: 'high' as const,
+        action: 'Revisar agora'
+      });
+    }
+
+    // Productivity insights
+    const completionRate = tasks.length > 0 ? (tasks.filter(t => t.completed).length / tasks.length * 100).toFixed(0) : 0;
+    if (Number(completionRate) < 70) {
+      newRecommendations.push({
+        id: 'low-completion',
+        title: `📊 Taxa de conclusão: ${completionRate}%`,
+        description: 'Stephany recomenda quebrar tarefas grandes em menores para aumentar a produtividade.',
+        type: 'productivity' as const,
+        priority: 'medium' as const,
+        action: 'Ver dicas'
+      });
+    }
+
+    // Financial insights
+    const expenses = transactions.filter(t => t.type === 'withdrawal');
+    const lastWeekExpenses = expenses.filter(t => 
+      new Date(t.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    );
+    
+    if (lastWeekExpenses.length > 15) {
+      newRecommendations.push({
+        id: 'high-spending',
+        title: `💰 ${lastWeekExpenses.length} gastos esta semana`,
+        description: 'Stephany identificou um padrão de gastos elevado. Considere revisar seu orçamento.',
+        type: 'finance' as const,
+        priority: 'medium' as const,
+        action: 'Analisar gastos'
+      });
+    }
+
+    // Project insights
+    const projectsWithoutTasks = projects.filter(project => 
+      !tasks.some(task => task.projectId === project.id)
+    );
+    
+    if (projectsWithoutTasks.length > 0) {
+      newRecommendations.push({
+        id: 'empty-projects',
+        title: `🚀 ${projectsWithoutTasks.length} projetos precisam de tarefas`,
+        description: 'Stephany sugere adicionar tarefas ou arquivar projetos inativos.',
+        type: 'projects' as const,
+        priority: 'low' as const,
+        action: 'Organizar'
+      });
+    }
+
+    // Motivation boost
+    if (completedToday.length > 3) {
+      newRecommendations.push({
+        id: 'great-day',
+        title: `🎉 Excelente produtividade hoje!`,
+        description: `Stephany parabeniza: você completou ${completedToday.length} tarefas hoje. Continue assim!`,
+        type: 'productivity' as const,
+        priority: 'low' as const,
+        action: 'Celebrar'
+      });
+    }
+
+    setRecommendations(newRecommendations.slice(0, 4)); // Mostra no máximo 4 recomendações
+  };
+
+  useEffect(() => {
+    generateStephanyRecommendations();
+  }, [tasks, projects, transactions, completedToday.length]);
+
+  const getRecommendationIcon = (type: string) => {
+    switch (type) {
+      case 'productivity': return <TrendingUp className="w-4 h-4" />;
+      case 'finance': return <DollarSign className="w-4 h-4" />;
+      case 'tasks': return <CheckSquare className="w-4 h-4" />;
+      case 'projects': return <Calendar className="w-4 h-4" />;
+      default: return <Sparkles className="w-4 h-4" />;
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200';
+      case 'medium': return 'border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200';
+      case 'low': return 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200';
+      default: return 'border-gray-200 bg-gray-50 text-gray-800 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200';
+    }
+  };
 
   const getTasksForDay = (day: Date) => {
     return tasks.filter(task => 
@@ -157,6 +270,51 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
+      {/* Stephany's AI Recommendations */}
+      {recommendations.length > 0 && (
+        <Card className="modern-card animate-fade-in-up bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-2 border-purple-200 dark:border-purple-800">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Sparkles className="w-6 h-6 text-purple-600 animate-pulse" />
+              Recomendações da Stephany
+              <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                IA
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {recommendations.map((rec, index) => (
+                <div
+                  key={rec.id}
+                  className={`p-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] hover:shadow-md ${getPriorityColor(rec.priority)}`}
+                  style={{ animationDelay: `${index * 100}ms` }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 p-2 rounded-full bg-white/50 dark:bg-black/20">
+                      {getRecommendationIcon(rec.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-semibold text-sm mb-1">{rec.title}</h4>
+                      <p className="text-xs opacity-90 mb-3">{rec.description}</p>
+                      {rec.action && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs h-7 border-current hover:bg-white/20 dark:hover:bg-black/20"
+                        >
+                          {rec.action}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-left">
         <div>
