@@ -3,8 +3,11 @@ import {
   Project, Task, Note, TodoList, Account, Transaction, 
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
-  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings
+  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings,
+  Activity, Routine, RoutineCompletion
 } from '@/types';
+
+// Activity type moved to src/types
 
 interface AppContextType {
   // Projects
@@ -39,6 +42,8 @@ interface AppContextType {
   receivables: Receivable[];
   addAccount: (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => void;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => void;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => void;
+  deleteTransaction: (id: string) => void;
   addDebt: (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => void;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
@@ -51,6 +56,21 @@ interface AppContextType {
   updateReceivable: (id: string, updates: Partial<Receivable>) => void;
   deleteReceivable: (id: string) => void;
   receiveReceivable: (receivableId: string, accountId: string) => void;
+
+  // Routines
+  routines: Routine[];
+  routineCompletions: Record<string, Record<string, RoutineCompletion>>; // date -> routineId -> completion
+  addRoutine: (routine: Omit<Routine, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'exceptions'>) => void;
+  updateRoutine: (id: string, updates: Partial<Routine>) => void;
+  softDeleteRoutine: (id: string) => void;
+  hardDeleteRoutine: (id: string) => void;
+  completeRoutineOnce: (routineId: string, date?: string) => void;
+  skipRoutineDay: (routineId: string, date?: string) => void;
+  skipRoutineBetween: (routineId: string, startDate: string, endDate: string) => void;
+  setRoutineException: (routineId: string, date: string, ex: { skip?: boolean; overrideTimesPerDay?: number }) => void;
+  pauseRoutineUntil: (routineId: string, untilDate: string) => void;
+  setRoutineActiveTo: (routineId: string, endDate: string) => void;
+  getRoutineProgress: (routineId: string, date?: string) => { count: number; goal: number; skipped: boolean; paused: boolean };
 
   // Network
   contacts: Contact[];
@@ -105,6 +125,13 @@ interface AppContextType {
   // AI / Assistant
   aiSettings: AISettings;
   updateAISettings: (settings: Partial<AISettings>) => void;
+
+  // Activity log
+  activities: Activity[];
+  logActivity: (activity: Omit<Activity, 'id' | 'at' | 'actor'>) => void;
+  actorName: string;
+  updateActorName: (name: string) => void;
+  clearActivities: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -119,6 +146,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [debts, setDebts] = useState<Debt[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [receivables, setReceivables] = useState<Receivable[]>([]);
+  const [routines, setRoutines] = useState<Routine[]>([]);
+  const [routineCompletions, setRoutineCompletions] = useState<Record<string, Record<string, RoutineCompletion>>>({});
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactGroups, setContactGroups] = useState<ContactGroup[]>([]);
   const [projectImages, setProjectImages] = useState<ProjectImage[]>([]);
@@ -136,6 +165,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     autoStartWork: true,
     soundEnabled: true,
   });
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [actorName, setActorName] = useState<string>(() => localStorage.getItem('actorName') || 'Você');
   const [aiSettings, setAISettings] = useState<AISettings>({
     enabled: true,
     deepAnalysis: true,
@@ -145,7 +176,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // Load data from localStorage on mount
   useEffect(() => {
-    const savedProjects = localStorage.getItem('projects');
+    const savedProjects = localStorage.getItem('weekflow_projects');
     const savedTasks = localStorage.getItem('tasks');
     const savedNotes = localStorage.getItem('notes');
     const savedTodoLists = localStorage.getItem('todoLists');
@@ -153,7 +184,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedTransactions = localStorage.getItem('transactions');
     const savedDebts = localStorage.getItem('debts');
     const savedGoals = localStorage.getItem('goals');
-    const savedReceivables = localStorage.getItem('receivables');
+    const savedReceivables = localStorage.getItem('weekflow_receivables');
     const savedContacts = localStorage.getItem('contacts');
     const savedContactGroups = localStorage.getItem('contactGroups');
     const savedProjectImages = localStorage.getItem('projectImages');
@@ -164,6 +195,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedPomodoroSessions = localStorage.getItem('pomodoroSessions');
     const savedPomodoroSettings = localStorage.getItem('pomodoroSettings');
     const savedAISettings = localStorage.getItem('aiSettings');
+    const savedActivities = localStorage.getItem('activities');
+    const savedActorName = localStorage.getItem('actorName');
+    const savedRoutines = localStorage.getItem('weekflow_routines');
+    const savedRoutineCompletions = localStorage.getItem('weekflow_routine_completions');
 
     if (savedProjects) setProjects(JSON.parse(savedProjects, (key, value) => {
       if (key.includes('Date') || key.includes('At')) return new Date(value);
@@ -189,6 +224,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (key === 'date' || key.includes('Date') || key.includes('At')) return new Date(value);
       return value;
     }));
+    if (savedActivities) setActivities(JSON.parse(savedActivities, (key, value) => {
+      if (key === 'at') return new Date(value);
+      return value;
+    }));
+    if (savedActorName) setActorName(savedActorName);
     if (savedDebts) setDebts(JSON.parse(savedDebts, (key, value) => {
       if (key.includes('Date') || key.includes('At')) return new Date(value);
       return value;
@@ -235,11 +275,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }));
     if (savedPomodoroSettings) setPomodoroSettings(JSON.parse(savedPomodoroSettings));
     if (savedAISettings) setAISettings(JSON.parse(savedAISettings));
+    if (savedRoutines) setRoutines(JSON.parse(savedRoutines, (key, value) => {
+      if (key === 'createdAt' || key === 'updatedAt') return new Date(value);
+      return value;
+    }));
+    if (savedRoutineCompletions) setRoutineCompletions(JSON.parse(savedRoutineCompletions));
   }, []);
 
   // Save to localStorage whenever data changes
   useEffect(() => {
-    localStorage.setItem('projects', JSON.stringify(projects));
+    localStorage.setItem('weekflow_projects', JSON.stringify(projects));
   }, [projects]);
 
   useEffect(() => {
@@ -271,7 +316,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [goals]);
 
   useEffect(() => {
-    localStorage.setItem('receivables', JSON.stringify(receivables));
+    localStorage.setItem('weekflow_receivables', JSON.stringify(receivables));
   }, [receivables]);
 
   useEffect(() => {
@@ -315,7 +360,162 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem('aiSettings', JSON.stringify(aiSettings));
   }, [aiSettings]);
 
+  // Persist Activities (activity log)
+  useEffect(() => {
+    localStorage.setItem('activities', JSON.stringify(activities));
+  }, [activities]);
+
+  // Persist actor name
+  useEffect(() => {
+    localStorage.setItem('actorName', actorName);
+  }, [actorName]);
+
+  // Persist routines
+  useEffect(() => {
+    localStorage.setItem('weekflow_routines', JSON.stringify(routines));
+  }, [routines]);
+  useEffect(() => {
+    localStorage.setItem('weekflow_routine_completions', JSON.stringify(routineCompletions));
+  }, [routineCompletions]);
+
   const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
+ 
+  // --------- Routine helpers (AppProvider scope) ---------
+  const formatDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const isPausedOn = (routine: Routine, dateStr: string) => {
+    if (!routine.pausedUntil) return false;
+    return routine.pausedUntil >= dateStr; // compare yyyy-MM-dd strings
+  };
+
+  const effectiveGoal = (routine: Routine, dateStr: string) => {
+    const ex = routine.exceptions?.[dateStr];
+    return ex?.overrideTimesPerDay ?? routine.timesPerDay;
+  };
+
+  const addRoutine = (routine: Omit<Routine, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'exceptions'>) => {
+    const newRoutine: Routine = {
+      ...routine,
+      id: generateId(),
+      deletedAt: null,
+      exceptions: {},
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    setRoutines(prev => [...prev, newRoutine]);
+    logActivity({ action: 'routine_added', entity: { type: 'routine', id: newRoutine.id, label: newRoutine.name } });
+  };
+
+  const updateRoutine = (id: string, updates: Partial<Routine>) => {
+    setRoutines(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r));
+    logActivity({ action: 'routine_updated', entity: { type: 'routine', id }, meta: { updates } });
+  };
+
+  const softDeleteRoutine = (id: string) => {
+    setRoutines(prev => prev.map(r => r.id === id ? { ...r, deletedAt: formatDate(new Date()), updatedAt: new Date() } : r));
+    logActivity({ action: 'routine_deleted', entity: { type: 'routine', id }, meta: { mode: 'soft' } });
+  };
+
+  const hardDeleteRoutine = (id: string) => {
+    setRoutines(prev => prev.filter(r => r.id !== id));
+    setRoutineCompletions(prev => {
+      const next: typeof prev = {};
+      for (const date of Object.keys(prev)) {
+        const map = { ...prev[date] };
+        delete map[id];
+        if (Object.keys(map).length) next[date] = map;
+      }
+      return next;
+    });
+    logActivity({ action: 'routine_deleted', entity: { type: 'routine', id }, meta: { mode: 'hard' } });
+  };
+
+  const setRoutineException = (routineId: string, date: string, ex: { skip?: boolean; overrideTimesPerDay?: number }) => {
+    setRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      const exceptions = { ...(r.exceptions || {}) };
+      exceptions[date] = { ...(exceptions[date] || {}), ...ex };
+      return { ...r, exceptions, updatedAt: new Date() };
+    }));
+  };
+
+  const skipRoutineDay = (routineId: string, date?: string) => {
+    const d = date || formatDate(new Date());
+    setRoutineException(routineId, d, { skip: true });
+    logActivity({ action: 'routine_skipped', entity: { type: 'routine', id: routineId }, meta: { date: d } });
+  };
+
+  const skipRoutineBetween = (routineId: string, startDate: string, endDate: string) => {
+    // Iterate inclusive from startDate to endDate (both yyyy-MM-dd)
+    const start = new Date(`${startDate}T00:00:00`);
+    const end = new Date(`${endDate}T00:00:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return;
+    const forward = start.getTime() <= end.getTime();
+    const from = forward ? start : end;
+    const to = forward ? end : start;
+    const dates: string[] = [];
+    const cur = new Date(from);
+    while (cur.getTime() <= to.getTime()) {
+      dates.push(formatDate(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    setRoutines(prev => prev.map(r => {
+      if (r.id !== routineId) return r;
+      const exceptions = { ...(r.exceptions || {}) } as NonNullable<Routine['exceptions']>;
+      for (const d of dates) {
+        exceptions[d] = { ...(exceptions[d] || {}), skip: true };
+      }
+      return { ...r, exceptions, updatedAt: new Date() };
+    }));
+    logActivity({ action: 'routine_skipped', entity: { type: 'routine', id: routineId }, meta: { startDate, endDate, mode: 'range' } });
+  };
+
+  const pauseRoutineUntil = (routineId: string, untilDate: string) => {
+    updateRoutine(routineId, { pausedUntil: untilDate });
+    logActivity({ action: 'routine_paused', entity: { type: 'routine', id: routineId }, meta: { untilDate } });
+  };
+
+  const setRoutineActiveTo = (routineId: string, endDate: string) => {
+    updateRoutine(routineId, { activeTo: endDate });
+  };
+
+  const getRoutineProgress = (routineId: string, date?: string) => {
+    const d = date || formatDate(new Date());
+    const routine = routines.find(r => r.id === routineId);
+    if (!routine) return { count: 0, goal: 0, skipped: false, paused: false };
+    const skipped = !!routine.exceptions?.[d]?.skip;
+    const paused = isPausedOn(routine, d);
+    const goal = effectiveGoal(routine, d);
+    const count = routineCompletions[d]?.[routineId]?.count || 0;
+    return { count, goal, skipped, paused };
+  };
+
+  const completeRoutineOnce = (routineId: string, date?: string) => {
+    const d = date || formatDate(new Date());
+    const routine = routines.find(r => r.id === routineId);
+    if (!routine) return;
+    if (isPausedOn(routine, d)) return;
+    if (routine.exceptions?.[d]?.skip) return;
+    const goal = effectiveGoal(routine, d);
+
+    setRoutineCompletions(prev => {
+      const dayMap = { ...(prev[d] || {}) };
+      const existing = dayMap[routineId] || { routineId, date: d, count: 0, timestamps: [] as string[] };
+      if (existing.count >= goal) return prev; // already complete
+      const next: RoutineCompletion = {
+        ...existing,
+        count: existing.count + 1,
+        timestamps: [...(existing.timestamps || []), new Date().toISOString()]
+      };
+      return { ...prev, [d]: { ...dayMap, [routineId]: next } };
+    });
+    logActivity({ action: 'routine_completed', entity: { type: 'routine', id: routineId }, meta: { date: d } });
+  };
 
   // Project methods
   const addProject = (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -326,12 +526,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
     };
     setProjects(prev => [...prev, newProject]);
+    logActivity({ action: 'project_added', entity: { type: 'project', id: newProject.id, label: newProject.name } });
   };
 
   const updateProject = (id: string, updates: Partial<Project>) => {
     setProjects(prev => prev.map(project => 
       project.id === id ? { ...project, ...updates, updatedAt: new Date() } : project
     ));
+    logActivity({ action: 'project_updated', entity: { type: 'project', id, label: updates.name } });
   };
 
   const deleteProject = (id: string) => {
@@ -342,6 +544,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setTodoLists(prev => prev.filter(list => list.projectId !== id));
     setProjectImages(prev => prev.filter(img => img.projectId !== id));
     setProjectWalletEntries(prev => prev.filter(e => e.projectId !== id));
+    logActivity({ action: 'project_deleted', entity: { type: 'project', id } });
   };
 
   // Check for overdue tasks and move them to today
@@ -400,16 +603,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
     };
     setTasks(prev => [...prev, newTask]);
+
+    // log
+    logActivity({
+      action: 'task_created',
+      entity: { type: 'task', id: newTask.id, label: newTask.title },
+      meta: { date: newTask.date }
+    });
   };
 
   const updateTask = (id: string, updates: Partial<Task>) => {
-    setTasks(prev => prev.map(task => 
-      task.id === id ? { ...task, ...updates, updatedAt: new Date() } : task
-    ));
+    setTasks(prev => {
+      const existing = prev.find(t => t.id === id);
+      const next = prev.map(task => 
+        task.id === id ? { ...task, ...updates, updatedAt: new Date() } : task
+      );
+      // log completion toggle
+      if (existing && typeof updates.completed === 'boolean' && updates.completed !== existing.completed) {
+        logActivity({
+          action: updates.completed ? 'task_completed' : 'task_uncompleted',
+          entity: { type: 'task', id: existing.id, label: existing.title },
+          meta: { date: existing.date }
+        });
+      }
+      return next;
+    });
   };
 
   const deleteTask = (id: string) => {
     setTasks(prev => prev.filter(task => task.id !== id));
+    // log
+    logActivity({ action: 'task_deleted', entity: { type: 'task', id } });
   };
 
   // Note methods
@@ -421,16 +645,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
     };
     setNotes(prev => [...prev, newNote]);
+    logActivity({ action: 'note_added', entity: { type: 'project', id: newNote.projectId || '', label: newNote.title }, meta: { noteId: newNote.id } });
   };
 
   const updateNote = (id: string, updates: Partial<Note>) => {
-    setNotes(prev => prev.map(note => 
-      note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note
-    ));
+    setNotes(prev => prev.map(note => note.id === id ? { ...note, ...updates, updatedAt: new Date() } : note));
+    logActivity({ action: 'note_updated', entity: { type: 'project', id: updates.projectId || '', label: updates.title } , meta: { noteId: id } });
   };
 
   const deleteNote = (id: string) => {
     setNotes(prev => prev.filter(note => note.id !== id));
+    logActivity({ action: 'note_deleted', meta: { noteId: id } });
   };
 
   // TodoList methods
@@ -481,7 +706,89 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return account;
     }));
+
+    // log
+    logActivity({
+      action: 'transaction_added',
+      entity: { type: 'transaction', id: newTransaction.id, label: newTransaction.description },
+      meta: { amount: newTransaction.amount, type: newTransaction.type, accountId: newTransaction.accountId }
+    });
   };
+
+  const updateTransaction = (id: string, updates: Partial<Transaction>) => {
+    setTransactions(prev => {
+      const existing = prev.find(t => t.id === id);
+      if (!existing) return prev;
+
+      const updated: Transaction = { ...existing, ...updates };
+
+      // If anything that impacts balance changed, adjust accounts accordingly
+      const accountChanged = updates.accountId && updates.accountId !== existing.accountId;
+      const typeChanged = typeof updates.type !== 'undefined' && updates.type !== existing.type;
+      const amountChanged = typeof updates.amount !== 'undefined' && updates.amount !== existing.amount;
+
+      if (accountChanged || typeChanged || amountChanged) {
+        // Revert old effect from old account
+        setAccounts(prevAcc => prevAcc.map(acc => {
+          if (acc.id === existing.accountId) {
+            const revertChange = existing.type === 'deposit' ? -existing.amount : existing.amount;
+            return { ...acc, balance: acc.balance + revertChange, updatedAt: new Date() };
+          }
+          return acc;
+        }));
+
+        // Apply new effect to new account
+        setAccounts(prevAcc => prevAcc.map(acc => {
+          if (acc.id === (updates.accountId || existing.accountId)) {
+            const newType = updates.type || existing.type;
+            const newAmount = typeof updates.amount === 'number' ? updates.amount : existing.amount;
+            const applyChange = newType === 'deposit' ? newAmount : -newAmount;
+            return { ...acc, balance: acc.balance + applyChange, updatedAt: new Date() };
+          }
+          return acc;
+        }));
+      }
+
+      const result = prev.map(t => t.id === id ? updated : t);
+
+      // log
+      logActivity({
+        action: 'transaction_updated',
+        entity: { type: 'transaction', id, label: updated.description },
+        meta: { amount: updated.amount, type: updated.type, accountId: updated.accountId }
+      });
+      return result;
+    });
+  };
+
+  const deleteTransaction = (id: string) => {
+    setTransactions(prev => {
+      const existing = prev.find(t => t.id === id);
+      if (!existing) return prev;
+
+      // Revert the transaction effect from the account
+      setAccounts(prevAcc => prevAcc.map(acc => {
+        if (acc.id === existing.accountId) {
+          const revertChange = existing.type === 'deposit' ? -existing.amount : existing.amount;
+          return { ...acc, balance: acc.balance + revertChange, updatedAt: new Date() };
+        }
+        return acc;
+      }));
+
+      const result = prev.filter(t => t.id !== id);
+      // log
+      logActivity({ action: 'transaction_deleted', entity: { type: 'transaction', id: existing.id, label: existing.description } });
+      return result;
+    });
+  };
+
+  // Activity methods
+  const logActivity = (activity: Omit<Activity, 'id' | 'at' | 'actor'>) => {
+    const entry: Activity = { id: generateId(), at: new Date(), actor: actorName, ...activity };
+    setActivities(prev => [entry, ...prev].slice(0, 200)); // keep last 200
+  };
+
+  const clearActivities = () => setActivities([]);
 
   const addReceivable = (receivable: Omit<Receivable, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'receivedAt'>) => {
     const newReceivable: Receivable = {
@@ -492,14 +799,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
     };
     setReceivables(prev => [...prev, newReceivable]);
+    logActivity({ action: 'receivable_added', entity: { type: 'project', id: newReceivable.projectId || '', label: newReceivable.name }, meta: { receivableId: newReceivable.id, amount: newReceivable.amount } });
   };
 
   const updateReceivable = (id: string, updates: Partial<Receivable>) => {
     setReceivables(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r));
+    logActivity({ action: 'receivable_updated', meta: { receivableId: id, updates } });
   };
 
   const deleteReceivable = (id: string) => {
     setReceivables(prev => prev.filter(r => r.id !== id));
+    logActivity({ action: 'receivable_deleted', meta: { receivableId: id } });
   };
 
   const receiveReceivable = (receivableId: string, accountId: string) => {
@@ -517,6 +827,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       description: `Recebimento: ${receivable.name}`,
       date: new Date(),
     });
+    logActivity({ action: 'receivable_received', meta: { receivableId, accountId, amount: receivable.amount } });
   };
 
   const addDebt = (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -617,16 +928,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: new Date(),
     };
     setContacts(prev => [...prev, newContact]);
+    logActivity({ action: 'contact_added', entity: { type: 'contact', id: newContact.id, label: newContact.name } });
   };
 
   const updateContact = (id: string, updates: Partial<Contact>) => {
     setContacts(prev => prev.map(contact => 
       contact.id === id ? { ...contact, ...updates, updatedAt: new Date() } : contact
     ));
+    logActivity({ action: 'contact_updated', entity: { type: 'contact', id, label: updates.name } });
   };
 
   const deleteContact = (id: string) => {
     setContacts(prev => prev.filter(contact => contact.id !== id));
+    logActivity({ action: 'contact_deleted', entity: { type: 'contact', id } });
   };
 
   const addContactGroup = (group: Omit<ContactGroup, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -905,6 +1219,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     receivables,
     addAccount,
     addTransaction,
+    updateTransaction,
+    deleteTransaction,
     addDebt,
     addGoal,
     updateAccount,
@@ -917,6 +1233,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateReceivable,
     deleteReceivable,
     receiveReceivable,
+
+    // Routines
+    routines,
+    routineCompletions,
+    addRoutine,
+    updateRoutine,
+    softDeleteRoutine,
+    hardDeleteRoutine,
+    completeRoutineOnce,
+    skipRoutineDay,
+    skipRoutineBetween,
+    setRoutineException,
+    pauseRoutineUntil,
+    setRoutineActiveTo,
+    getRoutineProgress,
     contacts,
     contactGroups,
     addContact,
@@ -961,6 +1292,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // AI
     aiSettings,
     updateAISettings,
+
+    // Activity
+    activities,
+    logActivity,
+    actorName,
+    updateActorName: setActorName,
+    clearActivities,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

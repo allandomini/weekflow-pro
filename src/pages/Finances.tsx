@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -22,11 +23,14 @@ import {
   Calendar,
   BadgeDollarSign,
   CheckCircle2,
-  Clock
+  Clock,
+  Pencil,
+  Trash2,
+  MoreVertical
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Account, Debt, Goal, Receivable, Project } from "@/types";
+import { Account, Debt, Goal, Receivable, Project, Transaction } from "@/types";
 
 export default function Finances() {
   const { 
@@ -38,6 +42,8 @@ export default function Finances() {
     projects,
     addAccount, 
     addTransaction, 
+    updateTransaction,
+    deleteTransaction,
     addDebt, 
     addGoal,
     updateAccount,
@@ -57,6 +63,7 @@ export default function Finances() {
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [isTransactionDialogOpen, setIsTransactionDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [isDebtDialogOpen, setIsDebtDialogOpen] = useState(false);
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [isReceivableDialogOpen, setIsReceivableDialogOpen] = useState(false);
@@ -168,6 +175,49 @@ export default function Finances() {
 
     setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
     setIsTransactionDialogOpen(false);
+  };
+
+  const handleSaveTransaction = () => {
+    if (!editingTransaction) return;
+    if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) return;
+
+    updateTransaction(editingTransaction.id, {
+      accountId: transactionForm.accountId,
+      type: transactionForm.type,
+      amount: parseFloat(transactionForm.amount),
+      description: `${transactionForm.description}${transactionForm.category ? ` • ${transactionForm.category}` : ""}`,
+    });
+
+    setEditingTransaction(null);
+    setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
+    setIsTransactionDialogOpen(false);
+  };
+
+  const openEditTransaction = (t: Transaction) => {
+    setEditingTransaction(t);
+    // Try to parse category from description suffix " • <cat>"
+    let baseDesc = t.description;
+    let cat = "general";
+    const marker = " • ";
+    const idx = t.description.lastIndexOf(marker);
+    if (idx !== -1) {
+      baseDesc = t.description.substring(0, idx);
+      cat = t.description.substring(idx + marker.length) || "general";
+    }
+    setTransactionForm({
+      accountId: t.accountId,
+      type: t.type as "deposit" | "withdrawal",
+      amount: String(t.amount),
+      description: baseDesc,
+      category: cat,
+    });
+    setIsTransactionDialogOpen(true);
+  };
+
+  const handleDeleteTransaction = (id: string) => {
+    if (confirm("Tem certeza que deseja excluir esta transação?")) {
+      deleteTransaction(id);
+    }
   };
 
   const handleCreateDebt = () => {
@@ -422,28 +472,45 @@ export default function Finances() {
                       </h4>
                       <div className="space-y-2">
                         {getAccountTransactions(account.id).map((transaction) => (
-                          <div key={transaction.id} className="flex items-center justify-between py-2 border-b border-border">
-                            <div className="flex items-center gap-2">
-                              {transaction.type === 'deposit' ? (
-                                <ArrowUpCircle className="w-4 h-4 text-success" />
-                              ) : (
-                                <ArrowDownCircle className="w-4 h-4 text-destructive" />
-                              )}
-                              <div>
-                                <div className="text-sm font-medium">{transaction.description}</div>
-                                <div className="text-xs text-muted-foreground">
-                                  {format(transaction.date, "d 'de' MMM", { locale: ptBR })}
-                                </div>
-                              </div>
-                            </div>
-                            <div className={`font-medium ${
-                              transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
-                            }`}>
-                              {transaction.type === 'deposit' ? '+' : '-'}
-                              {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                            </div>
-                          </div>
-                        ))}
+                  <div key={transaction.id} className="group flex items-center justify-between py-2 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      {transaction.type === 'deposit' ? (
+                        <ArrowUpCircle className="w-4 h-4 text-success" />
+                      ) : (
+                        <ArrowDownCircle className="w-4 h-4 text-destructive" />
+                      )}
+                      <div>
+                        <div className="text-sm font-medium">{transaction.description}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(transaction.date, "d 'de' MMM", { locale: ptBR })}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`font-medium ${
+                        transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
+                      }`}>
+                        {transaction.type === 'deposit' ? '+' : '-'}
+                        {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" title="Ações">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditTransaction(transaction)}>
+                            <Pencil className="mr-2 h-4 w-4" /> Editar
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteTransaction(transaction.id)}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
                         {getAccountTransactions(account.id).length === 0 && (
                           <p className="text-sm text-muted-foreground py-2">
                             Nenhuma transação encontrada
@@ -471,7 +538,7 @@ export default function Finances() {
                   .map((transaction) => {
                     const account = getAccountById(transaction.accountId);
                     return (
-                      <div key={transaction.id} className="flex items-center justify-between p-3 rounded-lg border">
+                      <div key={transaction.id} className="group flex items-center justify-between p-3 rounded-lg border">
                         <div className="flex items-center gap-3">
                           {transaction.type === 'deposit' ? (
                             <ArrowUpCircle className="w-5 h-5 text-success" />
@@ -485,11 +552,28 @@ export default function Finances() {
                             </div>
                           </div>
                         </div>
-                        <div className={`font-medium ${
-                          transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
-                        }`}>
-                          {transaction.type === 'deposit' ? '+' : '-'}
-                          {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        <div className="flex items-center gap-2">
+                          <div className={`font-medium ${
+                            transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {transaction.type === 'deposit' ? '+' : '-'}
+                            {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" title="Ações">
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEditTransaction(transaction)}>
+                                <Pencil className="mr-2 h-4 w-4" /> Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteTransaction(transaction.id)}>
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
                       </div>
                     );
@@ -824,9 +908,11 @@ export default function Finances() {
       <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova Transação</DialogTitle>
+            <DialogTitle>{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</DialogTitle>
             <DialogDescription>
-              Registre uma nova transação financeira (depósito ou retirada) em uma de suas contas.
+              {editingTransaction
+                ? 'Atualize os dados da transação selecionada.'
+                : 'Registre uma nova transação financeira (depósito ou retirada) em uma de suas contas.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -906,10 +992,23 @@ export default function Finances() {
               </div>
             </div>
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleCreateTransaction} className="flex-1">
-                Criar Transação
-              </Button>
-              <Button variant="outline" onClick={() => setIsTransactionDialogOpen(false)}>
+              {editingTransaction ? (
+                <Button onClick={handleSaveTransaction} className="flex-1">
+                  Salvar Alterações
+                </Button>
+              ) : (
+                <Button onClick={handleCreateTransaction} className="flex-1">
+                  Criar Transação
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsTransactionDialogOpen(false);
+                  setEditingTransaction(null);
+                  setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
+                }}
+              >
                 Cancelar
               </Button>
             </div>

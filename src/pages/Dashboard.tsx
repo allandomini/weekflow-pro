@@ -1,21 +1,25 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useApp } from "@/contexts/AppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock, Sparkles, TrendingUp, AlertCircle, CheckCircle, Calendar, Zap } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock, Sparkles, TrendingUp, AlertCircle, CheckCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
 import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addDays, addMonths, addYears } from "date-fns";
 import { Task } from "@/types";
 import { ptBR } from "date-fns/locale";
+import type { DateRange } from "react-day-picker";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useApp();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, activities } = useApp();
+  const navigate = useNavigate();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -44,6 +48,56 @@ export default function Dashboard() {
   const today = new Date();
   const [currentWeekDate, setCurrentWeekDate] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: Task | null; mode: 'single' | 'bulk'; range?: DateRange }>({ open: false, task: null, mode: 'single' });
+
+  const bulkMatchedDates = useMemo(() => {
+    const t = deleteModal.task;
+    if (!t || !t.isRoutine) return [] as Date[];
+    return tasks
+      .filter(candidate => candidate.isRoutine && candidate.title === t.title && (candidate.projectId || '') === (t.projectId || ''))
+      .map(c => {
+        const d = new Date(c.date);
+        d.setHours(0,0,0,0);
+        return d;
+      });
+  }, [deleteModal.task, tasks]);
+
+  const handleRequestDelete = (task: Task) => {
+    // Pré-seleciona o intervalo com o dia da tarefa clicada
+    const day = new Date(task.date);
+    day.setHours(0,0,0,0);
+    setDeleteModal({ open: true, task, mode: task.isRoutine ? 'bulk' : 'single', range: { from: day, to: day } });
+  };
+
+  const handleConfirmDeleteSingle = () => {
+    if (!deleteModal.task) return;
+    deleteTask(deleteModal.task.id);
+    setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
+  };
+
+  const handleConfirmDeleteBulk = () => {
+    const t = deleteModal.task;
+    const range = deleteModal.range;
+    if (!t || !range?.from || !range?.to) return;
+    const from = new Date(range.from);
+    const to = new Date(range.to);
+    from.setHours(0,0,0,0);
+    to.setHours(0,0,0,0);
+    // Excluir tarefas de rotina com mesmo título e mesmo projeto no intervalo
+    tasks.forEach(candidate => {
+      if (!candidate.isRoutine) return;
+      if (candidate.title !== t.title) return;
+      if ((candidate.projectId || '') !== (t.projectId || '')) return;
+      const d = new Date(candidate.date);
+      d.setHours(0,0,0,0);
+      if (d.getTime() >= from.getTime() && d.getTime() <= to.getTime()) {
+        deleteTask(candidate.id);
+      }
+    });
+    // Garante que a tarefa clicada também seja excluída
+    deleteTask(t.id);
+    setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
+  };
   const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -141,7 +195,7 @@ export default function Dashboard() {
       case 'productivity': return <TrendingUp className="w-4 h-4" />;
       case 'finance': return <DollarSign className="w-4 h-4" />;
       case 'tasks': return <CheckSquare className="w-4 h-4" />;
-      case 'projects': return <Calendar className="w-4 h-4" />;
+      case 'projects': return <CalendarIcon className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
   };
@@ -271,8 +325,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Recomendações da Stephany removidas do Dashboard por solicitação */}
-
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-left">
         <div>
@@ -412,11 +464,14 @@ export default function Dashboard() {
 
         {/* Tarefas de Hoje */}
         <Card className="modern-card animate-fade-in-right hover:shadow-medium transition-all duration-300">
-          <CardHeader>
+          <CardHeader className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-foreground">
               <CheckSquare className="w-5 h-5 text-success transition-colors duration-200" />
               {selectedDate ? `Tarefas de ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })}` : 'Tarefas de Hoje'}
             </CardTitle>
+            <Button variant="ghost" size="icon" aria-label="Abrir histórico" onClick={() => navigate('/historico')} className="hover:scale-105 active:scale-95 transition-transform">
+              <Clock className="w-5 h-5 text-muted-foreground" />
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -497,7 +552,7 @@ export default function Dashboard() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleDeleteTask(task.id)}
+                          onClick={() => handleRequestDelete(task)}
                           className="text-destructive transition-all duration-200 hover:scale-110 hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -644,6 +699,70 @@ export default function Dashboard() {
                 Cancelar
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      {/* Delete Dialog */}
+      <Dialog open={deleteModal.open} onOpenChange={(open) => setDeleteModal(prev => ({ ...prev, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir tarefa</DialogTitle>
+            <DialogDescription>
+              {deleteModal.task?.isRoutine
+                ? 'Esta tarefa faz parte de uma rotina. Você deseja excluir apenas esta ocorrência ou excluir em massa por intervalo?'
+                : 'Tem certeza que deseja excluir esta tarefa?'}
+            </DialogDescription>
+          </DialogHeader>
+          {deleteModal.task?.isRoutine && (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button
+                  variant={deleteModal.mode === 'single' ? 'default' : 'outline'}
+                  onClick={() => setDeleteModal(prev => ({ ...prev, mode: 'single' }))}
+                >
+                  Excluir somente esta
+                </Button>
+                <Button
+                  variant={deleteModal.mode === 'bulk' ? 'default' : 'outline'}
+                  onClick={() => setDeleteModal(prev => ({ ...prev, mode: 'bulk' }))}
+                >
+                  Excluir em massa
+                </Button>
+              </div>
+              {deleteModal.mode === 'bulk' && (
+                <div className="space-y-2">
+                  <Label>Intervalo de datas</Label>
+                  <div className="rounded-md border p-2">
+                    <Calendar
+                      mode="range"
+                      numberOfMonths={2}
+                      selected={deleteModal.range}
+                      onSelect={(range) => setDeleteModal(prev => ({ ...prev, range }))}
+                      showOutsideDays
+                      modifiers={{ matched: bulkMatchedDates }}
+                      modifiersClassNames={{ matched: 'ring-2 ring-destructive/60 rounded-md' }}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">Dias destacados são ocorrências desta rotina.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-2 pt-2">
+            {deleteModal.task?.isRoutine ? (
+              deleteModal.mode === 'bulk' ? (
+                <Button className="flex-1" disabled={!deleteModal.range?.from || !deleteModal.range?.to} onClick={handleConfirmDeleteBulk}>
+                  Confirmar exclusão em massa
+                </Button>
+              ) : (
+                <Button className="flex-1" onClick={handleConfirmDeleteSingle}>Confirmar</Button>
+              )
+            ) : (
+              <Button className="flex-1" onClick={handleConfirmDeleteSingle}>Confirmar</Button>
+            )}
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteModal({ open: false, task: null, mode: 'single', range: undefined })}>
+              Cancelar
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

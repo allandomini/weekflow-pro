@@ -5,7 +5,6 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Moon, Sun } from "lucide-react";
 import logoUrl from "@/assets/images/file.svg";
-import FloatingPomodoro from "./FloatingPomodoro";
 import FloatingClockify from "./FloatingClockify";
 
 interface LayoutProps {
@@ -65,7 +64,6 @@ export function Layout({ children }: LayoutProps) {
             </div>
           </main>
         </div>
-        <FloatingPomodoro />
         <FloatingClockify />
       </div>
     </SidebarProvider>

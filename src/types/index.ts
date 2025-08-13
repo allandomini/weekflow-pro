@@ -226,3 +226,74 @@ export interface AISettings {
   model?: string; // e.g., "gemini-1.5-pro"
   maxContextItems?: number; // caps how much data to pack into context
 }
+
+// Activity / Audit Log Types
+export interface ActivityEntityRef {
+  type: 'task' | 'transaction' | 'contact' | 'project' | 'routine';
+  id: string;
+  label?: string;
+}
+
+export interface Activity {
+  id: string;
+  at: Date;
+  actor: string;
+  action:
+    | 'task_created'
+    | 'task_completed'
+    | 'task_uncompleted'
+    | 'task_deleted'
+    | 'transaction_added'
+    | 'transaction_updated'
+    | 'transaction_deleted'
+    | 'contact_added'
+    | 'contact_updated'
+    | 'contact_deleted'
+    | 'project_added'
+    | 'project_updated'
+    | 'project_deleted'
+    | 'note_added'
+    | 'note_updated'
+    | 'note_deleted'
+    | 'receivable_added'
+    | 'receivable_updated'
+    | 'receivable_deleted'
+    | 'receivable_received'
+    | 'routine_added'
+    | 'routine_updated'
+    | 'routine_deleted'
+    | 'routine_completed'
+    | 'routine_skipped'
+    | 'routine_paused'
+    | 'routine_resumed';
+  entity?: ActivityEntityRef;
+  meta?: Record<string, any>;
+}
+
+// Routines
+export interface RoutineException {
+  skip?: boolean;
+  overrideTimesPerDay?: number;
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  color?: string;
+  timesPerDay: number; // e.g., 3 = beber água 3x
+  schedule: { type: 'daily' | 'weekly' | 'customDays'; daysOfWeek?: number[] };
+  activeFrom?: string; // yyyy-MM-dd
+  activeTo?: string;   // yyyy-MM-dd
+  pausedUntil?: string; // yyyy-MM-dd
+  exceptions?: Record<string, RoutineException>; // date (yyyy-MM-dd) -> exception
+  deletedAt?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RoutineCompletion {
+  routineId: string;
+  date: string; // yyyy-MM-dd
+  count: number;
+  timestamps?: string[]; // ISO strings for each completion
+}
