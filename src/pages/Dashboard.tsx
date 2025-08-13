@@ -191,6 +191,7 @@ export default function Dashboard() {
       startTime: taskForm.startTime || undefined,
       endTime: taskForm.endTime || undefined,
       isRoutine: taskForm.isRoutine,
+      isOverdue: false,
     } as const;
 
     if (editingTask) {
@@ -431,26 +432,33 @@ export default function Dashboard() {
                 }).map((task, index) => {
                   const project = getProjectById(task.projectId);
                   return (
-                    <div 
-                      key={task.id} 
-                      className={`
-                        flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01] hover:shadow-soft
-                        ${task.completed 
-                          ? 'bg-success/10 border-success/20' 
-                          : 'bg-card border-border hover:bg-accent/50'
-                        }
-                      `}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
+                     <div 
+                       key={task.id} 
+                       className={`
+                         flex items-center gap-3 p-4 rounded-lg border transition-all duration-200 hover:scale-[1.01] hover:shadow-soft
+                         ${task.completed 
+                           ? 'bg-success/10 border-success/20' 
+                           : task.isOverdue
+                             ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800'
+                             : 'bg-card border-border hover:bg-accent/50'
+                         }
+                       `}
+                       style={{ animationDelay: `${index * 50}ms` }}
+                     >
                       <Checkbox
                         checked={task.completed}
                         onCheckedChange={(checked) => handleToggleTask(task.id, !!checked)}
                         className="transition-all duration-200 hover:scale-110"
                       />
-                      <div className="flex-1">
-                        <div className={`font-medium transition-all duration-200 ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                          {task.title}
-                        </div>
+                       <div className="flex-1">
+                         <div className={`font-medium transition-all duration-200 flex items-center gap-2 ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                           {task.title}
+                           {task.isOverdue && !task.completed && (
+                             <Badge variant="destructive" className="text-xs animate-pulse">
+                               ATRASADA
+                             </Badge>
+                           )}
+                         </div>
                         <div className="flex items-center gap-2 mt-2">
                           {project && (
                             <Badge 

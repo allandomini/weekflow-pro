@@ -344,10 +344,57 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setProjectWalletEntries(prev => prev.filter(e => e.projectId !== id));
   };
 
+  // Check for overdue tasks and move them to today
+  useEffect(() => {
+    const checkOverdueTasks = () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      setTasks(prev => prev.map(task => {
+        if (!task.completed && !task.isRoutine) {
+          const taskDate = new Date(task.date);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          if (taskDate < today) {
+            // Move task to today and mark as overdue
+            return {
+              ...task,
+              date: new Date(),
+              isOverdue: true,
+              updatedAt: new Date()
+            };
+          }
+        }
+        return task;
+      }));
+    };
+
+    // Check on component mount
+    checkOverdueTasks();
+    
+    // Check daily at midnight
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    const timeoutId = setTimeout(() => {
+      checkOverdueTasks();
+      // Set up daily interval
+      const intervalId = setInterval(checkOverdueTasks, 24 * 60 * 60 * 1000);
+      return () => clearInterval(intervalId);
+    }, timeUntilMidnight);
+    
+    return () => clearTimeout(timeoutId);
+  }, []);
+
   // Task methods
   const addTask = (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newTask: Task = {
       ...task,
+      isOverdue: false,
       id: generateId(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -699,16 +746,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     // Criar uma tarefa quando o timer for parado
     if (entry.projectId) {
-      addTask({
-        title: entry.description,
-        description: `Tarefa criada a partir do Clockify - Duração: ${formatDuration(duration)}`,
-        completed: true,
-        projectId: entry.projectId,
-        date: new Date(),
-        startTime: entry.startTime.toTimeString().slice(0, 5),
-        endTime: endTime.toTimeString().slice(0, 5),
-        isRoutine: false
-      });
+        addTask({
+          title: entry.description,
+          description: `Tarefa criada a partir do Clockify - Duração: ${formatDuration(duration)}`,
+          completed: true,
+          projectId: entry.projectId,
+          date: new Date(),
+          startTime: entry.startTime.toTimeString().slice(0, 5),
+          endTime: endTime.toTimeString().slice(0, 5),
+          isRoutine: false,
+          isOverdue: false
+        });
     }
   };
 

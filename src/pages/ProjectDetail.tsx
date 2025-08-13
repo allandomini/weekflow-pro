@@ -98,6 +98,7 @@ export default function ProjectDetail() {
         endTime: undefined,
         isRoutine: true,
         completed: false,
+        isOverdue: false,
       });
     }
     setRoutineForm({ title: "", weeks: 4, weekday: 1 });

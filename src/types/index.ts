@@ -17,6 +17,7 @@ export interface Task {
   startTime?: string;
   endTime?: string;
   isRoutine: boolean;
+  isOverdue: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
