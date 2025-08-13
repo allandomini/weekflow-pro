@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Moon, Sun } from "lucide-react";
 import logoUrl from "@/assets/images/file.svg";
 import FloatingPomodoro from "./FloatingPomodoro";
+import FloatingClockify from "./FloatingClockify";
 
 interface LayoutProps {
   children: ReactNode;
@@ -65,6 +66,7 @@ export function Layout({ children }: LayoutProps) {
           </main>
         </div>
         <FloatingPomodoro />
+        <FloatingClockify />
       </div>
     </SidebarProvider>
   );

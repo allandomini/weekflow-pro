@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { useApp } from "@/contexts/AppContext";
 import { Sparkles, Send, Bot, User, TrendingUp, Calendar, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { isGeminiConfigured, generateGeminiResponse } from "@/lib/gemini";
 
 interface Message {
   id: string;
@@ -26,7 +27,7 @@ interface Recommendation {
 }
 
 export function GeminiChat() {
-  const { tasks, projects, contacts, transactions } = useApp();
+  const { tasks, projects, contacts, transactions, aiSettings } = useApp();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -113,6 +114,10 @@ export function GeminiChat() {
 
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
+    if (!aiSettings.enabled) {
+      toast({ title: "Assistente desabilitado", description: "Ative o Gemini em Configurações para usar o chat.", variant: "destructive" });
+      return;
+    }
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -126,21 +131,61 @@ export function GeminiChat() {
     setIsLoading(true);
 
     try {
-      // Create context from user data
-      const context = {
+      // Create context from user data (expanded if deep analysis enabled)
+      const basicContext = {
         tasks: tasks.length,
         completedTasks: tasks.filter(t => t.completed).length,
         projects: projects.length,
         contacts: contacts.length,
         totalRevenue: transactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + t.amount, 0),
         totalExpenses: transactions.filter(t => t.type === 'withdrawal').reduce((sum, t) => sum + t.amount, 0),
-        overdueTasks: tasks.filter(task => 
-          !task.completed && new Date(task.date) < new Date()
-        ).length
-      };
+        overdueTasks: tasks.filter(task => !task.completed && new Date(task.date) < new Date()).length,
+      } as any;
 
-      // Simulate Gemini response (replace with actual API call)
-      const response = await simulateGeminiResponse(content, context);
+      let context: any = basicContext;
+      if (aiSettings.deepAnalysis) {
+        const max = Math.max(1, aiSettings.maxContextItems ?? 100);
+        const recentTasks = [...tasks]
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+          .slice(-max)
+          .map(t => ({ id: t.id, title: t.title, completed: t.completed, date: t.date, projectId: t.projectId }));
+        const overdueTasksList = tasks
+          .filter(task => !task.completed && new Date(task.date) < new Date())
+          .slice(0, max)
+          .map(t => ({ id: t.id, title: t.title, date: t.date, projectId: t.projectId }));
+        const projectsDetail = projects.slice(0, max).map(p => ({ id: p.id, name: p.name, status: (p as any).status }));
+        const contactsSample = contacts.slice(0, max).map(c => ({ id: c.id, name: c.name, skills: c.skills, projectCount: c.projectIds?.length ?? 0 }));
+        const month = new Date().getMonth();
+        const expensesThisMonth = transactions.filter(t => t.type === 'withdrawal' && new Date(t.date).getMonth() === month)
+          .slice(0, max).map(t => ({ id: t.id, amount: t.amount, date: t.date, accountId: t.accountId }));
+        const revenuesThisMonth = transactions.filter(t => t.type === 'deposit' && new Date(t.date).getMonth() === month)
+          .slice(0, max).map(t => ({ id: t.id, amount: t.amount, date: t.date, accountId: t.accountId }));
+
+        context = {
+          ...basicContext,
+          recentTasks,
+          overdueTasksList,
+          projectsDetail,
+          contactsSample,
+          expensesThisMonth,
+          revenuesThisMonth,
+          model: aiSettings.model,
+          maxContextItems: max,
+        };
+      }
+
+      // Prefer real Gemini API when configured, fallback to simulator
+      let response: string;
+      if (isGeminiConfigured()) {
+        try {
+          response = await generateGeminiResponse(content, context, aiSettings.model);
+        } catch (apiErr) {
+          // fallback gracefully to simulator on API errors
+          response = await simulateGeminiResponse(content, context);
+        }
+      } else {
+        response = await simulateGeminiResponse(content, context);
+      }
 
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -224,12 +269,13 @@ export function GeminiChat() {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-primary" />
-            Assistente Gemini
+            {aiSettings.enabled ? 'Assistente Gemini' : 'Recomendações da Stephany'}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 min-h-0">
-          {/* Chat Area */}
+        <div className={`flex-1 grid grid-cols-1 ${aiSettings.enabled ? 'lg:grid-cols-3' : ''} gap-4 min-h-0`}>
+          {/* Chat Area (only when AI enabled) */}
+          {aiSettings.enabled && (
           <div className="lg:col-span-2 flex flex-col">
             <ScrollArea ref={scrollAreaRef} className="flex-1 pr-4 h-[400px]">
               <div className="space-y-4">
@@ -303,14 +349,15 @@ export function GeminiChat() {
               </Button>
             </div>
           </div>
+          )}
           
           {/* Recommendations Panel */}
-          <div className="lg:col-span-1">
+          <div className={aiSettings.enabled ? 'lg:col-span-1' : ''}>
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <TrendingUp className="w-5 h-5" />
-                  Recomendações
+                  Recomendações da Stephany
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -340,8 +387,9 @@ export function GeminiChat() {
                             size="sm"
                             className="w-full text-xs"
                             onClick={() => sendMessage(`Me ajude com: ${rec.title}`)}
+                            disabled={!aiSettings.enabled}
                           >
-                            Analisar
+                            {aiSettings.enabled ? 'Analisar' : 'Ative o assistente para analisar'}
                           </Button>
                         </Card>
                       ))

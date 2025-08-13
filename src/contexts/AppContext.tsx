@@ -3,7 +3,7 @@ import {
   Project, Task, Note, TodoList, Account, Transaction, 
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
-  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings
+  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings
 } from '@/types';
 
 interface AppContextType {
@@ -101,6 +101,10 @@ interface AppContextType {
   pausePomodoro: (sessionId: string) => void;
   resumePomodoro: (sessionId: string) => void;
   stopPomodoro: (sessionId: string) => void;
+
+  // AI / Assistant
+  aiSettings: AISettings;
+  updateAISettings: (settings: Partial<AISettings>) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -132,6 +136,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     autoStartWork: true,
     soundEnabled: true,
   });
+  const [aiSettings, setAISettings] = useState<AISettings>({
+    enabled: true,
+    deepAnalysis: true,
+    model: 'gemini-1.5-pro',
+    maxContextItems: 100,
+  });
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -153,6 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const savedPlakyItems = localStorage.getItem('plakyItems');
     const savedPomodoroSessions = localStorage.getItem('pomodoroSessions');
     const savedPomodoroSettings = localStorage.getItem('pomodoroSettings');
+    const savedAISettings = localStorage.getItem('aiSettings');
 
     if (savedProjects) setProjects(JSON.parse(savedProjects, (key, value) => {
       if (key.includes('Date') || key.includes('At')) return new Date(value);
@@ -223,6 +234,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return value;
     }));
     if (savedPomodoroSettings) setPomodoroSettings(JSON.parse(savedPomodoroSettings));
+    if (savedAISettings) setAISettings(JSON.parse(savedAISettings));
   }, []);
 
   // Save to localStorage whenever data changes
@@ -297,6 +309,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem('pomodoroSettings', JSON.stringify(pomodoroSettings));
   }, [pomodoroSettings]);
+
+  // Persist AI settings
+  useEffect(() => {
+    localStorage.setItem('aiSettings', JSON.stringify(aiSettings));
+  }, [aiSettings]);
 
   const generateId = () => Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
@@ -785,6 +802,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setPomodoroSettings(prev => ({ ...prev, ...settings }));
   };
 
+  const updateAISettings = (settings: Partial<AISettings>) => {
+    setAISettings(prev => ({ ...prev, ...settings }));
+  };
+
   const startPomodoro = (projectId?: string, taskId?: string) => {
     const sessionId = generateId();
     addPomodoroSession({
@@ -888,6 +909,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     pausePomodoro,
     resumePomodoro,
     stopPomodoro,
+
+    // AI
+    aiSettings,
+    updateAISettings,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -57,6 +57,20 @@ export default function Clockify() {
     }
   }, [activeTimer]);
 
+  // Restaurar timer ativo ao carregar/alterar entradas
+  useEffect(() => {
+    const active = clockifyTimeEntries.find(e => e.status === 'active');
+    if (active) {
+      setActiveTimer(active.id);
+      if (active.startTime) {
+        setTimerStart(new Date(active.startTime));
+      }
+    } else {
+      setActiveTimer(null);
+      setTimerStart(null);
+    }
+  }, [clockifyTimeEntries]);
+
   const startTimer = (entry: Partial<ClockifyTimeEntry>) => {
     if (activeTimer) return;
     
@@ -78,18 +92,31 @@ export default function Clockify() {
     setTimerStart(new Date());
   };
 
-  const stopTimer = () => {
-    if (!activeTimer) return;
-    stopClockifyTimer(activeTimer);
-    setActiveTimer(null);
-    setTimerStart(null);
+  const stopTimer = (id?: string) => {
+    const targetId = id || activeTimer;
+    if (!targetId) return;
+    stopClockifyTimer(targetId);
+    if (targetId === activeTimer) {
+      setActiveTimer(null);
+      setTimerStart(null);
+    }
   };
 
-  const pauseTimer = () => {
-    if (!activeTimer) return;
-    pauseClockifyTimer(activeTimer);
-    setActiveTimer(null);
-    setTimerStart(null);
+  const pauseTimer = (id?: string) => {
+    const targetId = id || activeTimer;
+    if (!targetId) return;
+    pauseClockifyTimer(targetId);
+    if (targetId === activeTimer) {
+      setActiveTimer(null);
+      setTimerStart(null);
+    }
+  };
+
+  const resumeTimer = (id: string) => {
+    if (!id) return;
+    resumeClockifyTimer(id);
+    setActiveTimer(id);
+    setTimerStart(new Date());
   };
 
   // Função para calcular duração em tempo real
@@ -97,7 +124,8 @@ export default function Clockify() {
     if (entry.status === 'active') {
       const now = new Date();
       const start = new Date(entry.startTime);
-      return Math.floor((now.getTime() - start.getTime()) / 1000);
+      // Somar duração acumulada com a sessão atual
+      return (entry.duration || 0) + Math.floor((now.getTime() - start.getTime()) / 1000);
     }
     return entry.duration || 0;
   };
@@ -190,11 +218,11 @@ export default function Clockify() {
                     })()}
                   </div>
                   <div className="flex gap-2 justify-center">
-                    <Button onClick={pauseTimer} size="lg" variant="outline">
+                    <Button onClick={() => pauseTimer()} size="lg" variant="outline">
                       <Pause className="w-4 h-4 mr-2" />
                       Pausar
                     </Button>
-                    <Button onClick={stopTimer} size="lg" className="bg-red-600 hover:bg-red-700">
+                    <Button onClick={() => stopTimer()} size="lg" className="bg-red-600 hover:bg-red-700">
                       <Square className="w-4 h-4 mr-2" />
                       Parar
                     </Button>
@@ -372,152 +400,306 @@ export default function Clockify() {
               </Badge>
             </div>
           </div>
+          <div className="space-y-6">
+            <Tabs defaultValue="inprogress" className="space-y-4">
+              <TabsList>
+                <TabsTrigger value="inprogress">Em andamento</TabsTrigger>
+                <TabsTrigger value="completed">Concluídas</TabsTrigger>
+              </TabsList>
 
-          <div className="grid gap-4">
-            {clockifyTimeEntries.map((entry) => (
-              <Card key={entry.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-medium">{entry.description}</h4>
-                        {entry.billable && (
-                          <Badge variant="secondary" className="text-xs">
-                            <DollarSign className="w-3 h-3 mr-1" />
-                            R$ {entry.hourlyRate}/h
-                          </Badge>
-                        )}
-                        <Badge variant={entry.status === 'active' ? 'default' : 'outline'}>
-                          {entry.status === 'active' ? 'Ativo' : 'Concluído'}
-                        </Badge>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                        {entry.projectId && (
-                          <span className="flex items-center gap-1">
-                            <FolderOpen className="w-3 h-3" />
-                            {getProjectById(entry.projectId)?.name}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {entry.status === 'active' ? 
-                            formatDuration(getCurrentDuration(entry)) : 
-                            entry.duration ? formatDuration(entry.duration) : '00:00:00'
-                          }
-                        </span>
-                        <span>
-                          {entry.startTime && format(entry.startTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}
-                        </span>
-                      </div>
-
-                      {entry.personIds.length > 0 && (
-                        <div className="flex items-center gap-2 mb-2">
-                          <Users className="w-3 h-3 text-muted-foreground" />
-                          <div className="flex gap-1">
-                            {entry.personIds.map(personId => {
-                              const person = getPersonById(personId);
-                              return person ? (
-                                <Badge key={personId} variant="outline" className="text-xs">
-                                  {person.name}
+              <TabsContent value="inprogress" className="mt-0">
+                <div className="grid gap-4">
+                  {clockifyTimeEntries
+                    .filter(e => e.status === 'active' || e.status === 'paused')
+                    .map((entry) => (
+                      <Card key={entry.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-medium">{entry.description}</h4>
+                                {entry.billable && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <DollarSign className="w-3 h-3 mr-1" />
+                                    R$ {entry.hourlyRate}/h
+                                  </Badge>
+                                )}
+                                <Badge variant={entry.status === 'active' ? 'default' : 'outline'}>
+                                  {entry.status === 'active' ? 'Ativo' : 'Pausado'}
                                 </Badge>
-                              ) : null;
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      {entry.tags.length > 0 && (
-                        <div className="flex gap-1">
-                          {entry.tags.map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              <Tag className="w-3 h-3 mr-1" />
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      {entry.status === 'active' && (
-                        <>
-                          <Button variant="outline" size="sm" onClick={() => pauseTimer()}>
-                            <Pause className="w-4 h-4" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => stopTimer()}>
-                            <Square className="w-4 h-4" />
-                          </Button>
-                        </>
-                      )}
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Editar Entrada</DialogTitle>
-                            <DialogDescription>Edite os detalhes da entrada de tempo</DialogDescription>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <Label htmlFor="edit-description">Descrição</Label>
-                              <Input
-                                id="edit-description"
-                                value={entry.description}
-                                onChange={(e) => updateClockifyTimeEntry(entry.id, { description: e.target.value })}
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="edit-project">Projeto</Label>
-                              <Select 
-                                value={entry.projectId} 
-                                onValueChange={(value) => updateClockifyTimeEntry(entry.id, { projectId: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {projects.map((project) => (
-                                    <SelectItem key={project.id} value={project.id}>
-                                      {project.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                id="edit-billable"
-                                checked={entry.billable}
-                                onCheckedChange={(checked) => updateClockifyTimeEntry(entry.id, { billable: checked })}
-                              />
-                              <Label htmlFor="edit-billable">Faturável</Label>
-                            </div>
-                            {entry.billable && (
-                              <div>
-                                <Label htmlFor="edit-hourlyRate">Taxa por hora (R$)</Label>
-                                <Input
-                                  id="edit-hourlyRate"
-                                  type="number"
-                                  value={entry.hourlyRate || 0}
-                                  onChange={(e) => updateClockifyTimeEntry(entry.id, { hourlyRate: parseFloat(e.target.value) || 0 })}
-                                />
                               </div>
-                            )}
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                                {entry.projectId && (
+                                  <span className="flex items-center gap-1">
+                                    <FolderOpen className="w-3 h-3" />
+                                    {getProjectById(entry.projectId)?.name}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {entry.status === 'active' ? 
+                                    formatDuration(getCurrentDuration(entry)) : 
+                                    entry.duration ? formatDuration(entry.duration) : '00:00:00'}
+                                </span>
+                                <span>
+                                  {entry.startTime && format(entry.startTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                                </span>
+                              </div>
+                              {entry.personIds.length > 0 && (
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <div className="flex gap-1">
+                                    {entry.personIds.map(personId => {
+                                      const person = getPersonById(personId);
+                                      return person ? (
+                                        <Badge key={personId} variant="outline" className="text-xs">
+                                          {person.name}
+                                        </Badge>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                              {entry.tags.length > 0 && (
+                                <div className="flex gap-1">
+                                  {entry.tags.map(tag => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                      <Tag className="w-3 h-3 mr-1" />
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {entry.status === 'active' ? (
+                                <>
+                                  <Button variant="outline" size="sm" onClick={() => pauseTimer(entry.id)}>
+                                    <Pause className="w-4 h-4" />
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => stopTimer(entry.id)}>
+                                    <Square className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <>
+                                  <Button variant="outline" size="sm" onClick={() => resumeTimer(entry.id)}>
+                                    <Play className="w-4 h-4" />
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => stopTimer(entry.id)}>
+                                    <Square className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              )}
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Editar Entrada</DialogTitle>
+                                    <DialogDescription>Edite os detalhes da entrada de tempo</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="edit-description">Descrição</Label>
+                                      <Input
+                                        id="edit-description"
+                                        value={entry.description}
+                                        onChange={(e) => updateClockifyTimeEntry(entry.id, { description: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="edit-project">Projeto</Label>
+                                      <Select 
+                                        value={entry.projectId} 
+                                        onValueChange={(value) => updateClockifyTimeEntry(entry.id, { projectId: value })}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {projects.map((project) => (
+                                            <SelectItem key={project.id} value={project.id}>
+                                              {project.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Switch
+                                        id="edit-billable"
+                                        checked={entry.billable}
+                                        onCheckedChange={(checked) => updateClockifyTimeEntry(entry.id, { billable: checked })}
+                                      />
+                                      <Label htmlFor="edit-billable">Faturável</Label>
+                                    </div>
+                                    {entry.billable && (
+                                      <div>
+                                        <Label htmlFor="edit-hourlyRate">Taxa por hora (R$)</Label>
+                                        <Input
+                                          id="edit-hourlyRate"
+                                          type="number"
+                                          value={entry.hourlyRate || 0}
+                                          onChange={(e) => updateClockifyTimeEntry(entry.id, { hourlyRate: parseFloat(e.target.value) || 0 })}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                              <Button variant="outline" size="sm" onClick={() => deleteClockifyTimeEntry(entry.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button variant="outline" size="sm" onClick={() => deleteClockifyTimeEntry(entry.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  {clockifyTimeEntries.filter(e => e.status === 'active' || e.status === 'paused').length === 0 && (
+                    <div className="text-sm text-muted-foreground">Nenhuma entrada ativa ou pausada.</div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="completed" className="mt-0">
+                <div className="grid gap-4">
+                  {clockifyTimeEntries
+                    .filter(e => e.status === 'completed')
+                    .map((entry) => (
+                      <Card key={entry.id}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h4 className="font-medium">{entry.description}</h4>
+                                {entry.billable && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    <DollarSign className="w-3 h-3 mr-1" />
+                                    R$ {entry.hourlyRate}/h
+                                  </Badge>
+                                )}
+                                <Badge variant="outline">Concluído</Badge>
+                              </div>
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
+                                {entry.projectId && (
+                                  <span className="flex items-center gap-1">
+                                    <FolderOpen className="w-3 h-3" />
+                                    {getProjectById(entry.projectId)?.name}
+                                  </span>
+                                )}
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {entry.duration ? formatDuration(entry.duration) : '00:00:00'}
+                                </span>
+                                <span>
+                                  {entry.startTime && format(entry.startTime, 'dd/MM/yyyy HH:mm', { locale: ptBR })}
+                                </span>
+                              </div>
+                              {entry.personIds.length > 0 && (
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Users className="w-3 h-3 text-muted-foreground" />
+                                  <div className="flex gap-1">
+                                    {entry.personIds.map(personId => {
+                                      const person = getPersonById(personId);
+                                      return person ? (
+                                        <Badge key={personId} variant="outline" className="text-xs">
+                                          {person.name}
+                                        </Badge>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                              {entry.tags.length > 0 && (
+                                <div className="flex gap-1">
+                                  {entry.tags.map(tag => (
+                                    <Badge key={tag} variant="secondary" className="text-xs">
+                                      <Tag className="w-3 h-3 mr-1" />
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent>
+                                  <DialogHeader>
+                                    <DialogTitle>Editar Entrada</DialogTitle>
+                                    <DialogDescription>Edite os detalhes da entrada de tempo</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div>
+                                      <Label htmlFor="edit-description">Descrição</Label>
+                                      <Input
+                                        id="edit-description"
+                                        value={entry.description}
+                                        onChange={(e) => updateClockifyTimeEntry(entry.id, { description: e.target.value })}
+                                      />
+                                    </div>
+                                    <div>
+                                      <Label htmlFor="edit-project">Projeto</Label>
+                                      <Select 
+                                        value={entry.projectId} 
+                                        onValueChange={(value) => updateClockifyTimeEntry(entry.id, { projectId: value })}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {projects.map((project) => (
+                                            <SelectItem key={project.id} value={project.id}>
+                                              {project.name}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                      <Switch
+                                        id="edit-billable"
+                                        checked={entry.billable}
+                                        onCheckedChange={(checked) => updateClockifyTimeEntry(entry.id, { billable: checked })}
+                                      />
+                                      <Label htmlFor="edit-billable">Faturável</Label>
+                                    </div>
+                                    {entry.billable && (
+                                      <div>
+                                        <Label htmlFor="edit-hourlyRate">Taxa por hora (R$)</Label>
+                                        <Input
+                                          id="edit-hourlyRate"
+                                          type="number"
+                                          value={entry.hourlyRate || 0}
+                                          onChange={(e) => updateClockifyTimeEntry(entry.id, { hourlyRate: parseFloat(e.target.value) || 0 })}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </DialogContent>
+                              </Dialog>
+                              <Button variant="outline" size="sm" onClick={() => deleteClockifyTimeEntry(entry.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  {clockifyTimeEntries.filter(e => e.status === 'completed').length === 0 && (
+                    <div className="text-sm text-muted-foreground">Nenhuma entrada concluída.</div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         </TabsContent>
 

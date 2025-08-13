@@ -216,3 +216,12 @@ export interface PomodoroSettings {
   autoStartWork: boolean;
   soundEnabled: boolean;
 }
+
+// AI / Assistant types
+export interface AISettings {
+  enabled: boolean;
+  deepAnalysis: boolean;
+  // Optional future-proofing for model selection and context sizing
+  model?: string; // e.g., "gemini-1.5-pro"
+  maxContextItems?: number; // caps how much data to pack into context
+}

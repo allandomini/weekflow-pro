@@ -270,50 +270,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in-up">
-      {/* Stephany's AI Recommendations */}
-      {recommendations.length > 0 && (
-        <Card className="modern-card animate-fade-in-up bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-2 border-purple-200 dark:border-purple-800">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <Sparkles className="w-6 h-6 text-purple-600 animate-pulse" />
-              Recomendações da Stephany
-              <Badge variant="secondary" className="ml-2 bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                IA
-              </Badge>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {recommendations.map((rec, index) => (
-                <div
-                  key={rec.id}
-                  className={`p-4 rounded-lg border transition-all duration-200 hover:scale-[1.02] hover:shadow-md ${getPriorityColor(rec.priority)}`}
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 p-2 rounded-full bg-white/50 dark:bg-black/20">
-                      {getRecommendationIcon(rec.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-semibold text-sm mb-1">{rec.title}</h4>
-                      <p className="text-xs opacity-90 mb-3">{rec.description}</p>
-                      {rec.action && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs h-7 border-current hover:bg-white/20 dark:hover:bg-black/20"
-                        >
-                          {rec.action}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {/* Recomendações da Stephany removidas do Dashboard por solicitação */}
 
       {/* Header */}
       <div className="flex items-center justify-between animate-fade-in-left">
