@@ -11,7 +11,7 @@ import { Project } from "@/types";
 
 export default function Projects() {
   const navigate = useNavigate();
-  const { projects, addProject, updateProject, deleteProject } = useApp();
+  const { projects, addProject, updateProject, deleteProject } = useAppContext();
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState({ name: "", color: "#3B82F6" });

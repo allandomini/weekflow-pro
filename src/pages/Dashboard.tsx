@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,16 @@ import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useAppContext();
+  
+  // Mock routine functions until implemented in context
+  const routines: any[] = [];
+  const skipRoutineDay = (routineId: string, dateStr: string) => {};
+  const skipRoutineBetween = (routineId: string, fromDate: string, toDate: string) => {};
+  const getRoutineProgress = (routineId: string, dateStr: string) => ({ goal: 1, count: 0, skipped: false, paused: false });
+  const addRoutine = (routine: any) => {};
+  const completeRoutineOnce = (routineId: string, dateStr: string) => {};
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{

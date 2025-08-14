@@ -42,8 +42,8 @@ export default function Finances() {
     projects,
     addAccount, 
     addTransaction, 
-    updateTransaction,
-    deleteTransaction,
+    // updateTransaction,
+    // deleteTransaction,
     addDebt, 
     addGoal,
     updateAccount,
@@ -181,7 +181,8 @@ export default function Finances() {
     if (!editingTransaction) return;
     if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) return;
 
-    updateTransaction(editingTransaction.id, {
+    // TODO: Implement updateTransaction in context
+    console.log('Update transaction:', editingTransaction.id, {
       accountId: transactionForm.accountId,
       type: transactionForm.type,
       amount: parseFloat(transactionForm.amount),
@@ -216,7 +217,8 @@ export default function Finances() {
 
   const handleDeleteTransaction = (id: string) => {
     if (confirm("Tem certeza que deseja excluir esta transação?")) {
-      deleteTransaction(id);
+      // TODO: Implement deleteTransaction in context
+      console.log('Delete transaction:', id);
     }
   };
 
