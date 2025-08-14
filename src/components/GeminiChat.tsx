@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Sparkles, Send, Bot, User, TrendingUp, Calendar, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { isGeminiConfigured, generateGeminiResponse } from "@/lib/gemini";
@@ -27,7 +27,7 @@ interface Recommendation {
 }
 
 export function GeminiChat() {
-  const { tasks, projects, contacts, transactions, aiSettings } = useApp();
+  const { tasks, projects, contacts, transactions, aiSettings } = useAppContext();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");

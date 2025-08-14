@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { PlakyBoard, PlakyColumn, PlakyItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,7 +37,7 @@ export default function Plaky() {
     updatePlakyItem,
     deletePlakyItem,
     updateTask
-  } = useApp();
+  } = useAppContext();
   
   // Get today's tasks
   const todayTasks = tasks.filter(task => {

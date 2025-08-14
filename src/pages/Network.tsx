@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -35,7 +35,7 @@ export default function Network() {
     addContactGroup,
     updateContactGroup,
     deleteContactGroup
-  } = useApp();
+  } = useAppContext();
 
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);

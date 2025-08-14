@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
+import { useState, useEffect } from "react";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,26 +17,7 @@ import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
 export default function Dashboard() {
-  const {
-    tasks,
-    projects,
-    accounts,
-    contacts,
-    transactions,
-    activities,
-    // task methods
-    addTask,
-    updateTask,
-    deleteTask,
-    // routines
-    routines,
-    addRoutine,
-    getRoutineProgress,
-    completeRoutineOnce,
-    skipRoutineDay,
-    skipRoutineBetween,
-  } = useApp();
-  const navigate = useNavigate();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useAppContext();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{

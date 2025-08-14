@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { ClockifyTimeEntry } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,7 +27,7 @@ export default function Clockify() {
     stopClockifyTimer,
     pauseClockifyTimer,
     resumeClockifyTimer
-  } = useApp();
+  } = useAppContext();
 
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [timerStart, setTimerStart] = useState<Date | null>(null);
@@ -71,7 +71,7 @@ export default function Clockify() {
     }
   }, [clockifyTimeEntries]);
 
-  const startTimer = (entry: Partial<ClockifyTimeEntry>) => {
+  const startTimer = async (entry: Partial<ClockifyTimeEntry>) => {
     if (activeTimer) return;
     
     const newEntry: Omit<ClockifyTimeEntry, 'id' | 'createdAt' | 'updatedAt'> = {
@@ -87,7 +87,7 @@ export default function Clockify() {
       status: 'active'
     };
 
-    const entryId = startClockifyTimer(newEntry);
+    const entryId = await startClockifyTimer(newEntry);
     setActiveTimer(entryId);
     setTimerStart(new Date());
   };
