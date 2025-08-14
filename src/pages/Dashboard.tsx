@@ -18,7 +18,25 @@ import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, activities } = useApp();
+  const {
+    tasks,
+    projects,
+    accounts,
+    contacts,
+    transactions,
+    activities,
+    // task methods
+    addTask,
+    updateTask,
+    deleteTask,
+    // routines
+    routines,
+    addRoutine,
+    getRoutineProgress,
+    completeRoutineOnce,
+    skipRoutineDay,
+    skipRoutineBetween,
+  } = useApp();
   const navigate = useNavigate();
 
   // Stephany's AI Recommendations
@@ -50,17 +68,21 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: Task | null; mode: 'single' | 'bulk'; range?: DateRange }>({ open: false, task: null, mode: 'single' });
 
+  // Helper: yyyy-MM-dd from local date
+  const toYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const bulkMatchedDates = useMemo(() => {
     const t = deleteModal.task;
     if (!t || !t.isRoutine) return [] as Date[];
-    return tasks
-      .filter(candidate => candidate.isRoutine && candidate.title === t.title && (candidate.projectId || '') === (t.projectId || ''))
-      .map(c => {
-        const d = new Date(c.date);
-        d.setHours(0,0,0,0);
-        return d;
-      });
-  }, [deleteModal.task, tasks]);
+    // If this is a virtual routine task (id starts with 'routine:'), we can't rely on materialized tasks.
+    // We will not perform heavy generation here; return empty to avoid misleading highlights.
+    return [] as Date[];
+  }, [deleteModal.task]);
 
   const handleRequestDelete = (task: Task) => {
     // Pré-seleciona o intervalo com o dia da tarefa clicada
@@ -71,7 +93,13 @@ export default function Dashboard() {
 
   const handleConfirmDeleteSingle = () => {
     if (!deleteModal.task) return;
-    deleteTask(deleteModal.task.id);
+    const t = deleteModal.task;
+    if (t.id.startsWith('routine:')) {
+      const [, routineId, dateStr] = t.id.split(':');
+      skipRoutineDay(routineId, dateStr);
+    } else {
+      deleteTask(t.id);
+    }
     setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
   };
 
@@ -83,19 +111,24 @@ export default function Dashboard() {
     const to = new Date(range.to);
     from.setHours(0,0,0,0);
     to.setHours(0,0,0,0);
-    // Excluir tarefas de rotina com mesmo título e mesmo projeto no intervalo
-    tasks.forEach(candidate => {
-      if (!candidate.isRoutine) return;
-      if (candidate.title !== t.title) return;
-      if ((candidate.projectId || '') !== (t.projectId || '')) return;
-      const d = new Date(candidate.date);
-      d.setHours(0,0,0,0);
-      if (d.getTime() >= from.getTime() && d.getTime() <= to.getTime()) {
-        deleteTask(candidate.id);
-      }
-    });
-    // Garante que a tarefa clicada também seja excluída
-    deleteTask(t.id);
+    if (t.id.startsWith('routine:')) {
+      const [, routineId] = t.id.split(':');
+      skipRoutineBetween(routineId, toYmd(from), toYmd(to));
+    } else {
+      // Legacy behavior for non-routine tasks
+      tasks.forEach(candidate => {
+        if (!candidate.isRoutine) return;
+        if (candidate.title !== t.title) return;
+        if ((candidate.projectId || '') !== (t.projectId || '')) return;
+        const d = new Date(candidate.date);
+        d.setHours(0,0,0,0);
+        if (d.getTime() >= from.getTime() && d.getTime() <= to.getTime()) {
+          deleteTask(candidate.id);
+        }
+      });
+      // Certifique-se que a tarefa clicada também seja excluída
+      deleteTask(t.id);
+    }
     setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
   };
   const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
@@ -210,9 +243,47 @@ export default function Dashboard() {
   };
 
   const getTasksForDay = (day: Date) => {
-    return tasks.filter(task => 
-      task.date.toDateString() === day.toDateString()
-    );
+    const sameDayTasks = tasks.filter(task => task.date.toDateString() === day.toDateString());
+    // Generate virtual routine occurrences based on routines definitions and completions
+    const dayStr = toYmd(day);
+    const virtuals: Task[] = [];
+    for (const r of routines) {
+      if (r.deletedAt) continue;
+      // Active window checks
+      if (r.activeFrom && r.activeFrom > dayStr) continue;
+      if (r.activeTo && r.activeTo < dayStr) continue;
+      // Progress and state
+      const { goal, count, skipped, paused } = getRoutineProgress(r.id, dayStr);
+      if (skipped || paused) continue;
+      const remaining = Math.max(0, goal - count);
+      if (remaining === 0) continue;
+      // Schedule match: daily always matches; weekly/customDays check day of week
+      const dow = day.getDay(); // 0-6 Sun-Sat
+      const sched = r.schedule;
+      let matches = false;
+      if (sched.type === 'daily') matches = true;
+      else if (sched.type === 'weekly') matches = (sched.daysOfWeek || []).includes(dow);
+      else if (sched.type === 'customDays') matches = (sched.daysOfWeek || []).includes(dow);
+      if (!matches) continue;
+      for (let i = 0; i < remaining; i++) {
+        virtuals.push({
+          // Synthetic ID encoding routine occurrence
+          id: `routine:${r.id}:${dayStr}:${i}`,
+          title: r.name,
+          description: undefined,
+          completed: false,
+          projectId: undefined,
+          date: day,
+          startTime: undefined,
+          endTime: undefined,
+          isRoutine: true,
+          isOverdue: false,
+          createdAt: day,
+          updatedAt: day,
+        });
+      }
+    }
+    return [...sameDayTasks, ...virtuals];
   };
 
   const getProjectById = (projectId?: string) => {
@@ -259,39 +330,23 @@ export default function Dashboard() {
           completed: false,
         });
       } else {
-        const getOccurrences = () => {
-          if (taskForm.repeatAlways) {
-            switch (taskForm.repeatUnit) {
-              case "day":
-                return 60;
-              case "week":
-                return 26;
-              case "month":
-                return 12;
-              case "year":
-                return 5;
-              default:
-                return 12;
-            }
-          }
-          return Math.max(1, Number(taskForm.repeatCount) || 1);
-        };
-
-        const occurrences = getOccurrences();
-        for (let i = 0; i < occurrences; i++) {
-          let date = baseDate;
-          if (i > 0) {
-            if (taskForm.repeatUnit === "day") date = addDays(baseDate, i);
-            if (taskForm.repeatUnit === "week") date = addWeeks(baseDate, i);
-            if (taskForm.repeatUnit === "month") date = addMonths(baseDate, i);
-            if (taskForm.repeatUnit === "year") date = addYears(baseDate, i);
-          }
-          addTask({
-            ...baseData,
-            date,
-            completed: false,
-          });
+        // Create a Routine definition instead of materializing occurrences
+        const baseDayStr = toYmd(baseDate);
+        // Map repeatUnit to a schedule; default to daily
+        let schedule: { type: 'daily' | 'weekly' | 'customDays'; daysOfWeek?: number[] } = { type: 'daily' };
+        if (taskForm.repeatUnit === 'week') {
+          schedule = { type: 'weekly', daysOfWeek: [baseDate.getDay()] };
         }
+        // For month/year we fallback to daily for now
+        addRoutine({
+          name: taskForm.title,
+          color: undefined,
+          timesPerDay: 1,
+          schedule,
+          activeFrom: baseDayStr,
+          activeTo: undefined,
+          pausedUntil: undefined,
+        });
       }
     }
 
@@ -300,6 +355,16 @@ export default function Dashboard() {
   };
 
   const handleToggleTask = (taskId: string, completed: boolean) => {
+    if (taskId.startsWith('routine:')) {
+      // routine:<routineId>:<yyyy-MM-dd>:<idx>
+      const parts = taskId.split(':');
+      const routineId = parts[1];
+      const dateStr = parts[2];
+      if (completed) {
+        completeRoutineOnce(routineId, dateStr);
+      }
+      return;
+    }
     updateTask(taskId, { completed });
   };
 
