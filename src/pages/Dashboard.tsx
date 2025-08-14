@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,7 @@ import { Task } from "@/types";
 import { ptBR } from "date-fns/locale";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useApp();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useAppContext();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{

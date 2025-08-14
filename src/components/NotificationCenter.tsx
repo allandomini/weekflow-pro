@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { toast } from '@/hooks/use-toast';
 import { isSameDay, addDays, differenceInMinutes } from 'date-fns';
 
 export function NotificationCenter() {
-  const { tasks, debts } = useApp();
+  const { tasks, debts } = useAppContext();
 
   useEffect(() => {
     // Tasks for today

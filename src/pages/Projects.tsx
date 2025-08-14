@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ export default function Projects() {
     projects, tasks, notes, todoLists, receivables,
     addProject, updateProject, deleteProject,
     addNote, deleteNote, addTodoList, updateTodoList, addReceivable
-  } = useApp();
+  } = useAppContext();
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState({

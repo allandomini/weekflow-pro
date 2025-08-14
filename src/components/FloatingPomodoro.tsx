@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,7 @@ export default function FloatingPomodoro() {
     pausePomodoro,
     resumePomodoro,
     stopPomodoro
-  } = useApp();
+  } = useAppContext();
 
   const [isOpen, setIsOpen] = useState(true);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -74,8 +74,8 @@ export default function FloatingPomodoro() {
     return () => clearInterval(timer);
   }, [activeSession, pomodoroSessions]);
 
-  const handleStart = () => {
-    const sessionId = startPomodoro();
+  const handleStart = async () => {
+    const sessionId = await startPomodoro();
     setActiveSession(sessionId);
     setCurrentTime(pomodoroSettings.workDuration * 60);
   };

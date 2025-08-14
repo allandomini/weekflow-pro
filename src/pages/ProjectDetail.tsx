@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ export default function ProjectDetail() {
     addNote, addTodoList, updateTodoList, addTask,
     addProjectImage, deleteProjectImage,
     addProjectWalletEntry,
-  } = useApp();
+  } = useAppContext();
 
   const project = useMemo(() => projects.find(p => p.id === projectId), [projects, projectId]);
 

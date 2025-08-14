@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -31,7 +31,7 @@ import { ptBR } from "date-fns/locale";
 import { Task } from "@/types";
 
 export default function Calendar() {
-  const { tasks, projects, addTask, updateTask, deleteTask } = useApp();
+  const { tasks, projects, addTask, updateTask, deleteTask } = useAppContext();
   const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
