@@ -18,6 +18,9 @@ export interface Task {
   endTime?: string;
   isRoutine: boolean;
   isOverdue: boolean;
+  priority?: 'low' | 'medium' | 'high';
+  status?: 'todo' | 'in_progress' | 'in_review' | 'done' | 'blocked';
+  labels?: string[];
   createdAt: Date;
   updatedAt: Date;
 }

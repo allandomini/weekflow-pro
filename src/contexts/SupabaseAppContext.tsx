@@ -6,8 +6,11 @@ import {
   Project, Task, Note, TodoList, Account, Transaction, 
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
-  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings
+  PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings,
+  Activity, ActivityEntityRef
 } from '@/types';
+
+// Using Activity and ActivityEntityRef from types.ts
 
 interface AppContextType {
   // Projects
@@ -18,9 +21,15 @@ interface AppContextType {
 
   // Tasks
   tasks: Task[];
+  routines: any[]; // TODO: Replace 'any' with the correct Routine type
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
+  addRoutine: (routine: any) => Promise<void>; // TODO: Replace 'any' with the correct Routine type
+  completeRoutineOnce: (routineId: string, date: string) => Promise<void>;
+  skipRoutineDay: (routineId: string, date: string) => Promise<void>;
+  skipRoutineBetween: (routineId: string, startDate: string, endDate: string) => Promise<void>;
+  getRoutineProgress: (routineId: string, startDate: string, endDate: string) => Promise<any>;
 
   // Notes
   notes: Note[];
@@ -42,6 +51,8 @@ interface AppContextType {
   receivables: Receivable[];
   addAccount: (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   addTransaction: (transaction: Omit<Transaction, 'id' | 'createdAt'>) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Transaction>) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
   addDebt: (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
@@ -109,6 +120,15 @@ interface AppContextType {
   aiSettings: AISettings;
   updateAISettings: (settings: Partial<AISettings>) => Promise<void>;
 
+  // User Settings
+  actorName: string;
+  updateActorName: (name: string) => Promise<void>;
+
+  // Activity Tracking
+  activities: Activity[];
+  addActivity: (action: string, entity?: ActivityEntityRef, metadata?: Record<string, any>) => void;
+  clearActivities: () => void;
+
   // Loading states
   loading: boolean;
   refreshData: () => Promise<void>;
@@ -120,10 +140,22 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
+  const [actorName, setActorName] = useState('System');
+
+  // Helper function to handle errors consistently
+  const handleError = (error: any, action: string) => {
+    console.error(`Error ${action}:`, error);
+    toast({
+      title: `Error ${action}`,
+      description: error.message || 'An unexpected error occurred',
+      variant: 'destructive',
+    });
+  };
 
   // All state
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [routines, setRoutines] = useState<any[]>([]); // TODO: Replace 'any' with the correct Routine type
   const [notes, setNotes] = useState<Note[]>([]);
   const [todoLists, setTodoLists] = useState<TodoList[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -154,6 +186,682 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     model: 'gemini-1.5-pro',
     maxContextItems: 100,
   });
+  
+  // Activities state
+  const [activities, setActivities] = useState<Activity[]>([]);
+  
+  // Add activity to the log
+  const addActivity = async (action: string, entity?: ActivityEntityRef, meta?: Record<string, any>) => {
+    try {
+      if (!user?.id) {
+        console.warn('Cannot log activity: No authenticated user');
+        return;
+      }
+
+      const now = new Date();
+      const activity: Activity = {
+        id: `temp-${Date.now()}`,
+        at: now,
+        actor: user?.email || 'system',
+        action,
+        ...(entity && { entity }),
+        ...(meta && { meta })
+      };
+
+      // Add to local state optimistically
+      setActivities(prev => [activity, ...prev].slice(0, 100)); // Keep only last 100 activities
+
+      try {
+        const activityData: any = {
+          action,
+          actor: user?.email || 'system',
+          user_id: user.id,
+          created_at: now.toISOString(),
+          metadata: meta || {}
+        };
+
+        if (entity) {
+          activityData.entity_type = entity.type;
+          activityData.entity_id = entity.id;
+          activityData.entity_label = entity.label;
+        }
+
+        const { data, error } = await supabase
+          .from('activities')
+          .insert(activityData)
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // Update the activity with the server-generated ID
+        setActivities(prev => 
+          prev.map(a => 
+            a.id === activity.id 
+              ? { ...a, id: data.id } 
+              : a
+          )
+        );
+
+        return { ...activity, id: data.id };
+      } catch (dbError) {
+        // Revert optimistic update on error
+        setActivities(prev => prev.filter(a => a.id !== activity.id));
+        console.error('Database error logging activity:', dbError);
+        throw dbError;
+      }
+    } catch (error) {
+      console.error('Error in addActivity:', error);
+      handleError(error, 'log activity');
+      throw error;
+    }
+  };
+  
+  // Clear all activities
+  const clearActivities = () => {
+    setActivities([]);
+    
+    // Optionally clear from Supabase
+    if (user) {
+      supabase
+        .from('activities')
+        .delete()
+        .eq('user_id', user.id)
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error clearing activities:', error);
+          }
+        });
+    }
+  };
+
+  // Routine methods
+  const addRoutine = async (routine: any) => {
+    try {
+      const { data, error } = await supabase
+        .from('routines')
+        .insert(routine)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setRoutines(prev => [...prev, data]);
+      return data;
+    } catch (error) {
+      handleError(error, 'adicionar rotina');
+      throw error;
+    }
+  };
+
+  const completeRoutineOnce = async (routineId: string, date: string) => {
+    try {
+      const { error } = await supabase
+        .from('routine_completions')
+        .upsert({
+          routine_id: routineId,
+          date,
+          completed: true
+        });
+
+      if (error) throw error;
+      
+      // Refresh routines data
+      await refreshData();
+    } catch (error) {
+      handleError(error, 'marcar rotina como concluída');
+      throw error;
+    }
+  };
+
+  const skipRoutineDay = async (routineId: string, date: string) => {
+    try {
+      const { error } = await supabase
+        .from('routine_skips')
+        .upsert({
+          routine_id: routineId,
+          date,
+          skipped: true
+        });
+
+      if (error) throw error;
+      
+      // Refresh routines data
+      await refreshData();
+    } catch (error) {
+      handleError(error, 'pular rotina');
+      throw error;
+    }
+  };
+
+  const skipRoutineBetween = async (routineId: string, startDate: string, endDate: string) => {
+    try {
+      // Get all dates between start and end
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const dates = [];
+      
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        dates.push(new Date(d).toISOString().split('T')[0]);
+      }
+      
+      // Insert skips for all dates
+      const { error } = await supabase
+        .from('routine_skips')
+        .upsert(
+          dates.map(date => ({
+            routine_id: routineId,
+            date,
+            skipped: true
+          })),
+          { onConflict: 'routine_id,date' }
+        );
+
+      if (error) throw error;
+      
+      // Refresh routines data
+      await refreshData();
+    } catch (error) {
+      handleError(error, 'pausar rotina');
+      throw error;
+    }
+  };
+
+  const getRoutineProgress = async (routineId: string, startDate: string, endDate: string) => {
+    try {
+      // Get completions in date range
+      const { data: completions } = await supabase
+        .from('routine_completions')
+        .select('date')
+        .eq('routine_id', routineId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      // Get skips in date range
+      const { data: skips } = await supabase
+        .from('routine_skips')
+        .select('date')
+        .eq('routine_id', routineId)
+        .gte('date', startDate)
+        .lte('date', endDate);
+
+      // Get paused periods in date range
+      const { data: paused } = await supabase
+        .from('routine_pauses')
+        .select('start_date, end_date')
+        .eq('routine_id', routineId)
+        .lte('start_date', endDate)
+        .gte('end_date', startDate);
+
+      return {
+        completed: completions?.length || 0,
+        skipped: skips?.length || 0,
+        paused: paused?.length || 0,
+        total: 0 // Will be calculated in the component
+      };
+    } catch (error) {
+      handleError(error, 'obter progresso da rotina');
+      throw error;
+    }
+  };
+
+  // Transaction methods
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        } as any) // Type assertion to handle Supabase types
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setTransactions(prev => 
+        prev.map(tx => tx.id === id ? { ...tx, ...data } : tx)
+      );
+      
+      return data;
+    } catch (error) {
+      handleError(error, 'atualizar transação');
+      throw error;
+    }
+  };
+
+  const deleteTransaction = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setTransactions(prev => prev.filter(tx => tx.id !== id));
+      
+      // Log activity
+      await addActivity('transaction_deleted', { 
+        type: 'transaction', 
+        id,
+        label: `Transaction ${id}`
+      });
+      
+      return true;
+    } catch (error) {
+      handleError(error, 'excluir transação');
+      throw error;
+    }
+  };
+
+  const deleteTask = async (id: string) => {
+    try {
+      const task = tasks.find(t => t.id === id);
+      if (!task) throw new Error('Task not found');
+      
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setTasks(prev => prev.filter(t => t.id !== id));
+      
+      await addActivity('task_deleted', {
+        type: 'task',
+        id,
+        label: task.title
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting task:', error);
+      throw error;
+    }
+  };
+
+  const addTask = async (taskData: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const now = new Date();
+      const taskToInsert = {
+        title: taskData.title,
+        description: taskData.description || null,
+        completed: taskData.completed || false,
+        project_id: taskData.projectId || null,
+        date: taskData.date instanceof Date ? taskData.date.toISOString().split('T')[0] : taskData.date,
+        start_time: taskData.startTime || null,
+        end_time: taskData.endTime || null,
+        is_routine: taskData.isRoutine || false,
+        is_overdue: taskData.isOverdue || false,
+        user_id: user.id,
+        created_at: now.toISOString(),
+        updated_at: now.toISOString(),
+        priority: taskData.priority || 'medium',
+        status: taskData.status || 'todo',
+        labels: taskData.labels || [],
+      };
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert(taskToInsert)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newTask: Task = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        completed: data.completed,
+        projectId: data.project_id,
+        date: new Date(data.date),
+        startTime: data.start_time,
+        endTime: data.end_time,
+        isRoutine: data.is_routine,
+        isOverdue: data.is_overdue,
+        priority: data.priority,
+        status: data.status,
+        labels: data.labels || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at)
+      };
+
+      setTasks(prev => [...prev, newTask]);
+      
+      // Log activity
+      await addActivity('task_created', { 
+        type: 'task', 
+        id: data.id,
+        label: data.title
+      }, {
+        projectId: data.project_id,
+        priority: data.priority,
+        status: data.status
+      });
+      
+      return newTask;
+    } catch (error) {
+      console.error('Error adding task:', error);
+      handleError(error, 'adding task');
+      throw error;
+    }
+  };
+
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+    try {
+      if (!user?.id) throw new Error('User not authenticated');
+      
+      const now = new Date();
+      const taskUpdates: Record<string, any> = {
+        ...updates,
+        updated_at: now.toISOString()
+      };
+
+      // Handle date conversion if provided
+      if (updates.date) {
+        taskUpdates.date = updates.date instanceof Date 
+          ? updates.date.toISOString().split('T')[0] 
+          : updates.date;
+      }
+
+      // Map frontend field names to database column names
+      if ('projectId' in updates) {
+        taskUpdates.project_id = updates.projectId;
+        delete taskUpdates.projectId;
+      }
+      if ('startTime' in updates) {
+        taskUpdates.start_time = updates.startTime;
+        delete taskUpdates.startTime;
+      }
+      if ('endTime' in updates) {
+        taskUpdates.end_time = updates.endTime;
+        delete taskUpdates.endTime;
+      }
+      if ('isRoutine' in updates) {
+        taskUpdates.is_routine = updates.isRoutine;
+        delete taskUpdates.isRoutine;
+      }
+      if ('isOverdue' in updates) {
+        taskUpdates.is_overdue = updates.isOverdue;
+        delete taskUpdates.isOverdue;
+      }
+
+      // Get the task before updating to track changes
+      const { data: existingTask } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (!existingTask) {
+        throw new Error('Task not found');
+      }
+
+      const { data, error } = await supabase
+        .from('tasks')
+        .update(taskUpdates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const updatedTask: Task = {
+        id: data.id,
+        title: data.title,
+        description: data.description,
+        completed: data.completed,
+        projectId: data.project_id,
+        date: new Date(data.date),
+        startTime: data.start_time,
+        endTime: data.end_time,
+        isRoutine: data.is_routine,
+        isOverdue: data.is_overdue,
+        priority: data.priority,
+        status: data.status,
+        labels: data.labels || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at)
+      };
+
+      setTasks(prev => prev.map(task => 
+        task.id === id ? { ...task, ...updatedTask } : task
+      ));
+      
+      // Log activity with detailed change information
+      const changedFields: Record<string, { from: any; to: any }> = {};
+      
+      Object.entries(updates).forEach(([key, value]) => {
+        if (JSON.stringify(existingTask[key]) !== JSON.stringify(value)) {
+          changedFields[key] = {
+            from: existingTask[key],
+            to: value
+          };
+        }
+      });
+
+      if (Object.keys(changedFields).length > 0) {
+        await addActivity('task_updated', {
+          type: 'task',
+          id,
+          label: updates.title || existingTask.title
+        }, {
+          changes: changedFields,
+          projectId: data.project_id
+        });
+      }
+
+      return updatedTask;
+    } catch (error) {
+      console.error('Error updating task:', error);
+      handleError(error, 'updating task');
+      throw error;
+    }
+  };
+
+const deleteProject = async (id: string) => {
+  try {
+    const project = projects.find(p => p.id === id);
+
+    const { error } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+
+    setProjects(prev => prev.filter(project => project.id !== id));
+
+    // Log activity
+    if (project) {
+      addActivity('project_deleted', {
+        type: 'project',
+        id,
+        label: project.name
+      });
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    throw error;
+  }
+};
+
+const addProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+  try {
+    const { data, error } = await supabase
+      .from('projects')
+      .insert([{ ...project, created_at: new Date().toISOString() }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    setProjects(prev => [...prev, data]);
+
+    // Log activity
+    addActivity('project_created', {
+      type: 'project',
+      id: data.id,
+      label: project.name
+    });
+
+    return data;
+  } catch (error) {
+    if (error) throw error;
+
+    setProjects(prev => prev.map(project =>
+      project.id === id ? { ...project, ...data } : project
+    ));
+    try {
+      // First, check if there are any transactions linked to this account
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('account_id', id)
+        .limit(1);
+
+      if (transactionsError) throw transactionsError;
+      
+      if (transactions && transactions.length > 0) {
+        throw new Error('Não é possível excluir uma conta que possui transações vinculadas.');
+      }
+
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      
+      setAccounts(prev => prev.filter(acc => acc.id !== id));
+    } catch (error) {
+      handleError(error, 'excluir conta');
+      throw error;
+    }
+  };
+
+  // Transaction methods
+  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          ...transaction,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Update the account balance
+      if (transaction.accountId) {
+        const account = accounts.find(acc => acc.id === transaction.accountId);
+        if (account) {
+          const amount = transaction.amount || 0;
+          const newBalance = account.balance + amount;
+          await updateAccount(transaction.accountId, { balance: newBalance });
+        }
+      }
+      
+      setTransactions(prev => [...prev, data]);
+      return data;
+    } catch (error) {
+      handleError(error, 'adicionar transação');
+      throw error;
+    }
+  };
+
+  // Refresh all data from the database
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      // Fetch all data in parallel
+      const [
+        { data: projectsData },
+        { data: tasksData },
+        { data: routinesData },
+        { data: notesData },
+        { data: todoListsData },
+        { data: accountsData },
+        { data: transactionsData },
+        { data: debtsData },
+        { data: goalsData },
+        { data: receivablesData },
+        { data: contactsData },
+        { data: contactGroupsData },
+        { data: projectImagesData },
+        { data: projectWalletEntriesData },
+        { data: clockifyTimeEntriesData },
+        { data: plakyBoardsData },
+        { data: plakyItemsData },
+        { data: pomodoroSessionsData },
+        { data: pomodoroSettingsData },
+        { data: aiSettingsData }
+      ] = await Promise.all([
+        supabase.from('projects').select('*'),
+        supabase.from('tasks').select('*'),
+        supabase.from('routines').select('*'),
+        supabase.from('notes').select('*'),
+        supabase.from('todo_lists').select('*'),
+        supabase.from('accounts').select('*'),
+        supabase.from('transactions').select('*'),
+        supabase.from('debts').select('*'),
+        supabase.from('goals').select('*'),
+        supabase.from('receivables').select('*'),
+        supabase.from('contacts').select('*'),
+        supabase.from('contact_groups').select('*'),
+        supabase.from('project_images').select('*'),
+        supabase.from('project_wallet_entries').select('*'),
+        supabase.from('clockify_time_entries').select('*'),
+        supabase.from('plaky_boards').select('*'),
+        supabase.from('plaky_items').select('*'),
+        supabase.from('pomodoro_sessions').select('*'),
+        supabase.from('pomodoro_settings').select('*').single(),
+        supabase.from('ai_settings').select('*').single()
+      ]);
+
+      // Update state with the fetched data
+      if (projectsData) setProjects(projectsData.map(transformDbProject));
+      if (tasksData) setTasks(tasksData.map(transformDbTask));
+      if (routinesData) setRoutines(routinesData);
+      if (notesData) setNotes(notesData);
+      if (todoListsData) setTodoLists(todoListsData);
+      if (accountsData) setAccounts(accountsData);
+      if (transactionsData) setTransactions(transactionsData);
+      if (debtsData) setDebts(debtsData);
+      if (goalsData) setGoals(goalsData);
+      if (receivablesData) setReceivables(receivablesData);
+      if (contactsData) setContacts(contactsData);
+      if (contactGroupsData) setContactGroups(contactGroupsData);
+      if (projectImagesData) setProjectImages(projectImagesData);
+      if (projectWalletEntriesData) setProjectWalletEntries(projectWalletEntriesData);
+      if (clockifyTimeEntriesData) setClockifyTimeEntries(clockifyTimeEntriesData);
+      if (plakyBoardsData) setPlakyBoards(plakyBoardsData);
+      if (plakyItemsData) setPlakyItems(plakyItemsData);
+      if (pomodoroSessionsData) setPomodoroSessions(pomodoroSessionsData);
+      if (pomodoroSettingsData) setPomodoroSettings(pomodoroSettingsData);
+      if (aiSettingsData) setAISettings(aiSettingsData);
+      
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+      toast({
+        title: 'Erro',
+        description: 'Falha ao atualizar os dados. Por favor, tente novamente.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Error handler
   const handleError = (error: any, operation: string) => {
@@ -276,6 +984,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
   // Load data when user changes
   useEffect(() => {
+    // Load actor name from local storage
+    const savedName = localStorage.getItem('actorName');
+    if (savedName) {
+      setActorName(savedName);
+    }
     if (user) {
       loadAllData();
     } else {
@@ -452,9 +1165,15 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
     // Tasks
     tasks,
+    routines,
     addTask,
     updateTask,
     deleteTask,
+    addRoutine,
+    completeRoutineOnce,
+    skipRoutineDay,
+    skipRoutineBetween,
+    getRoutineProgress,
 
     // Notes - placeholder implementations
     notes,
@@ -468,14 +1187,16 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     updateTodoList: async () => notImplemented('updateTodoList'),
     deleteTodoList: async () => notImplemented('deleteTodoList'),
 
-    // Financial - placeholder implementations
+    // Financial
     accounts,
     transactions,
     debts,
     goals,
     receivables,
-    addAccount: async () => notImplemented('addAccount'),
-    addTransaction: async () => notImplemented('addTransaction'),
+    addAccount,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
     addDebt: async () => notImplemented('addDebt'),
     addGoal: async () => notImplemented('addGoal'),
     updateAccount: async () => notImplemented('updateAccount'),
@@ -555,7 +1276,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   );
 }
 
-export function useAppContext() {
+// Export the AppContext for direct usage if needed
+export { AppContext };
+
+// Export the typed useAppContext hook
+export function useAppContext(): AppContextType {
   const context = useContext(AppContext);
   if (context === undefined) {
     throw new Error('useAppContext must be used within a SupabaseAppProvider');

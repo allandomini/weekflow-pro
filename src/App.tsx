@@ -60,6 +60,7 @@ const App = () => (
                     <Route path="/network" element={<Network />} />
                     <Route path="/clockify" element={<Clockify />} />
                     <Route path="/plaky" element={<Plaky />} />
+                    <Route path="/historico" element={<Historico />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<NotFound />} />
                   </Routes>
@@ -68,22 +69,6 @@ const App = () => (
               </ProtectedRoute>
             } />
           </Routes>
-          <Layout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/calendar" element={<Calendar />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/projects/:projectId" element={<ProjectDetail />} />
-              <Route path="/finances" element={<Finances />} />
-              <Route path="/network" element={<Network />} />
-              <Route path="/clockify" element={<Clockify />} />
-              <Route path="/plaky" element={<Plaky />} />
-              <Route path="/historico" element={<Historico />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <GeminiChat />
-          </Layout>
         </BrowserRouter>
       </TooltipProvider>
     </SupabaseAppProvider>

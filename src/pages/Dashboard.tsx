@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +18,8 @@ import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask } = useAppContext();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, routines, addRoutine, completeRoutineOnce, skipRoutineDay, skipRoutineBetween, getRoutineProgress } = useAppContext();
+  const navigate = useNavigate();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -222,20 +224,61 @@ export default function Dashboard() {
     }
   };
 
+  const [routineProgress, setRoutineProgress] = useState<Record<string, {goal: number; count: number; skipped: boolean; paused: boolean}>>({});
+
+  // Load routine progress for the current week
+  useEffect(() => {
+    const loadRoutineProgress = async () => {
+      const progress: Record<string, {goal: number; count: number; skipped: boolean; paused: boolean}> = {};
+      
+      // Get the start and end of the current week
+      const startOfWeekDate = startOfWeek(currentWeekDate, { weekStartsOn: 0 });
+      const endOfWeekDate = endOfWeek(currentWeekDate, { weekStartsOn: 0 });
+      
+      // For each day in the week
+      const days = eachDayOfInterval({ start: startOfWeekDate, end: endOfWeekDate });
+      
+      for (const day of days) {
+        const dayStr = toYmd(day);
+        for (const r of routines) {
+          if (r.deletedAt) continue;
+          // Active window checks
+          if (r.activeFrom && r.activeFrom > dayStr) continue;
+          if (r.activeTo && r.activeTo < dayStr) continue;
+          
+          try {
+            const progressData = await getRoutineProgress(r.id, dayStr, dayStr);
+            progress[`${r.id}-${dayStr}`] = progressData;
+          } catch (error) {
+            console.error('Error loading routine progress:', error);
+            progress[`${r.id}-${dayStr}`] = { goal: 1, count: 0, skipped: false, paused: false };
+          }
+        }
+      }
+      
+      setRoutineProgress(progress);
+    };
+    
+    loadRoutineProgress();
+  }, [routines, currentWeekDate]);
+
   const getTasksForDay = (day: Date) => {
     const sameDayTasks = tasks.filter(task => task.date.toDateString() === day.toDateString());
     // Generate virtual routine occurrences based on routines definitions and completions
     const dayStr = toYmd(day);
     const virtuals: Task[] = [];
+    
     for (const r of routines) {
       if (r.deletedAt) continue;
       // Active window checks
       if (r.activeFrom && r.activeFrom > dayStr) continue;
       if (r.activeTo && r.activeTo < dayStr) continue;
-      // Progress and state
-      const { goal, count, skipped, paused } = getRoutineProgress(r.id, dayStr);
-      if (skipped || paused) continue;
-      const remaining = Math.max(0, goal - count);
+      
+      // Get progress from state
+      const progress = routineProgress[`${r.id}-${dayStr}`] || { goal: 1, count: 0, skipped: false, paused: false };
+      
+      if (progress.skipped || progress.paused) continue;
+      const remaining = Math.max(0, progress.goal - progress.count);
       if (remaining === 0) continue;
       // Schedule match: daily always matches; weekly/customDays check day of week
       const dow = day.getDay(); // 0-6 Sun-Sat

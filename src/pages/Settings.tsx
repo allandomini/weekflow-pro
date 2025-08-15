@@ -5,12 +5,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 
 export default function Settings() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
   const [notifications, setNotifications] = useState<boolean>(() => localStorage.getItem("notifications") !== "false");
-  const { aiSettings, updateAISettings, actorName, updateActorName } = useApp();
+  const { aiSettings, updateAISettings, actorName, updateActorName } = useAppContext();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {

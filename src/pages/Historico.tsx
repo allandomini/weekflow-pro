@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useApp } from "@/contexts/AppContext";
+import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -25,16 +25,36 @@ import {
 import { format, isToday, isYesterday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+interface ActivityEntity {
+  type: string;
+  id: string;
+  label?: string;
+}
+
+interface Activity {
+  id: string;
+  action: string;
+  actor: string;
+  at: string;
+  metadata?: {
+    entity?: ActivityEntity;
+    [key: string]: any;
+  };
+}
+
 export default function Historico() {
   const navigate = useNavigate();
-  const { activities, clearActivities } = useApp();
+  const { activities = [], clearActivities } = useAppContext();
   const [query, setQuery] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [actorFilter, setActorFilter] = useState("");
   const [startDate, setStartDate] = useState<string>("");
   const [endDate, setEndDate] = useState<string>("");
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filtered = useMemo(() => {
+  const filtered: Activity[] = useMemo(() => {
+    if (!activities) return [];
+    
     const q = query.trim().toLowerCase();
     const actorQ = actorFilter.trim().toLowerCase();
     const start = startDate ? new Date(startDate) : null;
@@ -42,15 +62,16 @@ export default function Historico() {
     if (end) {
       end.setHours(23, 59, 59, 999);
     }
-    return activities.filter(a => {
+    
+    return (activities as Activity[]).filter((a: Activity) => {
       const at = new Date(a.at);
       if (start && at < start) return false;
       if (end && at > end) return false;
       if (actionFilter !== "all" && a.action !== actionFilter) return false;
       if (actorQ && !a.actor.toLowerCase().includes(actorQ)) return false;
       if (q) {
-        const label = a.entity?.label?.toLowerCase() || "";
-        if (!(label.includes(q) || a.action.includes(q))) return false;
+        const entityLabel = a.metadata?.entity?.label?.toLowerCase() || "";
+        if (!(entityLabel.includes(q) || a.action.includes(q))) return false;
       }
       return true;
     });
@@ -88,7 +109,9 @@ export default function Historico() {
     }
   };
 
-  const pathForEntity = (type?: string, id?: string) => {
+  const pathForEntity = (activity: Activity) => {
+    const type = activity.metadata?.entity?.type;
+    const id = activity.metadata?.entity?.id;
     if (!type || !id) return null;
     if (type === 'project') return `/projects/${id}`;
     return null; // other entity pages not linked yet
@@ -107,14 +130,14 @@ export default function Historico() {
 
   // Group by date (yyyy-MM-dd)
   const groups = useMemo(() => {
-    const map = new Map<string, { label: string; items: typeof activities }>();
+    const map = new Map<string, { label: string; items: Activity[] }>();
     for (const a of filtered) {
       const d = new Date(a.at);
       const key = format(d, "yyyy-MM-dd");
       if (!map.has(key)) {
-        map.set(key, { label: formatDayLabel(d), items: [] as any });
+        map.set(key, { label: formatDayLabel(d), items: [] });
       }
-      map.get(key)!.items.push(a);
+      map.get(key)?.items.push(a);
     }
     // Keep original order (activities already newest first)
     return Array.from(map.entries()).sort(([a], [b]) => (a < b ? 1 : -1));
@@ -225,22 +248,22 @@ export default function Historico() {
                         </div>
                         <div className="mt-1">
                           {a.action === 'task_created' && (
-                            <span>Criou tarefa <span className="font-medium">{a.entity?.label}</span></span>
+                            <span>Criou tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
                           )}
                           {a.action === 'task_completed' && (
-                            <span>Concluiu tarefa <span className="font-medium">{a.entity?.label}</span></span>
+                            <span>Concluiu tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
                           )}
                           {a.action === 'task_uncompleted' && (
-                            <span>Reabriu tarefa <span className="font-medium">{a.entity?.label}</span></span>
+                            <span>Reabriu tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
                           )}
                           {a.action === 'task_deleted' && (
                             <span>Excluiu uma tarefa</span>
                           )}
                           {a.action === 'transaction_added' && (
-                            <span>Registrou transação <span className="font-medium">{a.entity?.label}</span></span>
+                            <span>Registrou transação <span className="font-medium">{a.metadata?.entity?.label}</span></span>
                           )}
                           {a.action === 'transaction_updated' && (
-                            <span>Editou transação <span className="font-medium">{a.entity?.label}</span></span>
+                            <span>Editou transação <span className="font-medium">{a.metadata?.entity?.label}</span></span>
                           )}
                           {a.action === 'transaction_deleted' && (
                             <span>Excluiu uma transação</span>
@@ -248,19 +271,19 @@ export default function Historico() {
                           {a.action === 'contact_added' && (
                             <span>Adicionou um contato</span>
                           )}
-                          {(a.action.startsWith('project_') || a.entity?.type === 'project') && (
+                          {(a.action.startsWith('project_') || a.metadata?.entity?.type === 'project') && (
                             <span>
                               Projeto {a.action === 'project_added' ? 'criado' : a.action === 'project_updated' ? 'atualizado' : a.action === 'project_deleted' ? 'excluído' : ''}{' '}
                               {(() => {
-                                const path = pathForEntity(a.entity?.type, a.entity?.id);
+                                const path = pathForEntity(a);
                                 if (path) {
                                   return (
                                     <button className="underline" onClick={() => navigate(path)}>
-                                      {a.entity?.label}
+                                      {a.metadata?.entity?.label}
                                     </button>
                                   );
                                 }
-                                return <span className="font-medium">{a.entity?.label}</span>;
+                                return <span className="font-medium">{a.metadata?.entity?.label}</span>;
                               })()}
                             </span>
                           )}

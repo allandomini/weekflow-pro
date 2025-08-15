@@ -3,9 +3,12 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { ReactNode, useEffect, useState } from "react";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/button";
-import { Moon, Sun } from "lucide-react";
+import { Moon, Sun, LogOut } from "lucide-react";
 import logoUrl from "@/assets/images/file.svg";
 import FloatingClockify from "./FloatingClockify";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface LayoutProps {
   children: ReactNode;
@@ -13,6 +16,27 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const [isDominiDark, setIsDominiDark] = useState(false);
+  const { signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/auth');
+      toast({
+        title: "Até logo!",
+        description: "Você saiu da sua conta.",
+      });
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível fazer logout. Tente novamente.",
+        variant: "destructive",
+      });
+    }
+  };
 
   useEffect(() => {
     const stored = localStorage.getItem("theme");
@@ -45,7 +69,7 @@ export function Layout({ children }: LayoutProps) {
               <img src={logoUrl} alt="Logo" className="h-8 w-auto drop-shadow-sm dark:invert" />
               <h1 className="text-xl font-semibold text-foreground transition-colors duration-200">Domini Horus</h1>
             </div>
-            <div className="ml-auto animate-fade-in-right">
+            <div className="ml-auto flex items-center gap-2 animate-fade-in-right">
               <Button 
                 variant="outline" 
                 size="icon" 
@@ -54,6 +78,15 @@ export function Layout({ children }: LayoutProps) {
                 className="transition-all duration-200 hover:scale-105 hover:shadow-soft active:scale-95"
               >
                 {isDominiDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                aria-label="Sair" 
+                onClick={handleLogout}
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive transition-all duration-200"
+              >
+                <LogOut className="h-4 w-4" />
               </Button>
             </div>
           </header>
