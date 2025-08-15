@@ -426,11 +426,21 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
       if (error) throw error;
       
-      setTransactions(prev => 
-        prev.map(tx => tx.id === id ? { ...tx, ...data } as Transaction : tx)
-      );
+      // Transform the database response to match our Transaction type
+      const updatedTransaction: Transaction = {
+        id: data.id,
+        description: data.description,
+        amount: data.amount,
+        type: data.type as "deposit" | "withdrawal" | "transfer",
+        category: data.category,
+        date: new Date(data.date),
+        accountId: data.account_id,
+        createdAt: new Date(data.created_at)
+      };
       
-      return data;
+      setTransactions(prev => 
+        prev.map(tx => tx.id === id ? updatedTransaction : tx)
+      );
     } catch (error) {
       handleError(error, 'atualizar transação');
       throw error;
@@ -449,13 +459,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setTransactions(prev => prev.filter(tx => tx.id !== id));
       
       // Log activity
-      await addActivity('transaction_deleted', { 
+      addActivity('transaction_deleted', { 
         type: 'transaction', 
         id,
         label: `Transaction ${id}`
       });
-      
-      return true;
     } catch (error) {
       handleError(error, 'excluir transação');
       throw error;

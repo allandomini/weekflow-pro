@@ -35,9 +35,9 @@ interface Activity {
   id: string;
   action: string;
   actor: string;
-  at: string;
-  metadata?: {
-    entity?: ActivityEntity;
+  at: Date;
+  entity?: ActivityEntity;
+  meta?: {
     [key: string]: any;
   };
 }
@@ -63,14 +63,14 @@ export default function Historico() {
       end.setHours(23, 59, 59, 999);
     }
     
-    return (activities as Activity[]).filter((a: Activity) => {
+    return activities.filter((a: Activity) => {
       const at = new Date(a.at);
       if (start && at < start) return false;
       if (end && at > end) return false;
       if (actionFilter !== "all" && a.action !== actionFilter) return false;
       if (actorQ && !a.actor.toLowerCase().includes(actorQ)) return false;
       if (q) {
-        const entityLabel = a.metadata?.entity?.label?.toLowerCase() || "";
+        const entityLabel = a.entity?.label?.toLowerCase() || "";
         if (!(entityLabel.includes(q) || a.action.includes(q))) return false;
       }
       return true;
@@ -110,8 +110,8 @@ export default function Historico() {
   };
 
   const pathForEntity = (activity: Activity) => {
-    const type = activity.metadata?.entity?.type;
-    const id = activity.metadata?.entity?.id;
+    const type = activity.entity?.type;
+    const id = activity.entity?.id;
     if (!type || !id) return null;
     if (type === 'project') return `/projects/${id}`;
     return null; // other entity pages not linked yet
@@ -247,23 +247,23 @@ export default function Historico() {
                           <span className="text-muted-foreground text-xs">{a.action}</span>
                         </div>
                         <div className="mt-1">
-                          {a.action === 'task_created' && (
-                            <span>Criou tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
+                           {a.action === 'task_created' && (
+                            <span>Criou tarefa <span className="font-medium">{a.entity?.label}</span></span>
                           )}
                           {a.action === 'task_completed' && (
-                            <span>Concluiu tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
+                            <span>Concluiu tarefa <span className="font-medium">{a.entity?.label}</span></span>
                           )}
                           {a.action === 'task_uncompleted' && (
-                            <span>Reabriu tarefa <span className="font-medium">{a.metadata?.entity?.label}</span></span>
+                            <span>Reabriu tarefa <span className="font-medium">{a.entity?.label}</span></span>
                           )}
                           {a.action === 'task_deleted' && (
                             <span>Excluiu uma tarefa</span>
                           )}
                           {a.action === 'transaction_added' && (
-                            <span>Registrou transação <span className="font-medium">{a.metadata?.entity?.label}</span></span>
+                            <span>Registrou transação <span className="font-medium">{a.entity?.label}</span></span>
                           )}
                           {a.action === 'transaction_updated' && (
-                            <span>Editou transação <span className="font-medium">{a.metadata?.entity?.label}</span></span>
+                            <span>Editou transação <span className="font-medium">{a.entity?.label}</span></span>
                           )}
                           {a.action === 'transaction_deleted' && (
                             <span>Excluiu uma transação</span>
@@ -271,7 +271,7 @@ export default function Historico() {
                           {a.action === 'contact_added' && (
                             <span>Adicionou um contato</span>
                           )}
-                          {(a.action.startsWith('project_') || a.metadata?.entity?.type === 'project') && (
+                          {(a.action.startsWith('project_') || a.entity?.type === 'project') && (
                             <span>
                               Projeto {a.action === 'project_added' ? 'criado' : a.action === 'project_updated' ? 'atualizado' : a.action === 'project_deleted' ? 'excluído' : ''}{' '}
                               {(() => {
@@ -279,11 +279,11 @@ export default function Historico() {
                                 if (path) {
                                   return (
                                     <button className="underline" onClick={() => navigate(path)}>
-                                      {a.metadata?.entity?.label}
+                                      {a.entity?.label}
                                     </button>
                                   );
                                 }
-                                return <span className="font-medium">{a.metadata?.entity?.label}</span>;
+                                return <span className="font-medium">{a.entity?.label}</span>;
                               })()}
                             </span>
                           )}
