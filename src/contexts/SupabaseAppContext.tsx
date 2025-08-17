@@ -7,7 +7,7 @@ import {
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
   PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings,
-  Activity, ActivityEntityRef
+  Activity, ActivityEntityRef, TodoItem
 } from '@/types';
 
 // Using Activity and ActivityEntityRef from types.ts
@@ -241,10 +241,205 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       if (tasksData) {
         setTasks(tasksData.map(transformDbTask));
       }
+
+      // Load other data...
+      await loadFinancialData();
+      await loadContactsData();
+      await loadNotesData();
+      await loadTodoListsData();
+      
     } catch (error) {
       handleError(error, 'loading data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load financial data
+  const loadFinancialData = async () => {
+    if (!user) return;
+
+    // Load accounts
+    const { data: accountsData } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (accountsData) {
+      setAccounts(accountsData.map(a => ({
+        id: a.id,
+        name: a.name,
+        type: a.type as "checking" | "savings" | "investment",
+        balance: a.balance,
+        createdAt: new Date(a.created_at),
+        updatedAt: new Date(a.updated_at),
+      })));
+    }
+
+    // Load transactions
+    const { data: transactionsData } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (transactionsData) {
+      setTransactions(transactionsData.map(t => ({
+        id: t.id,
+        description: t.description,
+        amount: t.amount,
+        type: t.type as "deposit" | "withdrawal" | "transfer",
+        category: t.category,
+        date: new Date(t.date),
+        accountId: t.account_id,
+        createdAt: new Date(t.created_at),
+      })));
+    }
+
+    // Load debts
+    const { data: debtsData } = await supabase
+      .from('debts')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (debtsData) {
+      setDebts(debtsData.map(d => ({
+        id: d.id,
+        name: d.name,
+        totalAmount: d.total_amount,
+        remainingAmount: d.remaining_amount,
+        dueDate: new Date(d.due_date),
+        allocatedReceivableIds: d.allocated_receivable_ids || [],
+        createdAt: new Date(d.created_at),
+        updatedAt: new Date(d.updated_at),
+      })));
+    }
+
+    // Load goals
+    const { data: goalsData } = await supabase
+      .from('goals')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (goalsData) {
+      setGoals(goalsData.map(g => ({
+        id: g.id,
+        name: g.name,
+        targetAmount: g.target_amount,
+        currentAmount: g.current_amount,
+        targetDate: g.target_date ? new Date(g.target_date) : undefined,
+        createdAt: new Date(g.created_at),
+        updatedAt: new Date(g.updated_at),
+      })));
+    }
+
+    // Load receivables
+    const { data: receivablesData } = await supabase
+      .from('receivables')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (receivablesData) {
+      setReceivables(receivablesData.map(r => ({
+        id: r.id,
+        name: r.name,
+        amount: r.amount,
+        dueDate: new Date(r.due_date),
+        description: r.description,
+        projectId: r.project_id,
+        status: r.status,
+        receivedAt: r.received_at ? new Date(r.received_at) : undefined,
+        createdAt: new Date(r.created_at),
+        updatedAt: new Date(r.updated_at),
+      })));
+    }
+  };
+
+  // Load contacts data
+  const loadContactsData = async () => {
+    if (!user) return;
+
+    // Load contacts
+    const { data: contactsData } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (contactsData) {
+      setContacts(contactsData.map(c => ({
+        id: c.id,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        whatsapp: c.whatsapp,
+        linkedin: c.linkedin,
+        avatarUrl: c.avatar_url,
+        notes: c.notes,
+        skills: c.skills || [],
+        projectIds: c.project_ids || [],
+        groupIds: c.group_ids || [],
+        attachments: c.attachments || [],
+        createdAt: new Date(c.created_at),
+        updatedAt: new Date(c.updated_at),
+      })));
+    }
+
+    // Load contact groups
+    const { data: groupsData } = await supabase
+      .from('contact_groups')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (groupsData) {
+      setContactGroups(groupsData.map(g => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        memberIds: g.member_ids || [],
+        createdAt: new Date(g.created_at),
+        updatedAt: new Date(g.updated_at),
+      })));
+    }
+  };
+
+  // Load notes data
+  const loadNotesData = async () => {
+    if (!user) return;
+
+    const { data: notesData } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (notesData) {
+      setNotes(notesData.map(n => ({
+        id: n.id,
+        title: n.title,
+        content: n.content,
+        projectId: n.project_id,
+        createdAt: new Date(n.created_at),
+        updatedAt: new Date(n.updated_at),
+      })));
+    }
+  };
+
+  // Load todo lists data
+  const loadTodoListsData = async () => {
+    if (!user) return;
+
+    const { data: todoListsData } = await supabase
+      .from('todo_lists')
+      .select('*')
+      .eq('user_id', user.id);
+    
+    if (todoListsData) {
+      setTodoLists(todoListsData.map(tl => ({
+        id: tl.id,
+        title: tl.title,
+        items: tl.items as TodoItem[],
+        projectId: tl.project_id,
+        createdAt: new Date(tl.created_at),
+        updatedAt: new Date(tl.updated_at),
+      })));
     }
   };
 
@@ -274,6 +469,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       }]);
+      addActivity('project_created', { type: 'project', id: data.id, label: project.name });
     } catch (error) {
       handleError(error, 'adicionar projeto');
     }
@@ -305,6 +501,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         createdAt: new Date(data.created_at),
         updatedAt: new Date(data.updated_at),
       } : p));
+      addActivity('project_updated', { type: 'project', id, label: updates.name || 'Project' });
     } catch (error) {
       handleError(error, 'atualizar projeto');
     }
@@ -327,6 +524,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setTasks(prev => prev.filter(t => t.projectId !== id));
       setNotes(prev => prev.filter(n => n.projectId !== id));
       setTodoLists(prev => prev.filter(tl => tl.projectId !== id));
+      addActivity('project_deleted', { type: 'project', id, label: 'Project' });
     } catch (error) {
       handleError(error, 'deletar projeto');
     }
@@ -389,29 +587,374 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  // Routine methods - placeholder implementations
-  const addRoutine = async (routine: any) => {
-    notImplemented('addRoutine');
+  // Task methods implementation
+  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .insert({
+          user_id: user.id,
+          title: task.title,
+          description: task.description,
+          completed: task.completed,
+          project_id: task.projectId,
+          date: task.date.toISOString(),
+          start_time: task.startTime,
+          end_time: task.endTime,
+          is_routine: task.isRoutine,
+          is_overdue: task.isOverdue || false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setTasks(prev => [...prev, transformDbTask(data)]);
+      addActivity('task_created', { type: 'task', id: data.id, label: task.title });
+    } catch (error) {
+      handleError(error, 'adicionar tarefa');
+    }
   };
 
-  const completeRoutineOnce = async (routineId: string, date: string) => {
-    notImplemented('completeRoutineOnce');
+  const updateTask = async (id: string, updates: Partial<Task>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({
+          title: updates.title,
+          description: updates.description,
+          completed: updates.completed,
+          project_id: updates.projectId,
+          date: updates.date?.toISOString(),
+          start_time: updates.startTime,
+          end_time: updates.endTime,
+          is_routine: updates.isRoutine,
+          is_overdue: updates.isOverdue,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setTasks(prev => prev.map(t => t.id === id ? transformDbTask(data) : t));
+      addActivity('task_updated', { type: 'task', id, label: updates.title || 'Task' });
+    } catch (error) {
+      handleError(error, 'atualizar tarefa');
+    }
   };
 
-  const skipRoutineDay = async (routineId: string, date: string) => {
-    notImplemented('skipRoutineDay');
+  const deleteTask = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setTasks(prev => prev.filter(t => t.id !== id));
+      addActivity('task_deleted', { type: 'task', id, label: 'Task' });
+    } catch (error) {
+      handleError(error, 'deletar tarefa');
+    }
   };
 
-  const skipRoutineBetween = async (routineId: string, startDate: string, endDate: string) => {
-    notImplemented('skipRoutineBetween');
+  // Notes methods
+  const addNote = async (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .insert({
+          user_id: user.id,
+          title: note.title,
+          content: note.content,
+          project_id: note.projectId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setNotes(prev => [...prev, {
+        id: data.id,
+        title: data.title,
+        content: data.content,
+        projectId: data.project_id,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('note_created', { type: 'note', id: data.id, label: note.title });
+    } catch (error) {
+      handleError(error, 'adicionar nota');
+    }
   };
 
-  const getRoutineProgress = async (routineId: string, startDate: string, endDate: string) => {
-    notImplemented('getRoutineProgress');
-    return { completed: 0, skipped: 0, paused: 0, total: 0 };
+  const updateNote = async (id: string, updates: Partial<Note>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('notes')
+        .update({
+          title: updates.title,
+          content: updates.content,
+          project_id: updates.projectId,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setNotes(prev => prev.map(n => n.id === id ? {
+        id: data.id,
+        title: data.title,
+        content: data.content,
+        projectId: data.project_id,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : n));
+      addActivity('note_updated', { type: 'note', id, label: updates.title || 'Note' });
+    } catch (error) {
+      handleError(error, 'atualizar nota');
+    }
   };
 
-  // Transaction methods
+  const deleteNote = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('notes')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setNotes(prev => prev.filter(n => n.id !== id));
+      addActivity('note_deleted', { type: 'note', id, label: 'Note' });
+    } catch (error) {
+      handleError(error, 'deletar nota');
+    }
+  };
+
+  // Todo Lists methods
+  const addTodoList = async (todoList: Omit<TodoList, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('todo_lists')
+        .insert({
+          user_id: user.id,
+          title: todoList.title,
+          items: todoList.items,
+          project_id: todoList.projectId,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setTodoLists(prev => [...prev, {
+        id: data.id,
+        title: data.title,
+        items: data.items,
+        projectId: data.project_id,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('todo_list_created', { type: 'todo_list', id: data.id, label: todoList.title });
+    } catch (error) {
+      handleError(error, 'adicionar lista de tarefas');
+    }
+  };
+
+  const updateTodoList = async (id: string, updates: Partial<TodoList>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('todo_lists')
+        .update({
+          title: updates.title,
+          items: updates.items,
+          project_id: updates.projectId,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setTodoLists(prev => prev.map(tl => tl.id === id ? {
+        id: data.id,
+        title: data.title,
+        items: data.items,
+        projectId: data.project_id,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : tl));
+      addActivity('todo_list_updated', { type: 'todo_list', id, label: updates.title || 'Todo List' });
+    } catch (error) {
+      handleError(error, 'atualizar lista de tarefas');
+    }
+  };
+
+  const deleteTodoList = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('todo_lists')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setTodoLists(prev => prev.filter(tl => tl.id !== id));
+      addActivity('todo_list_deleted', { type: 'todo_list', id, label: 'Todo List' });
+    } catch (error) {
+      handleError(error, 'deletar lista de tarefas');
+    }
+  };
+
+  // Financial methods
+  const addAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .insert({
+          user_id: user.id,
+          name: account.name,
+          type: account.type,
+          balance: account.balance,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setAccounts(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        balance: data.balance,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('account_created', { type: 'account', id: data.id, label: account.name });
+    } catch (error) {
+      handleError(error, 'adicionar conta');
+    }
+  };
+
+  const updateAccount = async (id: string, updates: Partial<Account>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .update({
+          name: updates.name,
+          type: updates.type,
+          balance: updates.balance,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setAccounts(prev => prev.map(a => a.id === id ? {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        balance: data.balance,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : a));
+      addActivity('account_updated', { type: 'account', id, label: updates.name || 'Account' });
+    } catch (error) {
+      handleError(error, 'atualizar conta');
+    }
+  };
+
+  const deleteAccount = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      addActivity('account_deleted', { type: 'account', id, label: 'Account' });
+    } catch (error) {
+      handleError(error, 'deletar conta');
+    }
+  };
+
+  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          account_id: transaction.accountId,
+          amount: transaction.amount,
+          type: transaction.type,
+          category: transaction.category,
+          description: transaction.description,
+          date: transaction.date.toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const newTransaction: Transaction = {
+        id: data.id,
+        description: data.description,
+        amount: data.amount,
+        type: data.type as "deposit" | "withdrawal" | "transfer",
+        category: data.category,
+        date: new Date(data.date),
+        accountId: data.account_id,
+        createdAt: new Date(data.created_at)
+      };
+      
+      setTransactions(prev => [...prev, newTransaction]);
+      addActivity('transaction_created', { type: 'transaction', id: data.id, label: transaction.description });
+    } catch (error) {
+      handleError(error, 'adicionar transação');
+    }
+  };
+
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
     try {
       const { data, error } = await supabase
@@ -470,53 +1013,54 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     }
   };
 
-
-  // Task methods
-  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+  // Debts methods
+  const addDebt = async (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
     
     try {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('debts')
         .insert({
           user_id: user.id,
-          title: task.title,
-          description: task.description,
-          completed: task.completed,
-          project_id: task.projectId,
-          date: task.date.toISOString(),
-          start_time: task.startTime,
-          end_time: task.endTime,
-          is_routine: task.isRoutine,
-          is_overdue: task.isOverdue || false,
+          name: debt.name,
+          total_amount: debt.totalAmount,
+          remaining_amount: debt.remainingAmount,
+          due_date: debt.dueDate.toISOString(),
+          allocated_receivable_ids: debt.allocatedReceivableIds || [],
         })
         .select()
         .single();
 
       if (error) throw error;
       
-      setTasks(prev => [...prev, transformDbTask(data)]);
+      setDebts(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        totalAmount: data.total_amount,
+        remainingAmount: data.remaining_amount,
+        dueDate: new Date(data.due_date),
+        allocatedReceivableIds: data.allocated_receivable_ids,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('debt_created', { type: 'debt', id: data.id, label: debt.name });
     } catch (error) {
-      handleError(error, 'adicionar tarefa');
+      handleError(error, 'adicionar dívida');
     }
   };
 
-  const updateTask = async (id: string, updates: Partial<Task>) => {
+  const updateDebt = async (id: string, updates: Partial<Debt>) => {
     if (!user) return;
     
     try {
       const { data, error } = await supabase
-        .from('tasks')
+        .from('debts')
         .update({
-          title: updates.title,
-          description: updates.description,
-          completed: updates.completed,
-          project_id: updates.projectId,
-          date: updates.date?.toISOString(),
-          start_time: updates.startTime,
-          end_time: updates.endTime,
-          is_routine: updates.isRoutine,
-          is_overdue: updates.isOverdue,
+          name: updates.name,
+          total_amount: updates.totalAmount,
+          remaining_amount: updates.remainingAmount,
+          due_date: updates.dueDate?.toISOString(),
+          allocated_receivable_ids: updates.allocatedReceivableIds,
         })
         .eq('id', id)
         .eq('user_id', user.id)
@@ -525,33 +1069,502 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
       if (error) throw error;
       
-      setTasks(prev => prev.map(t => t.id === id ? transformDbTask(data) : t));
+      setDebts(prev => prev.map(d => d.id === id ? {
+        id: data.id,
+        name: data.name,
+        totalAmount: data.total_amount,
+        remainingAmount: data.remaining_amount,
+        dueDate: new Date(data.due_date),
+        allocatedReceivableIds: data.allocated_receivable_ids,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : d));
+      addActivity('debt_updated', { type: 'debt', id, label: updates.name || 'Debt' });
     } catch (error) {
-      handleError(error, 'atualizar tarefa');
+      handleError(error, 'atualizar dívida');
     }
   };
 
-  const deleteTask = async (id: string) => {
+  // Goals methods
+  const addGoal = async (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .insert({
+          user_id: user.id,
+          name: goal.name,
+          target_amount: goal.targetAmount,
+          current_amount: goal.currentAmount,
+          target_date: goal.targetDate?.toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setGoals(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        targetAmount: data.target_amount,
+        currentAmount: data.current_amount,
+        targetDate: data.target_date ? new Date(data.target_date) : undefined,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('goal_created', { type: 'goal', id: data.id, label: goal.name });
+    } catch (error) {
+      handleError(error, 'adicionar meta');
+    }
+  };
+
+  const updateGoal = async (id: string, updates: Partial<Goal>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('goals')
+        .update({
+          name: updates.name,
+          target_amount: updates.targetAmount,
+          current_amount: updates.currentAmount,
+          target_date: updates.targetDate?.toISOString(),
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setGoals(prev => prev.map(g => g.id === id ? {
+        id: data.id,
+        name: data.name,
+        targetAmount: data.target_amount,
+        currentAmount: data.current_amount,
+        targetDate: data.target_date ? new Date(data.target_date) : undefined,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : g));
+      addActivity('goal_updated', { type: 'goal', id, label: updates.name || 'Goal' });
+    } catch (error) {
+      handleError(error, 'atualizar meta');
+    }
+  };
+
+  // Receivables methods
+  const addReceivable = async (receivable: Omit<Receivable, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'receivedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('receivables')
+        .insert({
+          user_id: user.id,
+          name: receivable.name,
+          amount: receivable.amount,
+          due_date: receivable.dueDate.toISOString(),
+          description: receivable.description,
+          project_id: receivable.projectId,
+          status: 'pending',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setReceivables(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        amount: data.amount,
+        dueDate: new Date(data.due_date),
+        description: data.description,
+        projectId: data.project_id,
+        status: data.status,
+        receivedAt: data.received_at ? new Date(data.received_at) : undefined,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('receivable_created', { type: 'receivable', id: data.id, label: receivable.name });
+    } catch (error) {
+      handleError(error, 'adicionar recebível');
+    }
+  };
+
+  const updateReceivable = async (id: string, updates: Partial<Receivable>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('receivables')
+        .update({
+          name: updates.name,
+          amount: updates.amount,
+          due_date: updates.dueDate?.toISOString(),
+          description: updates.description,
+          project_id: updates.projectId,
+          status: updates.status,
+          received_at: updates.receivedAt?.toISOString(),
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setReceivables(prev => prev.map(r => r.id === id ? {
+        id: data.id,
+        name: data.name,
+        amount: data.amount,
+        dueDate: new Date(data.due_date),
+        description: data.description,
+        projectId: data.project_id,
+        status: data.status,
+        receivedAt: data.received_at ? new Date(data.received_at) : undefined,
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : r));
+      addActivity('receivable_updated', { type: 'receivable', id, label: updates.name || 'Receivable' });
+    } catch (error) {
+      handleError(error, 'atualizar recebível');
+    }
+  };
+
+  const deleteReceivable = async (id: string) => {
     if (!user) return;
     
     try {
       const { error } = await supabase
-        .from('tasks')
+        .from('receivables')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
 
       if (error) throw error;
       
-      setTasks(prev => prev.filter(t => t.id !== id));
+      setReceivables(prev => prev.filter(r => r.id !== id));
+      addActivity('receivable_deleted', { type: 'receivable', id, label: 'Receivable' });
     } catch (error) {
-      handleError(error, 'deletar tarefa');
+      handleError(error, 'deletar recebível');
     }
   };
 
-  // Implement all other methods following the same pattern...
-  // For brevity, I'll implement placeholder methods that throw errors
+  // Financial operations
+  const payDebt = async (debtId: string, accountId: string, amount: number) => {
+    if (!user) return;
+    
+    try {
+      // Find the debt
+      const debt = debts.find(d => d.id === debtId);
+      if (!debt) throw new Error('Debt not found');
 
+      // Update debt remaining amount
+      await updateDebt(debtId, {
+        remainingAmount: debt.remainingAmount - amount
+      });
+
+      // Create transaction for debt payment
+      await addTransaction({
+        accountId,
+        amount: -amount,
+        type: 'withdrawal',
+        category: 'Debt Payment',
+        description: `Payment for debt: ${debt.name}`,
+        date: new Date(),
+      });
+
+      addActivity('debt_payment', { type: 'debt', id: debtId, label: debt.name }, { amount });
+    } catch (error) {
+      handleError(error, 'pagar dívida');
+    }
+  };
+
+  const allocateToGoal = async (goalId: string, accountId: string, amount: number) => {
+    if (!user) return;
+    
+    try {
+      // Find the goal
+      const goal = goals.find(g => g.id === goalId);
+      if (!goal) throw new Error('Goal not found');
+
+      // Update goal current amount
+      await updateGoal(goalId, {
+        currentAmount: goal.currentAmount + amount
+      });
+
+      // Create transaction for goal allocation
+      await addTransaction({
+        accountId,
+        amount: -amount,
+        type: 'withdrawal',
+        category: 'Goal Allocation',
+        description: `Allocation to goal: ${goal.name}`,
+        date: new Date(),
+      });
+
+      addActivity('goal_allocation', { type: 'goal', id: goalId, label: goal.name }, { amount });
+    } catch (error) {
+      handleError(error, 'alocar para meta');
+    }
+  };
+
+  const receiveReceivable = async (receivableId: string, accountId: string) => {
+    if (!user) return;
+    
+    try {
+      // Find the receivable
+      const receivable = receivables.find(r => r.id === receivableId);
+      if (!receivable) throw new Error('Receivable not found');
+
+      // Update receivable status
+      await updateReceivable(receivableId, {
+        status: 'received',
+        receivedAt: new Date()
+      });
+
+      // Create transaction for receivable payment
+      await addTransaction({
+        accountId,
+        amount: receivable.amount,
+        type: 'deposit',
+        category: 'Receivable',
+        description: `Received: ${receivable.name}`,
+        date: new Date(),
+      });
+
+      addActivity('receivable_received', { type: 'receivable', id: receivableId, label: receivable.name });
+    } catch (error) {
+      handleError(error, 'receber recebível');
+    }
+  };
+
+  // Contact methods
+  const addContact = async (contact: Omit<Contact, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .insert({
+          user_id: user.id,
+          name: contact.name,
+          email: contact.email,
+          phone: contact.phone,
+          whatsapp: contact.whatsapp,
+          linkedin: contact.linkedin,
+          avatar_url: contact.avatarUrl,
+          notes: contact.notes,
+          skills: contact.skills,
+          project_ids: contact.projectIds,
+          group_ids: contact.groupIds,
+          attachments: contact.attachments,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setContacts(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        whatsapp: data.whatsapp,
+        linkedin: data.linkedin,
+        avatarUrl: data.avatar_url,
+        notes: data.notes,
+        skills: data.skills || [],
+        projectIds: data.project_ids || [],
+        groupIds: data.group_ids || [],
+        attachments: data.attachments || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('contact_created', { type: 'contact', id: data.id, label: contact.name });
+    } catch (error) {
+      handleError(error, 'adicionar contato');
+    }
+  };
+
+  const updateContact = async (id: string, updates: Partial<Contact>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('contacts')
+        .update({
+          name: updates.name,
+          email: updates.email,
+          phone: updates.phone,
+          whatsapp: updates.whatsapp,
+          linkedin: updates.linkedin,
+          avatar_url: updates.avatarUrl,
+          notes: updates.notes,
+          skills: updates.skills,
+          project_ids: updates.projectIds,
+          group_ids: updates.groupIds,
+          attachments: updates.attachments,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setContacts(prev => prev.map(c => c.id === id ? {
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        whatsapp: data.whatsapp,
+        linkedin: data.linkedin,
+        avatarUrl: data.avatar_url,
+        notes: data.notes,
+        skills: data.skills || [],
+        projectIds: data.project_ids || [],
+        groupIds: data.group_ids || [],
+        attachments: data.attachments || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : c));
+      addActivity('contact_updated', { type: 'contact', id, label: updates.name || 'Contact' });
+    } catch (error) {
+      handleError(error, 'atualizar contato');
+    }
+  };
+
+  const deleteContact = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('contacts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setContacts(prev => prev.filter(c => c.id !== id));
+      addActivity('contact_deleted', { type: 'contact', id, label: 'Contact' });
+    } catch (error) {
+      handleError(error, 'deletar contato');
+    }
+  };
+
+  const addContactGroup = async (group: Omit<ContactGroup, 'id' | 'createdAt' | 'updatedAt'>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('contact_groups')
+        .insert({
+          user_id: user.id,
+          name: group.name,
+          description: group.description,
+          member_ids: group.memberIds,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setContactGroups(prev => [...prev, {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        memberIds: data.member_ids || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      }]);
+      addActivity('contact_group_created', { type: 'contact_group', id: data.id, label: group.name });
+    } catch (error) {
+      handleError(error, 'adicionar grupo de contatos');
+    }
+  };
+
+  const updateContactGroup = async (id: string, updates: Partial<ContactGroup>) => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('contact_groups')
+        .update({
+          name: updates.name,
+          description: updates.description,
+          member_ids: updates.memberIds,
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setContactGroups(prev => prev.map(g => g.id === id ? {
+        id: data.id,
+        name: data.name,
+        description: data.description,
+        memberIds: data.member_ids || [],
+        createdAt: new Date(data.created_at),
+        updatedAt: new Date(data.updated_at),
+      } : g));
+      addActivity('contact_group_updated', { type: 'contact_group', id, label: updates.name || 'Contact Group' });
+    } catch (error) {
+      handleError(error, 'atualizar grupo de contatos');
+    }
+  };
+
+  const deleteContactGroup = async (id: string) => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('contact_groups')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setContactGroups(prev => prev.filter(g => g.id !== id));
+      addActivity('contact_group_deleted', { type: 'contact_group', id, label: 'Contact Group' });
+    } catch (error) {
+      handleError(error, 'deletar grupo de contatos');
+    }
+  };
+
+  // Routine methods - placeholder implementations
+  const addRoutine = async (routine: any) => {
+    console.warn('Routine functionality not yet implemented in Supabase');
+    toast({
+      title: 'Funcionalidade não implementada',
+      description: 'Rotinas ainda não estão disponíveis no modo Supabase',
+      variant: 'destructive',
+    });
+  };
+
+  const completeRoutineOnce = async (routineId: string, date: string) => {
+    console.warn('Routine functionality not yet implemented in Supabase');
+  };
+
+  const skipRoutineDay = async (routineId: string, date: string) => {
+    console.warn('Routine functionality not yet implemented in Supabase');
+  };
+
+  const skipRoutineBetween = async (routineId: string, startDate: string, endDate: string) => {
+    console.warn('Routine functionality not yet implemented in Supabase');
+  };
+
+  const getRoutineProgress = async (routineId: string, startDate: string, endDate: string) => {
+    console.warn('Routine functionality not yet implemented in Supabase');
+    return { completed: 0, skipped: 0, paused: 0, total: 0 };
+  };
+
+  // Implementation helper
   const notImplemented = (method: string) => {
     throw new Error(`${method} not yet implemented in Supabase context`);
   };
@@ -575,17 +1588,17 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     skipRoutineBetween,
     getRoutineProgress,
 
-    // Notes - placeholder implementations
+    // Notes
     notes,
-    addNote: async () => notImplemented('addNote'),
-    updateNote: async () => notImplemented('updateNote'),
-    deleteNote: async () => notImplemented('deleteNote'),
+    addNote,
+    updateNote,
+    deleteNote,
 
-    // TodoLists - placeholder implementations
+    // TodoLists
     todoLists,
-    addTodoList: async () => notImplemented('addTodoList'),
-    updateTodoList: async () => notImplemented('updateTodoList'),
-    deleteTodoList: async () => notImplemented('deleteTodoList'),
+    addTodoList,
+    updateTodoList,
+    deleteTodoList,
 
     // Financial
     accounts,
@@ -593,32 +1606,32 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     debts,
     goals,
     receivables,
-    addAccount: async () => notImplemented('addAccount'),
-    addTransaction: async () => notImplemented('addTransaction'),
+    addAccount,
+    addTransaction,
     updateTransaction,
     deleteTransaction,
-    addDebt: async () => notImplemented('addDebt'),
-    addGoal: async () => notImplemented('addGoal'),
-    updateAccount: async () => notImplemented('updateAccount'),
-    deleteAccount: async () => notImplemented('deleteAccount'),
-    updateDebt: async () => notImplemented('updateDebt'),
-    updateGoal: async () => notImplemented('updateGoal'),
-    payDebt: async () => notImplemented('payDebt'),
-    allocateToGoal: async () => notImplemented('allocateToGoal'),
-    addReceivable: async () => notImplemented('addReceivable'),
-    updateReceivable: async () => notImplemented('updateReceivable'),
-    deleteReceivable: async () => notImplemented('deleteReceivable'),
-    receiveReceivable: async () => notImplemented('receiveReceivable'),
+    addDebt,
+    addGoal,
+    updateAccount,
+    deleteAccount,
+    updateDebt,
+    updateGoal,
+    payDebt,
+    allocateToGoal,
+    addReceivable,
+    updateReceivable,
+    deleteReceivable,
+    receiveReceivable,
 
-    // Network - placeholder implementations
+    // Network
     contacts,
     contactGroups,
-    addContact: async () => notImplemented('addContact'),
-    updateContact: async () => notImplemented('updateContact'),
-    deleteContact: async () => notImplemented('deleteContact'),
-    addContactGroup: async () => notImplemented('addContactGroup'),
-    updateContactGroup: async () => notImplemented('updateContactGroup'),
-    deleteContactGroup: async () => notImplemented('deleteContactGroup'),
+    addContact,
+    updateContact,
+    deleteContact,
+    addContactGroup,
+    updateContactGroup,
+    deleteContactGroup,
 
     // Project media and wallet - placeholder implementations
     projectImages,
