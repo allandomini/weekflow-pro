@@ -277,8 +277,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     name: dbReceivable.name,
     amount: parseFloat(dbReceivable.amount),
     dueDate: new Date(dbReceivable.due_date),
-    status: dbReceivable.status,
-    notes: dbReceivable.notes,
+    status: dbReceivable.status as 'pending' | 'received',
+    description: dbReceivable.description,
+    projectId: dbReceivable.project_id,
+    receivedAt: dbReceivable.received_at ? new Date(dbReceivable.received_at) : undefined,
     createdAt: new Date(dbReceivable.created_at),
     updatedAt: new Date(dbReceivable.updated_at),
   });
@@ -387,13 +389,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           color: r.color,
           timesPerDay: r.times_per_day,
           schedule: typeof r.schedule === 'string' ? JSON.parse(r.schedule) : r.schedule,
-          activeFrom: new Date(r.active_from),
-          activeTo: r.active_to ? new Date(r.active_to) : undefined,
-          pausedUntil: r.paused_until ? new Date(r.paused_until) : undefined,
+          activeFrom: r.active_from,
+          activeTo: r.active_to || undefined,
+          pausedUntil: r.paused_until || undefined,
           exceptions: typeof r.exceptions === 'string' ? JSON.parse(r.exceptions) : r.exceptions,
           createdAt: new Date(r.created_at),
           updatedAt: new Date(r.updated_at),
-          deletedAt: r.deleted_at ? new Date(r.deleted_at) : null,
+          deletedAt: r.deleted_at || null,
         })));
       }
 
@@ -601,9 +603,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         console.log('Activities loaded:', activitiesData);
         setActivities(activitiesData.map(a => ({
           id: a.id,
-          action: a.action,
-          entity: a.entity,
-          meta: a.meta,
+          action: a.action as any,
+          actor: 'user',
+          entity: a.entity as any,
+          meta: a.meta as Record<string, any>,
           at: new Date(a.at),
         })));
       }
@@ -1637,12 +1640,12 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             name: routine.name,
             color: routine.color,
             times_per_day: routine.timesPerDay,
-            schedule: routine.schedule,
-            active_from: new Date(routine.activeFrom).toISOString(),
-            active_to: routine.activeTo ? new Date(routine.activeTo).toISOString() : null,
-            paused_until: routine.pausedUntil ? new Date(routine.pausedUntil).toISOString() : null,
-            exceptions: routine.exceptions || {}
-          })
+            schedule: routine.schedule as any,
+            active_from: routine.activeFrom,
+            active_to: routine.activeTo || null,
+            paused_until: routine.pausedUntil || null,
+            exceptions: {} as any
+          } as any)
           .select()
           .single();
 
@@ -1661,7 +1664,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           createdAt: new Date(data.created_at),
           updatedAt: new Date(data.updated_at),
           deletedAt: null,
-          exceptions: routine.exceptions || {}
+          exceptions: {} as any
         };
         
         setRoutines(prev => [...prev, newRoutine]);
@@ -1679,10 +1682,119 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         });
       }
     },
-    updateRoutine: async () => notImplemented('updateRoutine'),
-    softDeleteRoutine: async () => notImplemented('softDeleteRoutine'),
-    hardDeleteRoutine: async () => notImplemented('hardDeleteRoutine'),
-    completeRoutineOnce: async (routineId: string, date?: string) => {
+    updateRoutine: async (id: string, updates: Partial<Routine>) => {
+      if (!user) return;
+      
+      try {
+        const { error } = await supabase
+          .from('routines')
+          .update({
+            name: updates.name,
+            color: updates.color,
+            times_per_day: updates.timesPerDay,
+            schedule: updates.schedule as any,
+            active_from: updates.activeFrom,
+            active_to: updates.activeTo || null,
+            paused_until: updates.pausedUntil || null,
+            exceptions: updates.exceptions as any || {},
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        
+        setRoutines(prev => prev.map(r => r.id === id ? { ...r, ...updates, updatedAt: new Date() } : r));
+        
+        await logActivity({
+          action: 'routine_updated',
+          entity: { type: 'routine', id } as any,
+          meta: { updates }
+        });
+        
+        toast({
+          title: "Rotina atualizada",
+          description: "Rotina foi atualizada com sucesso.",
+        });
+      } catch (error) {
+        console.error('Error updating routine:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível atualizar a rotina.",
+          variant: "destructive",
+        });
+      }
+    },
+    softDeleteRoutine: async (id: string) => {
+      if (!user) return;
+      
+      try {
+        const { error } = await supabase
+          .from('routines')
+          .update({
+            deleted_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        
+        setRoutines(prev => prev.map(r => r.id === id ? { ...r, deletedAt: new Date().toISOString(), updatedAt: new Date() } : r));
+        
+        await logActivity({
+          action: 'routine_deleted',
+          entity: { type: 'routine', id } as any,
+          meta: { mode: 'soft' }
+        });
+        
+        toast({
+          title: "Rotina excluída",
+          description: "Rotina foi excluída com sucesso.",
+        });
+      } catch (error) {
+        console.error('Error soft deleting routine:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a rotina.",
+          variant: "destructive",
+        });
+      }
+    },
+    hardDeleteRoutine: async (id: string) => {
+      if (!user) return;
+      
+      try {
+        const { error } = await supabase
+          .from('routines')
+          .delete()
+          .eq('id', id)
+          .eq('user_id', user.id);
+
+        if (error) throw error;
+        
+        setRoutines(prev => prev.filter(r => r.id !== id));
+        
+        await logActivity({
+          action: 'routine_deleted',
+          entity: { type: 'routine', id } as any,
+          meta: { mode: 'hard' }
+        });
+        
+        toast({
+          title: "Rotina removida",
+          description: "Rotina foi removida permanentemente.",
+        });
+      } catch (error) {
+        console.error('Error hard deleting routine:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível remover a rotina.",
+          variant: "destructive",
+        });
+      }
+    },
+    completeRoutineOnce: async (routineId: string, date?: string): Promise<void> => {
       try {
         const d = date || new Date().toISOString().split('T')[0]; // yyyy-MM-dd format
         
@@ -1770,7 +1882,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           description: `"${routine.name}" foi marcada como completada.`,
         });
         
-        return completionData;
+        // Return void as expected
       } catch (error) {
         console.error('Error completing routine:', error);
         toast({

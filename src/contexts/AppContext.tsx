@@ -505,12 +505,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setRoutineCompletions(prev => {
       const dayMap = { ...(prev[d] || {}) };
-      const existing = dayMap[routineId] || { routineId, date: d, count: 0, timestamps: [] as string[] };
+      const existing = dayMap[routineId] || { 
+        id: '', 
+        routineId, 
+        date: d, 
+        count: 0, 
+        goal, 
+        skipped: false, 
+        paused: false, 
+        createdAt: new Date(), 
+        updatedAt: new Date() 
+      };
       if (existing.count >= goal) return prev; // already complete
       const next: RoutineCompletion = {
         ...existing,
         count: existing.count + 1,
-        timestamps: [...(existing.timestamps || []), new Date().toISOString()]
+        updatedAt: new Date()
       };
       return { ...prev, [d]: { ...dayMap, [routineId]: next } };
     });
