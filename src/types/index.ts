@@ -277,14 +277,20 @@ export interface Activity {
 export interface RoutineException {
   skip?: boolean;
   overrideTimesPerDay?: number;
+  overrideTimes?: string[];
 }
 
 export interface Routine {
   id: string;
   name: string;
+  description?: string;
   color: string;
   timesPerDay: number; // e.g., 3 = beber água 3x
-  schedule: Record<string, any>; // JSONB field
+  specificTimes?: string[]; // e.g., ["08:00", "12:00", "18:00"]
+  weekdays?: number[]; // 0-6 (Sunday-Saturday), empty = every day
+  durationDays?: number; // null = forever, number = specific duration
+  priority: 'low' | 'medium' | 'high';
+  schedule: Record<string, any>; // JSONB field (legacy, kept for compatibility)
   activeFrom: string; // yyyy-MM-dd
   activeTo?: string;   // yyyy-MM-dd
   pausedUntil?: string; // yyyy-MM-dd
@@ -302,6 +308,28 @@ export interface RoutineCompletion {
   goal: number;
   skipped: boolean;
   paused: boolean;
+  specificTime?: string; // e.g., "08:00"
+  completedAt?: Date;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface RoutineExceptionRecord {
+  id: string;
+  routineId: string;
+  date: string; // yyyy-MM-dd
+  action: 'skip' | 'override_times' | 'override_count';
+  value?: any; // JSON value for overrides
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface RoutineBulkOperation {
+  id: string;
+  routineId: string;
+  operationType: 'delete_occurrences' | 'skip_period';
+  startDate: string; // yyyy-MM-dd
+  endDate: string; // yyyy-MM-dd
+  affectedDates: string[]; // yyyy-MM-dd[]
+  createdAt: Date;
 }

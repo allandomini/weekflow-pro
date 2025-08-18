@@ -755,8 +755,50 @@ export type Database = {
           },
         ]
       }
+      routine_bulk_operations: {
+        Row: {
+          affected_dates: string[]
+          created_at: string
+          end_date: string
+          id: string
+          operation_type: string
+          routine_id: string
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          affected_dates: string[]
+          created_at?: string
+          end_date: string
+          id?: string
+          operation_type: string
+          routine_id: string
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          affected_dates?: string[]
+          created_at?: string
+          end_date?: string
+          id?: string
+          operation_type?: string
+          routine_id?: string
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_bulk_operations_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       routine_completions: {
         Row: {
+          completed_at: string | null
           count: number
           created_at: string
           date: string
@@ -765,10 +807,12 @@ export type Database = {
           paused: boolean
           routine_id: string
           skipped: boolean
+          specific_time: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          completed_at?: string | null
           count?: number
           created_at?: string
           date: string
@@ -777,10 +821,12 @@ export type Database = {
           paused?: boolean
           routine_id: string
           skipped?: boolean
+          specific_time?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          completed_at?: string | null
           count?: number
           created_at?: string
           date?: string
@@ -789,12 +835,54 @@ export type Database = {
           paused?: boolean
           routine_id?: string
           skipped?: boolean
+          specific_time?: string | null
           updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "routine_completions_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routine_exceptions: {
+        Row: {
+          action: string
+          created_at: string
+          date: string
+          id: string
+          routine_id: string
+          updated_at: string
+          user_id: string
+          value: Json | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          date: string
+          id?: string
+          routine_id: string
+          updated_at?: string
+          user_id: string
+          value?: Json | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          date?: string
+          id?: string
+          routine_id?: string
+          updated_at?: string
+          user_id?: string
+          value?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_exceptions_routine_id_fkey"
             columns: ["routine_id"]
             isOneToOne: false
             referencedRelation: "routines"
@@ -809,14 +897,19 @@ export type Database = {
           color: string
           created_at: string
           deleted_at: string | null
+          description: string | null
+          duration_days: number | null
           exceptions: Json | null
           id: string
           name: string
           paused_until: string | null
+          priority: string | null
           schedule: Json
+          specific_times: string[] | null
           times_per_day: number
           updated_at: string
           user_id: string
+          weekdays: number[] | null
         }
         Insert: {
           active_from?: string
@@ -824,14 +917,19 @@ export type Database = {
           color?: string
           created_at?: string
           deleted_at?: string | null
+          description?: string | null
+          duration_days?: number | null
           exceptions?: Json | null
           id?: string
           name: string
           paused_until?: string | null
+          priority?: string | null
           schedule?: Json
+          specific_times?: string[] | null
           times_per_day?: number
           updated_at?: string
           user_id: string
+          weekdays?: number[] | null
         }
         Update: {
           active_from?: string
@@ -839,14 +937,19 @@ export type Database = {
           color?: string
           created_at?: string
           deleted_at?: string | null
+          description?: string | null
+          duration_days?: number | null
           exceptions?: Json | null
           id?: string
           name?: string
           paused_until?: string | null
+          priority?: string | null
           schedule?: Json
+          specific_times?: string[] | null
           times_per_day?: number
           updated_at?: string
           user_id?: string
+          weekdays?: number[] | null
         }
         Relationships: []
       }
@@ -993,7 +1096,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_routine_occurrences: {
+        Args: { p_end_date: string; p_routine_id: string; p_start_date: string }
+        Returns: {
+          count: number
+          date: string
+          times: string[]
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

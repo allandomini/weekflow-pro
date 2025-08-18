@@ -1,25 +1,38 @@
-import { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAppContext } from "../contexts/SupabaseAppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Checkbox } from "../components/ui/checkbox";
-import { Calendar } from "../components/ui/calendar";
-import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock, Sparkles, TrendingUp, AlertCircle, CheckCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
-import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addDays, addMonths, addYears } from "date-fns";
-import { Task } from "../types";
-import { ptBR } from "date-fns/locale";
-import type { DateRange } from "react-day-picker";
+import React, { useState, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../contexts/SupabaseAppContext';
+import { useRoutinesOptimized } from '../hooks/useRoutinesOptimized';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { Textarea } from '../components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Checkbox } from '../components/ui/checkbox';
+import RoutinesManager from '../components/RoutinesManager';
+import { RoutineLoadingIndicator } from '@/components/RoutineLoadingIndicator';
+
+import { 
+  ArrowLeft, Plus, Edit, Trash2, Settings, Calendar, Clock, 
+  Repeat, Target, Play, Pause, SkipForward, MoreHorizontal,
+  CheckSquare, DollarSign, Users, TrendingUp, CheckCircle, XCircle,
+  CalendarDays, Sparkles, AlertCircle, Zap, Loader2
+} from 'lucide-react';
+import { format, isToday, isYesterday, isTomorrow, addDays, subDays, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addMonths, addYears } from 'date-fns';
+import { Task, Project, Routine } from '../types';
+import { ptBR } from 'date-fns/locale';
 
 export default function Dashboard() {
-  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, routines, addRoutine, completeRoutineOnce, skipRoutineDay, skipRoutineBetween, getRoutineProgress } = useAppContext();
   const navigate = useNavigate();
+  const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, addRoutine, skipRoutineDay, skipRoutineBetween, hardDeleteRoutine, routineLoading } = useAppContext();
+  
+  // Use optimized routines hook
+  const { routines, routineCompletions, completeRoutine, getRoutineProgress } = useRoutinesOptimized();
+  
+  const { toast } = useToast();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -33,6 +46,8 @@ export default function Dashboard() {
 
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [routinesManagerOpen, setRoutinesManagerOpen] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [taskForm, setTaskForm] = useState({
     title: "",
     description: "",
@@ -43,12 +58,18 @@ export default function Dashboard() {
     repeatUnit: "day" as "day" | "week" | "month" | "year",
     repeatCount: 7,
     repeatAlways: false,
+    // New routine fields
+    routineTimesPerDay: 1,
+    routineSpecificTimes: [] as string[],
+    routineWeekdays: [] as number[],
+    routineDurationDays: null as number | null,
+    routinePriority: "medium" as "low" | "medium" | "high",
   });
 
   const today = new Date();
   const [currentWeekDate, setCurrentWeekDate] = useState<Date>(today);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: Task | null; mode: 'single' | 'bulk'; range?: DateRange }>({ open: false, task: null, mode: 'single' });
+  const [deleteModal, setDeleteModal] = useState<{ open: boolean; task: Task | null; mode: 'single' }>({ open: false, task: null, mode: 'single' });
 
   // Helper: yyyy-MM-dd from local date
   const toYmd = (d: Date) => {
@@ -58,61 +79,33 @@ export default function Dashboard() {
     return `${y}-${m}-${day}`;
   };
 
-  const bulkMatchedDates = useMemo(() => {
-    const t = deleteModal.task;
-    if (!t || !t.isRoutine) return [] as Date[];
-    // If this is a virtual routine task (id starts with 'routine:'), we can't rely on materialized tasks.
-    // We will not perform heavy generation here; return empty to avoid misleading highlights.
-    return [] as Date[];
-  }, [deleteModal.task]);
+
 
   const handleRequestDelete = (task: Task) => {
-    // Pré-seleciona o intervalo com o dia da tarefa clicada
-    const day = new Date(task.date);
-    day.setHours(0,0,0,0);
-    setDeleteModal({ open: true, task, mode: task.isRoutine ? 'bulk' : 'single', range: { from: day, to: day } });
+    // Para rotinas, sempre usar modo single (deletar completamente)
+    // Para tarefas normais, usar modo single
+    setDeleteModal({ open: true, task, mode: 'single' });
   };
 
   const handleConfirmDeleteSingle = () => {
     if (!deleteModal.task) return;
     const t = deleteModal.task;
     if (t.id.startsWith('routine:')) {
-      const [, routineId, dateStr] = t.id.split(':');
-      skipRoutineDay(routineId, dateStr);
+      const [, routineId] = t.id.split(':');
+      // DELETAR a rotina completamente
+      hardDeleteRoutine(routineId);
+      
+      toast({
+        title: "Rotina excluída",
+        description: "A rotina foi excluída permanentemente.",
+      });
     } else {
       deleteTask(t.id);
     }
-    setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
+    setDeleteModal({ open: false, task: null, mode: 'single' });
   };
 
-  const handleConfirmDeleteBulk = () => {
-    const t = deleteModal.task;
-    const range = deleteModal.range;
-    if (!t || !range?.from || !range?.to) return;
-    const from = new Date(range.from);
-    const to = new Date(range.to);
-    from.setHours(0,0,0,0);
-    to.setHours(0,0,0,0);
-    if (t.id.startsWith('routine:')) {
-      const [, routineId] = t.id.split(':');
-      skipRoutineBetween(routineId, toYmd(from), toYmd(to));
-    } else {
-      // Legacy behavior for non-routine tasks
-      tasks.forEach(candidate => {
-        if (!candidate.isRoutine) return;
-        if (candidate.title !== t.title) return;
-        if ((candidate.projectId || '') !== (t.projectId || '')) return;
-        const d = new Date(candidate.date);
-        d.setHours(0,0,0,0);
-        if (d.getTime() >= from.getTime() && d.getTime() <= to.getTime()) {
-          deleteTask(candidate.id);
-        }
-      });
-      // Certifique-se que a tarefa clicada também seja excluída
-      deleteTask(t.id);
-    }
-    setDeleteModal({ open: false, task: null, mode: 'single', range: undefined });
-  };
+
   const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
@@ -210,7 +203,7 @@ export default function Dashboard() {
       case 'productivity': return <TrendingUp className="w-4 h-4" />;
       case 'finance': return <DollarSign className="w-4 h-4" />;
       case 'tasks': return <CheckSquare className="w-4 h-4" />;
-      case 'projects': return <CalendarIcon className="w-4 h-4" />;
+      case 'projects': return <CalendarDays className="w-4 h-4" />;
       default: return <Sparkles className="w-4 h-4" />;
     }
   };
@@ -256,11 +249,13 @@ export default function Dashboard() {
         }
       }
       
-      setRoutineProgress(progress);
+      setRoutineProgress(prev => ({ ...prev, ...progress }));
     };
     
     loadRoutineProgress();
-  }, [routines, currentWeekDate]);
+  }, [routines, currentWeekDate, getRoutineProgress, routineCompletions]);
+
+
 
   const getTasksForDay = (day: Date) => {
     const sameDayTasks = tasks.filter(task => task.date.toDateString() === day.toDateString());
@@ -278,26 +273,36 @@ export default function Dashboard() {
       const progress = routineProgress[`${r.id}-${dayStr}`] || { goal: 1, count: 0, skipped: false, paused: false };
       
       if (progress.skipped || progress.paused) continue;
-      const remaining = Math.max(0, progress.goal - progress.count);
-      if (remaining === 0) continue;
-      // Schedule match: daily always matches; weekly/customDays check day of week
+      
+      // Check weekday filter
       const dow = day.getDay(); // 0-6 Sun-Sat
-      const sched = r.schedule;
-      let matches = false;
-      if (sched.type === 'daily') matches = true;
-      else if (sched.type === 'weekly') matches = (sched.daysOfWeek || []).includes(dow);
-      else if (sched.type === 'customDays') matches = (sched.daysOfWeek || []).includes(dow);
-      if (!matches) continue;
-      for (let i = 0; i < remaining; i++) {
+      if (r.weekdays && r.weekdays.length > 0 && !r.weekdays.includes(dow)) continue;
+      
+      // Check duration limit
+      if (r.durationDays) {
+        const startDate = new Date(r.activeFrom);
+        const currentDate = new Date(dayStr);
+        const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= r.durationDays) continue;
+      }
+      
+      // Get specific times for this day
+      const times = r.specificTimes && r.specificTimes.length > 0 ? r.specificTimes : ['09:00'];
+      
+      // Create virtual tasks for each time slot
+      for (let i = 0; i < progress.goal; i++) {
+        // Check if this specific occurrence is completed
+        const isCompleted = i < progress.count;
+        
         virtuals.push({
           // Synthetic ID encoding routine occurrence
           id: `routine:${r.id}:${dayStr}:${i}`,
           title: r.name,
-          description: undefined,
-          completed: false,
+          description: r.description,
+          completed: isCompleted,
           projectId: undefined,
           date: day,
-          startTime: undefined,
+          startTime: i < times.length ? times[i] : `${i + 1}ª vez`,
           endTime: undefined,
           isRoutine: true,
           isOverdue: false,
@@ -325,6 +330,12 @@ export default function Dashboard() {
       repeatUnit: "day",
       repeatCount: 7,
       repeatAlways: false,
+      // New routine fields
+      routineTimesPerDay: 1,
+      routineSpecificTimes: [],
+      routineWeekdays: [],
+      routineDurationDays: null,
+      routinePriority: "medium",
     });
     setIsTaskDialogOpen(true);
   };
@@ -363,8 +374,13 @@ export default function Dashboard() {
         // For month/year we fallback to daily for now
         addRoutine({
           name: taskForm.title,
+          description: taskForm.description,
           color: '#3b82f6', // Cor padrão azul
-          timesPerDay: 1,
+          timesPerDay: taskForm.routineTimesPerDay,
+          specificTimes: taskForm.routineSpecificTimes,
+          weekdays: taskForm.routineWeekdays,
+          durationDays: taskForm.routineDurationDays,
+          priority: taskForm.routinePriority,
           schedule,
           activeFrom: baseDayStr,
           activeTo: undefined,
@@ -377,14 +393,36 @@ export default function Dashboard() {
     setEditingTask(null);
   };
 
-  const handleToggleTask = (taskId: string, completed: boolean) => {
+  const handleToggleTask = async (taskId: string, completed: boolean) => {
     if (taskId.startsWith('routine:')) {
       // routine:<routineId>:<yyyy-MM-dd>:<idx>
       const parts = taskId.split(':');
       const routineId = parts[1];
       const dateStr = parts[2];
+      const occurrenceIndex = parseInt(parts[3]);
+      
       if (completed) {
-        completeRoutineOnce(routineId, dateStr);
+        // Complete the routine - this will increment the count
+        await completeRoutine(routineId, dateStr);
+        
+        // Update local progress state immediately for better UX
+        setRoutineProgress(prev => {
+          const key = `${routineId}-${dateStr}`;
+          const current = prev[key] || { goal: 1, count: 0, skipped: false, paused: false };
+          const newCount = Math.min(current.count + 1, current.goal);
+          return {
+            ...prev,
+            [key]: {
+              ...current,
+              count: newCount
+            }
+          };
+        });
+      } else {
+        // For now, we don't support uncompleting routines
+        // This would require more complex logic to handle partial completions
+        // The user can use the routines manager to reset completions if needed
+        console.log('Uncompleting routines is not supported yet');
       }
       return;
     }
@@ -403,12 +441,28 @@ export default function Dashboard() {
       repeatUnit: "day",
       repeatCount: 7,
       repeatAlways: false,
+      // New routine fields
+      routineTimesPerDay: 1,
+      routineSpecificTimes: [],
+      routineWeekdays: [],
+      routineDurationDays: null,
+      routinePriority: "medium",
     });
     setIsTaskDialogOpen(true);
   };
 
   const handleDeleteTask = (taskId: string) => {
     deleteTask(taskId);
+  };
+
+  const handleOpenRoutinesManager = (routine: Routine) => {
+    setSelectedRoutine(routine);
+    setRoutinesManagerOpen(true);
+  };
+
+  const handleCloseRoutinesManager = () => {
+    setRoutinesManagerOpen(false);
+    setSelectedRoutine(null);
   };
 
   return (
@@ -428,6 +482,14 @@ export default function Dashboard() {
         >
           <Plus className="w-4 h-4 mr-2" />
           Nova Tarefa
+        </Button>
+        <Button 
+          variant="outline" 
+          onClick={() => navigate('/routines')} 
+          className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
+        >
+          <Settings className="w-4 h-4 mr-2" />
+          Gerenciar Rotinas
         </Button>
       </div>
 
@@ -735,56 +797,179 @@ export default function Dashboard() {
               <Label htmlFor="isRoutine" className="text-foreground">Tarefa de rotina</Label>
             </div>
             {taskForm.isRoutine && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-foreground block mb-1">Vezes por dia</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={10}
+                      value={taskForm.routineTimesPerDay}
+                      onChange={(e) => setTaskForm(prev => ({ ...prev, routineTimesPerDay: Number(e.target.value) }))}
+                      className="modern-input"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-foreground block mb-1">Duração (dias)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="Deixe vazio para sempre"
+                      value={taskForm.routineDurationDays || ''}
+                      onChange={(e) => setTaskForm(prev => ({ ...prev, routineDurationDays: e.target.value ? Number(e.target.value) : null }))}
+                      className="modern-input"
+                    />
+                  </div>
+                </div>
+                
                 <div>
-                  <Label className="text-foreground block mb-1">Frequência</Label>
+                  <Label className="text-foreground block mb-2">Horários específicos</Label>
+                  <div className="space-y-2">
+                    {taskForm.routineSpecificTimes.map((time, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <Input
+                          type="time"
+                          value={time}
+                          onChange={(e) => {
+                            const newTimes = [...taskForm.routineSpecificTimes];
+                            newTimes[index] = e.target.value;
+                            setTaskForm(prev => ({ ...prev, routineSpecificTimes: newTimes }));
+                          }}
+                          className="modern-input flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const newTimes = taskForm.routineSpecificTimes.filter((_, i) => i !== index);
+                            setTaskForm(prev => ({ ...prev, routineSpecificTimes: newTimes }));
+                          }}
+                          className="text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTaskForm(prev => ({ ...prev, routineSpecificTimes: [...prev.routineSpecificTimes, '09:00'] }))}
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar horário
+                    </Button>
+                  </div>
+                </div>
+
+                <div>
+                  <Label className="text-foreground block mb-2">Dias da semana</Label>
+                  <div className="grid grid-cols-7 gap-2">
+                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                      <div key={index} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`weekday-${index}`}
+                          checked={taskForm.routineWeekdays.includes(index)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setTaskForm(prev => ({ ...prev, routineWeekdays: [...prev.routineWeekdays, index] }));
+                            } else {
+                              setTaskForm(prev => ({ ...prev, routineWeekdays: prev.routineWeekdays.filter(d => d !== index) }));
+                            }
+                          }}
+                          className="transition-all duration-200 hover:scale-110"
+                        />
+                        <Label htmlFor={`weekday-${index}`} className="text-xs text-center">{day}</Label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {taskForm.routineWeekdays.length === 0 ? 'Selecione para todos os dias' : 
+                     taskForm.routineWeekdays.length === 7 ? 'Todos os dias selecionados' :
+                     `${taskForm.routineWeekdays.length} dia(s) selecionado(s)`}
+                  </p>
+                </div>
+
+                <div>
+                  <Label className="text-foreground block mb-1">Prioridade</Label>
                   <Select
-                    value={taskForm.repeatUnit}
-                    onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
+                    value={taskForm.routinePriority}
+                    onValueChange={(value) => setTaskForm(prev => ({ ...prev, routinePriority: value as "low" | "medium" | "high" }))}
                   >
                     <SelectTrigger className="modern-input">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="modern-dropdown">
-                      <SelectItem value="day">Dia</SelectItem>
-                      <SelectItem value="week">Semana</SelectItem>
-                      <SelectItem value="month">Mês</SelectItem>
-                      <SelectItem value="year">Ano</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="high">Alta</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-foreground block mb-1">Quantidade</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    value={taskForm.repeatCount}
-                    onChange={(e) => setTaskForm(prev => ({ ...prev, repeatCount: Number(e.target.value) }))}
-                    className="modern-input"
-                    disabled={taskForm.repeatAlways}
-                  />
-                </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <Checkbox
-                    id="repeatAlways"
-                    checked={taskForm.repeatAlways}
-                    onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
-                    className="transition-all duration-200 hover:scale-110"
-                  />
-                  <Label htmlFor="repeatAlways" className="text-foreground">Sempre</Label>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-foreground block mb-1">Frequência</Label>
+                    <Select
+                      value={taskForm.repeatUnit}
+                      onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
+                    >
+                      <SelectTrigger className="modern-input">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="modern-dropdown">
+                        <SelectItem value="day">Dia</SelectItem>
+                        <SelectItem value="week">Semana</SelectItem>
+                        <SelectItem value="month">Mês</SelectItem>
+                        <SelectItem value="year">Ano</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label className="text-foreground block mb-1">Quantidade</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={taskForm.repeatCount}
+                      onChange={(e) => setTaskForm(prev => ({ ...prev, repeatCount: Number(e.target.value) }))}
+                      className="modern-input"
+                      disabled={taskForm.repeatAlways}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 pt-6">
+                    <Checkbox
+                      id="repeatAlways"
+                      checked={taskForm.repeatAlways}
+                      onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
+                      className="transition-all duration-200 hover:scale-110"
+                    />
+                    <Label htmlFor="repeatAlways" className="text-foreground">Sempre</Label>
+                  </div>
                 </div>
               </div>
             )}
             <div className="flex gap-3 pt-4">
               <Button 
                 onClick={handleSaveTask} 
+                disabled={routineLoading}
                 className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
               >
-                Criar Tarefa
+                {routineLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Criando...</span>
+                  </div>
+                ) : (
+                  'Criar Tarefa'
+                )}
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsTaskDialogOpen(false)}
+                disabled={routineLoading}
                 className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
               >
                 Cancelar
@@ -800,63 +985,42 @@ export default function Dashboard() {
             <DialogTitle>Excluir tarefa</DialogTitle>
             <DialogDescription>
               {deleteModal.task?.isRoutine
-                ? 'Esta tarefa faz parte de uma rotina. Você deseja excluir apenas esta ocorrência ou excluir em massa por intervalo?'
+                ? 'Esta tarefa faz parte de uma rotina. Você pode excluir apenas esta ocorrência ou excluir todas as ocorrências em um intervalo de datas.'
                 : 'Tem certeza que deseja excluir esta tarefa?'}
             </DialogDescription>
           </DialogHeader>
-          {deleteModal.task?.isRoutine && (
+                        {deleteModal.task?.isRoutine && (
             <div className="space-y-3">
-              <div className="flex gap-2">
-                <Button
-                  variant={deleteModal.mode === 'single' ? 'default' : 'outline'}
-                  onClick={() => setDeleteModal(prev => ({ ...prev, mode: 'single' }))}
-                >
-                  Excluir somente esta
-                </Button>
-                <Button
-                  variant={deleteModal.mode === 'bulk' ? 'default' : 'outline'}
-                  onClick={() => setDeleteModal(prev => ({ ...prev, mode: 'bulk' }))}
-                >
-                  Excluir em massa
-                </Button>
+              <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mx-auto mb-2" />
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Atenção:</strong> Excluir uma rotina irá removê-la permanentemente de todas as datas.
+                </p>
               </div>
-              {deleteModal.mode === 'bulk' && (
-                <div className="space-y-2">
-                  <Label>Intervalo de datas</Label>
-                  <div className="rounded-md border p-2">
-                    <Calendar
-                      mode="range"
-                      numberOfMonths={2}
-                      selected={deleteModal.range}
-                      onSelect={(range) => setDeleteModal(prev => ({ ...prev, range }))}
-                      showOutsideDays
-                      modifiers={{ matched: bulkMatchedDates }}
-                      modifiersClassNames={{ matched: 'ring-2 ring-destructive/60 rounded-md' }}
-                    />
-                    <p className="mt-2 text-xs text-muted-foreground">Dias destacados são ocorrências desta rotina.</p>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           <div className="flex gap-2 pt-2">
             {deleteModal.task?.isRoutine ? (
-              deleteModal.mode === 'bulk' ? (
-                <Button className="flex-1" disabled={!deleteModal.range?.from || !deleteModal.range?.to} onClick={handleConfirmDeleteBulk}>
-                  Confirmar exclusão em massa
-                </Button>
-              ) : (
-                <Button className="flex-1" onClick={handleConfirmDeleteSingle}>Confirmar</Button>
-              )
+              <Button className="flex-1" onClick={handleConfirmDeleteSingle}>
+                Excluir rotina permanentemente
+              </Button>
             ) : (
               <Button className="flex-1" onClick={handleConfirmDeleteSingle}>Confirmar</Button>
             )}
-            <Button variant="outline" className="flex-1" onClick={() => setDeleteModal({ open: false, task: null, mode: 'single', range: undefined })}>
+            <Button variant="outline" className="flex-1" onClick={() => setDeleteModal({ open: false, task: null, mode: 'single' })}>
               Cancelar
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Routines Manager Modal */}
+      {routinesManagerOpen && selectedRoutine && (
+        <RoutinesManager
+          routine={selectedRoutine}
+          onClose={handleCloseRoutinesManager}
+        />
+      )}
     </div>
   );
 }

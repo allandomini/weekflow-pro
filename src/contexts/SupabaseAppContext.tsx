@@ -7,7 +7,7 @@ import {
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
   PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings,
-  Activity, ActivityEntityRef, Routine, RoutineCompletion
+  Activity, ActivityEntityRef, Routine, RoutineCompletion, RoutineExceptionRecord, RoutineBulkOperation
 } from '@/types';
 
 interface AppContextType {
@@ -61,17 +61,23 @@ interface AppContextType {
   // Routines
   routines: Routine[];
   routineCompletions: Record<string, Record<string, RoutineCompletion>>;
+  routineExceptions: RoutineExceptionRecord[];
+  routineBulkOperations: RoutineBulkOperation[];
+  routineLoading: boolean;
   addRoutine: (routine: Omit<Routine, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'exceptions'>) => Promise<void>;
   updateRoutine: (id: string, updates: Partial<Routine>) => Promise<void>;
   softDeleteRoutine: (id: string) => Promise<void>;
   hardDeleteRoutine: (id: string) => Promise<void>;
-  completeRoutineOnce: (routineId: string, date?: string) => Promise<void>;
+  completeRoutineOnce: (routineId: string, date?: string, specificTime?: string) => Promise<void>;
   skipRoutineDay: (routineId: string, date?: string) => Promise<void>;
   skipRoutineBetween: (routineId: string, startDate: string, endDate: string) => Promise<void>;
-  setRoutineException: (routineId: string, date: string, ex: { skip?: boolean; overrideTimesPerDay?: number }) => Promise<void>;
+  setRoutineException: (routineId: string, date: string, ex: { skip?: boolean; overrideTimesPerDay?: number; overrideTimes?: string[] }) => Promise<void>;
   pauseRoutineUntil: (routineId: string, untilDate: string) => Promise<void>;
   setRoutineActiveTo: (routineId: string, endDate: string) => Promise<void>;
   getRoutineProgress: (routineId: string, date?: string) => Promise<{ count: number; goal: number; skipped: boolean; paused: boolean }>;
+  getRoutineOccurrences: (routineId: string, startDate: string, endDate: string) => Promise<Array<{ date: string; times: string[]; count: number }>>;
+  bulkDeleteRoutineOccurrences: (routineId: string, dates: string[]) => Promise<void>;
+  bulkSkipRoutinePeriod: (routineId: string, startDate: string, endDate: string) => Promise<void>;
 
   // Network
   contacts: Contact[];
@@ -164,6 +170,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   const [tasks, setTasks] = useState<Task[]>([]);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [routineCompletions, setRoutineCompletions] = useState<Record<string, Record<string, RoutineCompletion>>>({});
+  const [routineExceptions, setRoutineExceptions] = useState<RoutineExceptionRecord[]>([]);
+  const [routineBulkOperations, setRoutineBulkOperations] = useState<RoutineBulkOperation[]>([]);
+  const [routineLoading, setRoutineLoading] = useState(false);
   const [notes, setNotes] = useState<Note[]>([]);
   const [todoLists, setTodoLists] = useState<TodoList[]>([]);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -337,18 +346,62 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     updatedAt: new Date(dbEntry.updated_at),
   });
 
-  // Load all data function
+  // Load all data function - OPTIMIZED VERSION
   const loadAllData = async () => {
     if (!user) return;
     
+    console.log('Loading all data for user:', user.id);
     setLoading(true);
     try {
-      // Load projects
-      const { data: projectsData } = await supabase
-        .from('projects')
-        .select('*')
-        .eq('user_id', user.id);
-      
+      // Load all data in parallel for better performance
+      const [
+        { data: projectsData },
+        { data: tasksData },
+        { data: routinesData, error: routinesError },
+        { data: routineCompletionsData, error: routineCompletionsError },
+        { data: notesData },
+        { data: contactsData, error: contactsError },
+        { data: contactGroupsData, error: contactGroupsError },
+        { data: clockifyData, error: clockifyError },
+        { data: accountsData },
+        { data: transactionsData },
+        { data: debtsData, error: debtsError },
+        { data: goalsData, error: goalsError },
+        { data: receivablesData, error: receivablesError },
+        { data: pomodoroSettingsData },
+        { data: aiSettingsData },
+        { data: activitiesData, error: activitiesError }
+      ] = await Promise.all([
+        supabase.from('projects').select('*').eq('user_id', user.id),
+        supabase.from('tasks').select('*').eq('user_id', user.id),
+        supabase.from('routines').select('*').eq('user_id', user.id).is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('routine_completions').select('*').eq('user_id', user.id),
+        supabase.from('notes').select('*').eq('user_id', user.id),
+        supabase.from('contacts').select('*').eq('user_id', user.id),
+        supabase.from('contact_groups').select('*').eq('user_id', user.id),
+        supabase.from('clockify_time_entries').select('*').eq('user_id', user.id),
+        supabase.from('accounts').select('*').eq('user_id', user.id),
+        supabase.from('transactions').select('*').eq('user_id', user.id),
+        supabase.from('debts').select('*').eq('user_id', user.id),
+        supabase.from('goals').select('*').eq('user_id', user.id),
+        supabase.from('receivables').select('*').eq('user_id', user.id),
+        supabase.from('pomodoro_settings').select('*').eq('user_id', user.id).single(),
+        supabase.from('ai_settings').select('*').eq('user_id', user.id).single(),
+        supabase.from('activities').select('*').eq('user_id', user.id).order('at', { ascending: false }).limit(100)
+      ]);
+
+      // Handle errors
+      if (routinesError) console.error('Error loading routines:', routinesError);
+      if (routineCompletionsError) console.error('Error loading routine completions:', routineCompletionsError);
+      if (contactsError) console.error('Error loading contacts:', contactsError);
+      if (contactGroupsError) console.error('Error loading contact groups:', contactGroupsError);
+      if (clockifyError) console.error('Error loading clockify time entries:', clockifyError);
+      if (debtsError) console.error('Error loading debts:', debtsError);
+      if (goalsError) console.error('Error loading goals:', goalsError);
+      if (receivablesError) console.error('Error loading receivables:', receivablesError);
+      if (activitiesError) console.error('Error loading activities:', activitiesError);
+
+      // Set projects
       if (projectsData) {
         setProjects(projectsData.map(p => ({
           id: p.id,
@@ -360,34 +413,24 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         })));
       }
 
-      // Load tasks
-      const { data: tasksData } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', user.id);
-      
+      // Set tasks
       if (tasksData) {
         setTasks(tasksData.map(transformDbTask));
       }
 
-      // Load routines
-      const { data: routinesData, error: routinesError } = await supabase
-        .from('routines')
-        .select('*')
-        .eq('user_id', user.id)
-        .is('deleted_at', null);
-      
-      if (routinesError) {
-        console.error('Error loading routines:', routinesError);
-      }
-      
+      // Set routines
       if (routinesData) {
-        console.log('Routines loaded:', routinesData);
+        console.log('Routines loaded:', routinesData.length);
         setRoutines(routinesData.map(r => ({
           id: r.id,
           name: r.name,
+          description: r.description,
           color: r.color,
           timesPerDay: r.times_per_day,
+          specificTimes: r.specific_times || [],
+          weekdays: r.weekdays || [],
+          durationDays: r.duration_days || null,
+          priority: (r.priority as 'low' | 'medium' | 'high') || 'medium',
           schedule: typeof r.schedule === 'string' ? JSON.parse(r.schedule) : r.schedule,
           activeFrom: r.active_from,
           activeTo: r.active_to || undefined,
@@ -399,133 +442,92 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         })));
       }
 
-      // Load notes
-      const { data: notesData } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('user_id', user.id);
-      
+      // Set routine completions - OPTIMIZED TRANSFORMATION
+      if (routineCompletionsData) {
+        console.log('Routine completions loaded:', routineCompletionsData.length);
+        const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
+        
+        // Use reduce for better performance
+        routineCompletionsData.reduce((acc, completion) => {
+          const date = completion.date;
+          const routineId = completion.routine_id;
+          
+          if (!acc[date]) {
+            acc[date] = {};
+          }
+          
+          acc[date][routineId] = {
+            id: completion.id,
+            routineId: completion.routine_id,
+            date: completion.date,
+            count: completion.count,
+            goal: completion.goal,
+            skipped: completion.skipped,
+            paused: completion.paused,
+            specificTime: completion.specific_time || undefined,
+            completedAt: completion.completed_at ? new Date(completion.completed_at) : undefined,
+            createdAt: new Date(completion.created_at),
+            updatedAt: new Date(completion.updated_at)
+          };
+          
+          return acc;
+        }, completionsMap);
+        
+        setRoutineCompletions(completionsMap);
+      }
+
+      // Set notes
       if (notesData) {
         setNotes(notesData.map(transformDbNote));
       }
 
-      // Load contacts
-      const { data: contactsData, error: contactsError } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (contactsError) {
-        console.error('Error loading contacts:', contactsError);
-      }
-      
+      // Set contacts
       if (contactsData) {
         console.log('Contacts loaded:', contactsData);
         setContacts(contactsData.map(transformDbContact));
       }
 
-      // Load contact groups
-      const { data: contactGroupsData, error: contactGroupsError } = await supabase
-        .from('contact_groups')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (contactGroupsError) {
-        console.error('Error loading contact groups:', contactGroupsError);
-      }
-      
+      // Set contact groups
       if (contactGroupsData) {
         console.log('Contact groups loaded:', contactGroupsData);
         setContactGroups(contactGroupsData.map(transformDbContactGroup));
       }
 
-      // Load Clockify time entries
-      const { data: clockifyData, error: clockifyError } = await supabase
-        .from('clockify_time_entries')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (clockifyError) {
-        console.error('Error loading clockify time entries:', clockifyError);
-      }
-      
+      // Set Clockify time entries
       if (clockifyData) {
         console.log('Clockify time entries loaded:', clockifyData);
         setClockifyTimeEntries(clockifyData.map(transformDbClockifyTimeEntry));
       }
 
-      // Load accounts
-      const { data: accountsData } = await supabase
-        .from('accounts')
-        .select('*')
-        .eq('user_id', user.id);
-      
+      // Set accounts
       if (accountsData) {
         setAccounts(accountsData.map(transformDbAccount));
       }
 
-      // Load transactions
-      const { data: transactionsData } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('user_id', user.id);
-      
+      // Set transactions
       if (transactionsData) {
         setTransactions(transactionsData.map(transformDbTransaction));
       }
 
-      // Load debts
-      const { data: debtsData, error: debtsError } = await supabase
-        .from('debts')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (debtsError) {
-        console.error('Error loading debts:', debtsError);
-      }
-      
+      // Set debts
       if (debtsData) {
         console.log('Debts loaded:', debtsData);
         setDebts(debtsData.map(transformDbDebt));
       }
 
-      // Load goals
-      const { data: goalsData, error: goalsError } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (goalsError) {
-        console.error('Error loading goals:', goalsError);
-      }
-      
+      // Set goals
       if (goalsData) {
         console.log('Goals loaded:', goalsData);
         setGoals(goalsData.map(transformDbGoal));
       }
 
-      // Load receivables
-      const { data: receivablesData, error: receivablesError } = await supabase
-        .from('receivables')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (receivablesError) {
-        console.error('Error loading receivables:', receivablesError);
-      }
-      
+      // Set receivables
       if (receivablesData) {
         console.log('Receivables loaded:', receivablesData);
         setReceivables(receivablesData.map(transformDbReceivable));
       }
 
-      // Load pomodoro settings
-      const { data: pomodoroSettingsData } = await supabase
-        .from('pomodoro_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
+      // Set pomodoro settings
       if (pomodoroSettingsData) {
         setPomodoroSettings({
           workDuration: pomodoroSettingsData.work_duration,
@@ -538,13 +540,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         });
       }
 
-      // Load AI settings
-      const { data: aiSettingsData } = await supabase
-        .from('ai_settings')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-      
+      // Set AI settings
       if (aiSettingsData) {
         setAISettings({
           enabled: aiSettingsData.enabled,
@@ -554,51 +550,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         });
       }
 
-      // Load routine completions
-      const { data: routineCompletionsData, error: routineCompletionsError } = await supabase
-        .from('routine_completions')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (routineCompletionsError) {
-        console.error('Error loading routine completions:', routineCompletionsError);
-      }
-      
-      if (routineCompletionsData) {
-        console.log('Routine completions loaded:', routineCompletionsData);
-        // Transform routine completions to the expected format
-        const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
-        routineCompletionsData.forEach(rc => {
-          if (!completionsMap[rc.routine_id]) {
-            completionsMap[rc.routine_id] = {};
-          }
-          completionsMap[rc.routine_id][rc.date] = {
-            id: rc.id,
-            routineId: rc.routine_id,
-            date: rc.date,
-            count: rc.count,
-            goal: rc.goal,
-            skipped: rc.skipped,
-            paused: rc.paused,
-            createdAt: new Date(rc.created_at),
-            updatedAt: new Date(rc.updated_at),
-          };
-        });
-        setRoutineCompletions(completionsMap);
-      }
-
-      // Load activities
-      const { data: activitiesData, error: activitiesError } = await supabase
-        .from('activities')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('at', { ascending: false })
-        .limit(100);
-      
-      if (activitiesError) {
-        console.error('Error loading activities:', activitiesError);
-      }
-      
+      // Set activities
       if (activitiesData) {
         console.log('Activities loaded:', activitiesData);
         setActivities(activitiesData.map(a => ({
@@ -611,9 +563,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         })));
       }
 
+      console.log('loadAllData completed successfully');
+      setLoading(false);
     } catch (error) {
-      handleError(error, 'loading data');
-    } finally {
+      console.error('Error loading data:', error);
       setLoading(false);
     }
   };
@@ -1629,45 +1582,81 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     // Routines - placeholder implementations
     routines,
     routineCompletions,
+    routineExceptions: [],
+    routineBulkOperations: [],
+    routineLoading,
     addRoutine: async (routine: Omit<Routine, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'exceptions'>) => {
       if (!user) return;
       
+      setRoutineLoading(true);
+      
       try {
+        // Create a temporary ID for optimistic update
+        const tempId = `temp-${Date.now()}`;
+        const now = new Date();
+        
+        // Create the routine object for optimistic update
+        const optimisticRoutine: Routine = {
+          id: tempId,
+          name: routine.name,
+          description: routine.description,
+          color: routine.color,
+          timesPerDay: routine.timesPerDay,
+          specificTimes: routine.specificTimes,
+          weekdays: routine.weekdays,
+          durationDays: routine.durationDays,
+          priority: routine.priority || 'medium',
+          schedule: routine.schedule,
+          activeFrom: routine.activeFrom,
+          activeTo: routine.activeTo,
+          pausedUntil: routine.pausedUntil,
+          createdAt: now,
+          updatedAt: now,
+          deletedAt: null,
+          exceptions: {} as any
+        };
+        
+        // Optimistic update - add to state immediately
+        setRoutines(prev => [...prev, optimisticRoutine]);
+        
+        // Perform the actual database insert
         const { data, error } = await supabase
           .from('routines')
           .insert({
             user_id: user.id,
             name: routine.name,
+            description: routine.description,
             color: routine.color,
             times_per_day: routine.timesPerDay,
+            specific_times: routine.specificTimes || [],
+            weekdays: routine.weekdays || [],
+            duration_days: routine.durationDays || null,
+            priority: routine.priority || 'medium',
             schedule: routine.schedule as any,
             active_from: routine.activeFrom,
             active_to: routine.activeTo || null,
             paused_until: routine.pausedUntil || null,
             exceptions: {} as any
           } as any)
-          .select()
+          .select('id, created_at, updated_at')
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Rollback optimistic update on error
+          setRoutines(prev => prev.filter(r => r.id !== tempId));
+          throw error;
+        }
         
-        // Create the routine object in the expected format
-        const newRoutine: Routine = {
+        // Update the routine with the real ID from database
+        const finalRoutine: Routine = {
+          ...optimisticRoutine,
           id: data.id,
-          name: routine.name,
-          color: routine.color,
-          timesPerDay: routine.timesPerDay,
-          schedule: routine.schedule,
-          activeFrom: routine.activeFrom,
-          activeTo: routine.activeTo,
-          pausedUntil: routine.pausedUntil,
           createdAt: new Date(data.created_at),
           updatedAt: new Date(data.updated_at),
-          deletedAt: null,
-          exceptions: {} as any
         };
         
-        setRoutines(prev => [...prev, newRoutine]);
+        // Replace the temporary routine with the real one
+        setRoutines(prev => prev.map(r => r.id === tempId ? finalRoutine : r));
         
         toast({
           title: "Rotina criada",
@@ -1680,6 +1669,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           description: "Não foi possível criar a rotina.",
           variant: "destructive",
         });
+      } finally {
+        setRoutineLoading(false);
       }
     },
     updateRoutine: async (id: string, updates: Partial<Routine>) => {
@@ -1690,8 +1681,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           .from('routines')
           .update({
             name: updates.name,
+            description: updates.description,
             color: updates.color,
             times_per_day: updates.timesPerDay,
+            specific_times: updates.specificTimes,
+            weekdays: updates.weekdays,
+            duration_days: updates.durationDays,
+            priority: updates.priority,
             schedule: updates.schedule as any,
             active_from: updates.activeFrom,
             active_to: updates.activeTo || null,
@@ -1794,100 +1790,111 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         });
       }
     },
-    completeRoutineOnce: async (routineId: string, date?: string): Promise<void> => {
+    completeRoutineOnce: async (routineId: string, date?: string, specificTime?: string): Promise<void> => {
+      if (!user) return;
+      
+      const d = date || new Date().toISOString().split('T')[0]; // yyyy-MM-dd format
+      
+      // OPTIMISTIC UPDATE: Update local state immediately for better UX
+      const currentCompletion = routineCompletions[d]?.[routineId];
+      const currentCount = currentCompletion?.count || 0;
+      
+      // Create optimistic completion data
+      const optimisticCompletion: RoutineCompletion = {
+        id: currentCompletion?.id || `temp-${Date.now()}`,
+        routineId: routineId,
+        date: d,
+        count: currentCount + 1,
+        goal: currentCompletion?.goal || 1,
+        skipped: false,
+        paused: false,
+        specificTime: specificTime || currentCompletion?.specificTime,
+        completedAt: new Date(),
+        createdAt: currentCompletion?.createdAt || new Date(),
+        updatedAt: new Date()
+      };
+      
+      // Update local state immediately (optimistic update)
+      setRoutineCompletions(prev => {
+        const dayMap = { ...(prev[d] || {}) };
+        return { ...prev, [d]: { ...dayMap, [routineId]: optimisticCompletion } };
+      });
+      
       try {
-        const d = date || new Date().toISOString().split('T')[0]; // yyyy-MM-dd format
+        // Use the optimized database function
+        const { data: result, error } = await supabase
+          .rpc('complete_routine_once', {
+            p_user_id: user.id,
+            p_routine_id: routineId,
+            p_date: d,
+            p_specific_time: specificTime || null
+          });
         
-        // Get the routine to check if it can be completed
-        const routine = routines.find(r => r.id === routineId);
-        if (!routine) {
-          throw new Error('Routine not found');
+        if (error) {
+          // Rollback optimistic update on error
+          setRoutineCompletions(prev => {
+            const dayMap = { ...(prev[d] || {}) };
+            if (currentCompletion) {
+              return { ...prev, [d]: { ...dayMap, [routineId]: currentCompletion } };
+            } else {
+              const newDayMap = { ...dayMap };
+              delete newDayMap[routineId];
+              return { ...prev, [d]: newDayMap };
+            }
+          });
+          throw error;
         }
         
-        // Check if routine is paused or skipped on this date
-        if (routine.pausedUntil && routine.pausedUntil >= d) {
-          throw new Error('Routine is paused on this date');
+        // Check if the operation was successful
+        if (result && result.length > 0 && !result[0].success) {
+          // Rollback optimistic update on business logic error
+          setRoutineCompletions(prev => {
+            const dayMap = { ...(prev[d] || {}) };
+            if (currentCompletion) {
+              return { ...prev, [d]: { ...dayMap, [routineId]: currentCompletion } };
+            } else {
+              const newDayMap = { ...dayMap };
+              delete newDayMap[routineId];
+              return { ...prev, [d]: newDayMap };
+            }
+          });
+          throw new Error(result[0].message);
         }
         
-        if (routine.exceptions?.[d]?.skip) {
-          throw new Error('Routine is skipped on this date');
-        }
+        // Update with real data from database
+        const finalCompletion: RoutineCompletion = {
+          id: currentCompletion?.id || `db-${Date.now()}`,
+          routineId: routineId,
+          date: d,
+          count: result?.[0]?.new_count || currentCount + 1,
+          goal: optimisticCompletion.goal,
+          skipped: false,
+          paused: false,
+          specificTime: specificTime || currentCompletion?.specificTime,
+          completedAt: new Date(),
+          createdAt: currentCompletion?.createdAt || new Date(),
+          updatedAt: new Date()
+        };
         
-        // Get the goal for this date
-        const goal = routine.exceptions?.[d]?.overrideTimesPerDay || routine.timesPerDay;
-        
-        // Check if already completed
-        const { data: existingCompletion, error: fetchError } = await supabase
-          .from('routine_completions')
-          .select('*')
-          .eq('routine_id', routineId)
-          .eq('user_id', user?.id)
-          .eq('date', d)
-          .single();
-        
-        if (fetchError && fetchError.code !== 'PGRST116') {
-          throw fetchError;
-        }
-        
-        const currentCount = existingCompletion?.count || 0;
-        
-        if (currentCount >= goal) {
-          throw new Error('Routine already completed for this date');
-        }
-        
-        // Insert or update the completion record
-        const { data: completionData, error: upsertError } = await supabase
-          .from('routine_completions')
-          .upsert({
-            user_id: user?.id,
-            routine_id: routineId,
-            date: d,
-            count: currentCount + 1,
-            goal: goal,
-            skipped: false,
-            paused: false,
-            updated_at: new Date().toISOString()
-          })
-          .select()
-          .single();
-        
-        if (upsertError) throw upsertError;
-        
-        // Update local state
+        // Update local state with real data
         setRoutineCompletions(prev => {
           const dayMap = { ...(prev[d] || {}) };
-          const existing = dayMap[routineId] || { 
-            id: completionData.id,
-            routineId, 
-            date: d, 
-            count: 0, 
-            goal: goal,
-            skipped: false,
-            paused: false,
-            createdAt: new Date(completionData.created_at),
-            updatedAt: new Date(completionData.updated_at)
-          };
-          
-          const updated = {
-            ...existing,
-            count: currentCount + 1,
-            updatedAt: new Date(completionData.updated_at)
-          };
-          
-          return { ...prev, [d]: { ...dayMap, [routineId]: updated } };
+          return { ...prev, [d]: { ...dayMap, [routineId]: finalCompletion } };
         });
+        
+        // Get routine name for toast
+        const routine = routines.find(r => r.id === routineId);
         
         toast({
           title: "Rotina completada",
-          description: `"${routine.name}" foi marcada como completada.`,
+          description: `"${routine?.name || 'Rotina'}" foi marcada como completada.`,
         });
         
-        // Return void as expected
       } catch (error) {
         console.error('Error completing routine:', error);
         toast({
           title: "Erro",
-          description: "Não foi possível completar a rotina.",
+          description: error instanceof Error ? error.message : "Não foi possível completar a rotina.",
           variant: "destructive",
         });
         throw error;
@@ -2026,25 +2033,198 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         // Get the goal (times per day, or override from exceptions)
         const goal = routine.exceptions?.[d]?.overrideTimesPerDay || routine.timesPerDay;
         
-        // Get completion count from database
-        const { data: completionData, error } = await supabase
-          .from('routine_completions')
-          .select('*')
-          .eq('routine_id', routineId)
-          .eq('user_id', user?.id)
-          .eq('date', d)
-          .single();
-        
-        if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-          console.error('Error fetching routine completion:', error);
+        // Try to get completion count from local state first
+        const localCompletions = routineCompletions[d]?.[routineId];
+        if (localCompletions) {
+          return { 
+            count: localCompletions.count, 
+            goal, 
+            skipped, 
+            paused 
+          };
         }
         
-        const count = completionData?.count || 0;
-        
-        return { count, goal, skipped, paused };
+        // If not in local state, try to get from database
+        try {
+          const { data: completionData, error } = await supabase
+            .from('routine_completions')
+            .select('count')
+            .eq('routine_id', routineId)
+            .eq('user_id', user?.id)
+            .eq('date', d)
+            .maybeSingle();
+          
+          if (error) {
+            console.error('Error fetching routine completion:', error);
+            return { count: 0, goal, skipped, paused };
+          }
+          
+          const count = completionData?.count || 0;
+          
+          // Update local state with the fetched data
+          if (completionData) {
+            setRoutineCompletions(prev => {
+              const dayMap = { ...(prev[d] || {}) };
+              const completion = {
+                id: completionData.id || `temp-${Date.now()}`,
+                routineId: routineId,
+                date: d,
+                count: completionData.count,
+                goal: goal,
+                skipped: skipped,
+                paused: paused,
+                specificTime: completionData.specific_time || undefined,
+                completedAt: completionData.completed_at ? new Date(completionData.completed_at) : undefined,
+                createdAt: completionData.created_at ? new Date(completionData.created_at) : new Date(),
+                updatedAt: completionData.updated_at ? new Date(completionData.updated_at) : new Date()
+              };
+              
+              return { ...prev, [d]: { ...dayMap, [routineId]: completion } };
+            });
+          }
+          
+          return { count, goal, skipped, paused };
+        } catch (dbError) {
+          console.error('Database error in getRoutineProgress:', dbError);
+          return { count: 0, goal, skipped, paused };
+        }
       } catch (error) {
         console.error('Error getting routine progress:', error);
         return { count: 0, goal: 1, skipped: false, paused: false };
+      }
+    },
+    getRoutineOccurrences: async (routineId: string, startDate: string, endDate: string) => {
+      try {
+        const { data, error } = await supabase
+          .rpc('get_routine_occurrences', {
+            p_routine_id: routineId,
+            p_start_date: startDate,
+            p_end_date: endDate
+          });
+
+        if (error) throw error;
+        
+        return data || [];
+      } catch (error) {
+        console.error('Error getting routine occurrences:', error);
+        return [];
+      }
+    },
+    bulkDeleteRoutineOccurrences: async (routineId: string, dates: string[]) => {
+      try {
+        // Create bulk operation record
+        const { data: bulkOp, error: bulkError } = await supabase
+          .from('routine_bulk_operations')
+          .insert({
+            user_id: user?.id,
+            routine_id: routineId,
+            operation_type: 'delete_occurrences',
+            start_date: dates[0],
+            end_date: dates[dates.length - 1],
+            affected_dates: dates
+          })
+          .select()
+          .single();
+
+        if (bulkError) throw bulkError;
+
+        // Delete routine completions for these dates
+        const { error: deleteError } = await supabase
+          .from('routine_completions')
+          .delete()
+          .eq('routine_id', routineId)
+          .in('date', dates);
+
+        if (deleteError) throw deleteError;
+
+        // Update local state
+        setRoutineCompletions(prev => {
+          const newState = { ...prev };
+          dates.forEach(date => {
+            if (newState[routineId] && newState[routineId][date]) {
+              delete newState[routineId][date];
+            }
+          });
+          return newState;
+        });
+
+        toast({
+          title: "Ocorrências excluídas",
+          description: `${dates.length} ocorrências da rotina foram excluídas.`,
+        });
+      } catch (error) {
+        console.error('Error bulk deleting routine occurrences:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir as ocorrências.",
+          variant: "destructive",
+        });
+      }
+    },
+    bulkSkipRoutinePeriod: async (routineId: string, startDate: string, endDate: string) => {
+      try {
+        // Get all dates in the range
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        const dates: string[] = [];
+        
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+          dates.push(d.toISOString().split('T')[0]);
+        }
+
+        // Create bulk operation record
+        const { data: bulkOp, error: bulkError } = await supabase
+          .from('routine_bulk_operations')
+          .insert({
+            user_id: user?.id,
+            routine_id: routineId,
+            operation_type: 'skip_period',
+            start_date: startDate,
+            end_date: endDate,
+            affected_dates: dates
+          })
+          .select()
+          .single();
+
+        if (bulkError) throw bulkError;
+
+        // Create exceptions for each date
+        const exceptions = dates.map(date => ({
+          user_id: user?.id,
+          routine_id: routineId,
+          date,
+          action: 'skip',
+          value: null
+        }));
+
+        const { error: exceptionsError } = await supabase
+          .from('routine_exceptions')
+          .insert(exceptions);
+
+        if (exceptionsError) throw exceptionsError;
+
+        // Update local state
+        setRoutineExceptions(prev => [...prev, ...exceptions.map(ex => ({
+          id: ex.routine_id + '-' + ex.date,
+          routineId: ex.routine_id,
+          date: ex.date,
+          action: ex.action as any,
+          value: ex.value,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }))]);
+
+        toast({
+          title: "Período pulado",
+          description: `Rotina pausada de ${startDate} até ${endDate}.`,
+        });
+      } catch (error) {
+        console.error('Error bulk skipping routine period:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível pausar o período.",
+          variant: "destructive",
+        });
       }
     },
 

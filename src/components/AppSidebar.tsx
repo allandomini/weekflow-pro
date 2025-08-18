@@ -1,4 +1,4 @@
-import { Calendar, ClipboardList, Users, Wallet, Home, FolderOpen, StickyNote, Settings, Clock, Trello } from "lucide-react";
+import { Calendar, ClipboardList, Users, Wallet, Home, FolderOpen, StickyNote, Settings, Clock, Trello, Repeat } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 import {
@@ -17,6 +17,7 @@ const items = [
   { title: "Dashboard", url: "/", icon: Home },
   { title: "Calendário", url: "/calendar", icon: Calendar },
   { title: "Projetos", url: "/projects", icon: FolderOpen },
+  { title: "Rotinas", url: "/routines", icon: Repeat },
   { title: "Finanças", url: "/finances", icon: Wallet },
   { title: "Network", url: "/network", icon: Users },
   { title: "Clockify", url: "/clockify", icon: Clock },

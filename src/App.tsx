@@ -18,6 +18,7 @@ import Clockify from "./pages/Clockify";
 import Plaky from "./pages/Plaky";
 import Auth from "./pages/Auth";
 import Historico from "./pages/Historico";
+import Routines from "./pages/Routines";
 import { GeminiChat } from "./components/GeminiChat";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
                     <Route path="/calendar" element={<Calendar />} />
                     <Route path="/projects" element={<Projects />} />
                     <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                    <Route path="/routines" element={<Routines />} />
                     <Route path="/finances" element={<Finances />} />
                     <Route path="/network" element={<Network />} />
                     <Route path="/clockify" element={<Clockify />} />
