@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Sparkles, Send, Bot, User, TrendingUp, Calendar, Users, DollarSign } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -271,6 +271,12 @@ export function GeminiChat() {
             <Sparkles className="w-5 h-5 text-primary" />
             {aiSettings.enabled ? 'Assistente Gemini' : 'Recomendações da Stephany'}
           </DialogTitle>
+          <DialogDescription>
+            {aiSettings.enabled 
+              ? 'Converse com seu assistente de IA para obter insights sobre seus dados e produtividade.'
+              : 'Receba recomendações personalizadas baseadas em suas atividades e metas.'
+            }
+          </DialogDescription>
         </DialogHeader>
         
         <div className={`flex-1 grid grid-cols-1 ${aiSettings.enabled ? 'lg:grid-cols-3' : ''} gap-4 min-h-0`}>

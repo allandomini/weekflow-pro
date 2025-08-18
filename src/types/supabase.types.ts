@@ -110,41 +110,6 @@ export type Database = GeneratedDatabase & {
         };
         Relationships: [];
       };
-      routine_completions: {
-        Row: {
-          id: string;
-          routine_id: string;
-          completed_at: string;
-          created_at: string;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          id?: string;
-          routine_id: string;
-          completed_at: string;
-          created_at?: string;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          id?: string;
-          routine_id?: string;
-          completed_at?: string;
-          created_at?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: "routine_completions_routine_id_fkey";
-            columns: ["routine_id"];
-            isOneToOne: false;
-            referencedRelation: "routines";
-            referencedColumns: ["id"];
-          }
-        ];
-      };
       routine_skips: {
         Row: {
           id: string;

@@ -3,7 +3,7 @@ import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -324,7 +324,7 @@ export default function Network() {
                       </div>
 
                       {/* Skills */}
-                      {contact.skills.length > 0 && (
+                      {Array.isArray(contact.skills) && contact.skills.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground mb-2">
                             Habilidades
@@ -345,7 +345,7 @@ export default function Network() {
                       )}
 
                       {/* Projects */}
-                      {contact.projectIds.length > 0 && (
+                      {Array.isArray(contact.projectIds) && contact.projectIds.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground mb-2">
                             Projetos
@@ -650,6 +650,11 @@ export default function Network() {
             <DialogTitle>
               {editingGroup ? 'Editar Grupo' : 'Novo Grupo'}
             </DialogTitle>
+            <DialogDescription>
+              {editingGroup 
+                ? 'Edite as informações do grupo selecionado.' 
+                : 'Crie um novo grupo para organizar seus contatos.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

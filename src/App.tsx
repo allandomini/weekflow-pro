@@ -1,10 +1,11 @@
-import { Toaster } from "@/components/ui/toaster";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "./components/ui/toaster";
+import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SupabaseAppProvider } from "@/contexts/SupabaseAppContext";
-import { useAuth } from "@/hooks/useAuth";
-import { Layout } from "@/components/Layout";
+import { SupabaseAppProvider } from "./contexts/SupabaseAppContext";
+
+import { useAuth } from "./hooks/useAuth";
+import { Layout } from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Projects from "./pages/Projects";

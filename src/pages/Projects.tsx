@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FolderOpen, Plus, Edit, Trash2 } from "lucide-react";
@@ -102,6 +102,11 @@ export default function Projects() {
             <DialogTitle>
               {editingProject ? 'Editar Projeto' : 'Novo Projeto'}
             </DialogTitle>
+            <DialogDescription>
+              {editingProject 
+                ? 'Edite as informações do projeto selecionado.' 
+                : 'Crie um novo projeto para organizar suas tarefas e atividades.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

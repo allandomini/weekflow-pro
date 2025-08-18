@@ -3,7 +3,7 @@ import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -459,6 +459,11 @@ export default function Calendar() {
             <DialogTitle>
               {editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}
             </DialogTitle>
+            <DialogDescription>
+              {editingTask 
+                ? 'Edite as informações da tarefa selecionada.' 
+                : 'Crie uma nova tarefa para o calendário.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useAppContext } from '@/contexts/SupabaseAppContext';
-import { toast } from '@/hooks/use-toast';
+import { useAppContext } from '../contexts/SupabaseAppContext';
+import { toast } from '../hooks/use-toast';
 import { isSameDay, addDays, differenceInMinutes } from 'date-fns';
 
 export function NotificationCenter() {

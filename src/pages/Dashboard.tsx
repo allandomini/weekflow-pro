@@ -1,19 +1,19 @@
 import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAppContext } from "@/contexts/SupabaseAppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
+import { useAppContext } from "../contexts/SupabaseAppContext";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Badge } from "../components/ui/badge";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../components/ui/dialog";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Textarea } from "../components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Checkbox } from "../components/ui/checkbox";
+import { Calendar } from "../components/ui/calendar";
 import { CalendarDays, CheckSquare, DollarSign, Users, Plus, Edit, Trash2, Clock, Sparkles, TrendingUp, AlertCircle, CheckCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
 import { format, isToday, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks, addDays, addMonths, addYears } from "date-fns";
-import { Task } from "@/types";
+import { Task } from "../types";
 import { ptBR } from "date-fns/locale";
 import type { DateRange } from "react-day-picker";
 
@@ -247,7 +247,7 @@ export default function Dashboard() {
           if (r.activeTo && r.activeTo < dayStr) continue;
           
           try {
-            const progressData = await getRoutineProgress(r.id, dayStr, dayStr);
+            const progressData = await getRoutineProgress(r.id, dayStr);
             progress[`${r.id}-${dayStr}`] = progressData;
           } catch (error) {
             console.error('Error loading routine progress:', error);
@@ -363,7 +363,7 @@ export default function Dashboard() {
         // For month/year we fallback to daily for now
         addRoutine({
           name: taskForm.title,
-          color: undefined,
+          color: '#3b82f6', // Cor padrão azul
           timesPerDay: 1,
           schedule,
           activeFrom: baseDayStr,
@@ -659,6 +659,9 @@ export default function Dashboard() {
         <DialogContent className="animate-scale-in">
           <DialogHeader>
             <DialogTitle className="text-foreground">Nova Tarefa</DialogTitle>
+            <DialogDescription>
+              Crie uma nova tarefa ou rotina para organizar suas atividades diárias.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

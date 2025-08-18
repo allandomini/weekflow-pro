@@ -44,6 +44,54 @@ export type Database = {
         }
         Relationships: []
       }
+      activities: {
+        Row: {
+          action: string
+          actor: string
+          at: string
+          created_at: string
+          entity: Json | null
+          entity_id: string | null
+          entity_label: string | null
+          entity_type: string | null
+          id: string
+          meta: Json | null
+          metadata: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          actor: string
+          at?: string
+          created_at?: string
+          entity?: Json | null
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type?: string | null
+          id?: string
+          meta?: Json | null
+          metadata?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          actor?: string
+          at?: string
+          created_at?: string
+          entity?: Json | null
+          entity_id?: string | null
+          entity_label?: string | null
+          entity_type?: string | null
+          id?: string
+          meta?: Json | null
+          metadata?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ai_settings: {
         Row: {
           created_at: string
@@ -706,6 +754,101 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      routine_completions: {
+        Row: {
+          count: number
+          created_at: string
+          date: string
+          goal: number
+          id: string
+          paused: boolean
+          routine_id: string
+          skipped: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          created_at?: string
+          date: string
+          goal?: number
+          id?: string
+          paused?: boolean
+          routine_id: string
+          skipped?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          created_at?: string
+          date?: string
+          goal?: number
+          id?: string
+          paused?: boolean
+          routine_id?: string
+          skipped?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routine_completions_routine_id_fkey"
+            columns: ["routine_id"]
+            isOneToOne: false
+            referencedRelation: "routines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routines: {
+        Row: {
+          active_from: string
+          active_to: string | null
+          color: string
+          created_at: string
+          deleted_at: string | null
+          exceptions: Json | null
+          id: string
+          name: string
+          paused_until: string | null
+          schedule: Json
+          times_per_day: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active_from?: string
+          active_to?: string | null
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          exceptions?: Json | null
+          id?: string
+          name: string
+          paused_until?: string | null
+          schedule?: Json
+          times_per_day?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active_from?: string
+          active_to?: string | null
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          exceptions?: Json | null
+          id?: string
+          name?: string
+          paused_until?: string | null
+          schedule?: Json
+          times_per_day?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       tasks: {
         Row: {

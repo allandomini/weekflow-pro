@@ -282,10 +282,10 @@ export interface RoutineException {
 export interface Routine {
   id: string;
   name: string;
-  color?: string;
+  color: string;
   timesPerDay: number; // e.g., 3 = beber água 3x
-  schedule: { type: 'daily' | 'weekly' | 'customDays'; daysOfWeek?: number[] };
-  activeFrom?: string; // yyyy-MM-dd
+  schedule: Record<string, any>; // JSONB field
+  activeFrom: string; // yyyy-MM-dd
   activeTo?: string;   // yyyy-MM-dd
   pausedUntil?: string; // yyyy-MM-dd
   exceptions?: Record<string, RoutineException>; // date (yyyy-MM-dd) -> exception
@@ -295,8 +295,13 @@ export interface Routine {
 }
 
 export interface RoutineCompletion {
+  id: string;
   routineId: string;
   date: string; // yyyy-MM-dd
   count: number;
-  timestamps?: string[]; // ISO strings for each completion
+  goal: number;
+  skipped: boolean;
+  paused: boolean;
+  createdAt: Date;
+  updatedAt: Date;
 }
