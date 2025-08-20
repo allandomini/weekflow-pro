@@ -1,15 +1,13 @@
-import { useState } from "react";
-import { useAppContext } from "../contexts/SupabaseAppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Button } from "../components/ui/button";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
-import { Badge } from "../components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "../components/ui/dialog";
-import { Input } from "../components/ui/input";
-import { Label } from "../components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
-import { Checkbox } from "../components/ui/checkbox";
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { 
   Wallet, 
   Plus, 
@@ -21,16 +19,23 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   Calendar,
-  BadgeDollarSign,
-  CheckCircle2,
-  Clock,
-  Pencil,
+  Eye,
+  EyeOff,
   Trash2,
-  MoreVertical
-} from "lucide-react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Account, Debt, Goal, Receivable, Project, Transaction } from "../types";
+  MoreVertical,
+  Edit,
+  Trash,
+  Pencil,
+  CheckCircle2,
+  Clock
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { Account, Transaction, Debt, Goal, Receivable } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function Finances() {
   const { 
@@ -42,22 +47,18 @@ export default function Finances() {
     projects,
     addAccount, 
     addTransaction, 
-    // updateTransaction,
-    // deleteTransaction,
     addDebt, 
     addGoal,
     updateAccount,
-    updateDebt,
-    updateGoal,
     payDebt,
     allocateToGoal,
     addReceivable,
     updateReceivable,
-    deleteReceivable,
-    receiveReceivable
-    ,
-    // @ts-ignore - these exist in context
-    deleteAccount
+    receiveReceivable,
+    deleteAccount,
+    updateDebt,
+    deleteDebt,
+    deleteReceivable
   } = useAppContext();
 
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
@@ -69,13 +70,15 @@ export default function Finances() {
   const [isReceivableDialogOpen, setIsReceivableDialogOpen] = useState(false);
   const [isReceiveDialogOpen, setIsReceiveDialogOpen] = useState(false);
   const [isPayDebtDialogOpen, setIsPayDebtDialogOpen] = useState(false);
-  const [isAllocateGoalDialogOpen, setIsAllocateGoalDialogOpen] = useState(false);
   const [isAllocateAdvanceDialogOpen, setIsAllocateAdvanceDialogOpen] = useState(false);
-
-  const [selectedDebt, setSelectedDebt] = useState<Debt | null>(null);
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
-  const [selectedReceivable, setSelectedReceivable] = useState<Receivable | null>(null);
+  const [isEditDebtDialogOpen, setIsEditDebtDialogOpen] = useState(false);
+  const [isDeleteDebtDialogOpen, setIsDeleteDebtDialogOpen] = useState(false);
+  const [selectedDebt, setSelectedDebt] = useState<any>(null);
   const [selectedReceivableIds, setSelectedReceivableIds] = useState<string[]>([]);
+  const [editDebtForm, setEditDebtForm] = useState({ name: '', totalAmount: 0, remainingAmount: 0, dueDate: '' });
+  const [selectedGoal, setSelectedGoal] = useState<any>(null);
+  const [isAllocateGoalDialogOpen, setIsAllocateGoalDialogOpen] = useState(false);
+  const [selectedReceivable, setSelectedReceivable] = useState<Receivable | null>(null);
 
   const [accountForm, setAccountForm] = useState({
     name: "",
@@ -410,7 +413,7 @@ export default function Finances() {
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">A Receber</CardTitle>
-            <BadgeDollarSign className="h-4 w-4 text-muted-foreground" />
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
@@ -606,9 +609,43 @@ export default function Finances() {
                 return (
                   <Card key={debt.id} className="shadow-elegant">
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <CreditCard className="w-5 h-5 text-destructive" />
-                        {debt.name}
+                      <CardTitle className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-5 h-5 text-destructive" />
+                          {debt.name}
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => {
+                              setSelectedDebt(debt);
+                              setEditDebtForm({
+                                name: debt.name,
+                                totalAmount: debt.totalAmount,
+                                remainingAmount: debt.remainingAmount,
+                                dueDate: format(debt.dueDate, 'yyyy-MM-dd')
+                              });
+                              setIsEditDebtDialogOpen(true);
+                            }}>
+                              <Edit className="mr-2 h-4 w-4" />
+                              Editar
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                setSelectedDebt(debt);
+                                setIsDeleteDebtDialogOpen(true);
+                              }}
+                              className="text-destructive"
+                            >
+                              <Trash className="mr-2 h-4 w-4" />
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -1414,6 +1451,122 @@ export default function Finances() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Debt Dialog */}
+      <Dialog open={isEditDebtDialogOpen} onOpenChange={setIsEditDebtDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Dívida</DialogTitle>
+            <DialogDescription>
+              Edite os detalhes da dívida selecionada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="edit-debt-name">Nome da Dívida</Label>
+              <Input
+                id="edit-debt-name"
+                value={editDebtForm.name}
+                onChange={(e) => setEditDebtForm(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Nome da dívida"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-debt-total">Valor Total</Label>
+              <Input
+                id="edit-debt-total"
+                type="number"
+                step="0.01"
+                value={editDebtForm.totalAmount}
+                onChange={(e) => setEditDebtForm(prev => ({ ...prev, totalAmount: parseFloat(e.target.value) || 0 }))}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-debt-remaining">Valor Restante</Label>
+              <Input
+                id="edit-debt-remaining"
+                type="number"
+                step="0.01"
+                value={editDebtForm.remainingAmount}
+                onChange={(e) => setEditDebtForm(prev => ({ ...prev, remainingAmount: parseFloat(e.target.value) || 0 }))}
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-debt-due-date">Data de Vencimento</Label>
+              <Input
+                id="edit-debt-due-date"
+                type="date"
+                value={editDebtForm.dueDate}
+                onChange={(e) => setEditDebtForm(prev => ({ ...prev, dueDate: e.target.value }))}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={async () => {
+                  if (selectedDebt) {
+                    await updateDebt(selectedDebt.id, {
+                      name: editDebtForm.name,
+                      totalAmount: editDebtForm.totalAmount,
+                      remainingAmount: editDebtForm.remainingAmount,
+                      dueDate: new Date(editDebtForm.dueDate)
+                    });
+                    setIsEditDebtDialogOpen(false);
+                    setSelectedDebt(null);
+                  }
+                }}
+                className="flex-1"
+              >
+                Salvar Alterações
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setIsEditDebtDialogOpen(false);
+                  setSelectedDebt(null);
+                }}
+                className="flex-1"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Debt Confirmation Dialog */}
+      <AlertDialog open={isDeleteDebtDialogOpen} onOpenChange={setIsDeleteDebtDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Dívida</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a dívida "{selectedDebt?.name}"? 
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIsDeleteDebtDialogOpen(false);
+              setSelectedDebt(null);
+            }}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={async () => {
+                if (selectedDebt) {
+                  await deleteDebt(selectedDebt.id);
+                  setIsDeleteDebtDialogOpen(false);
+                  setSelectedDebt(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

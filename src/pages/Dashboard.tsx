@@ -110,9 +110,21 @@ export default function Dashboard() {
   const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  const todayTasks = tasks.filter(task => isToday(task.date));
-  const completedToday = todayTasks.filter(task => task.completed);
-  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+  const todayTasks = useMemo(() => {
+    const today = new Date();
+    return tasks.filter(task => {
+      const taskDate = new Date(task.date);
+      return taskDate.toDateString() === today.toDateString();
+    });
+  }, [tasks]);
+  const completedToday = useMemo(() => 
+    todayTasks.filter(task => task.completed),
+    [todayTasks]
+  );
+  const totalBalance = useMemo(() => 
+    accounts.reduce((sum, account) => sum + account.balance, 0),
+    [accounts]
+  );
 
   const generateStephanyRecommendations = () => {
     const newRecommendations = [];

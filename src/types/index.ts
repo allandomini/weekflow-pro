@@ -232,7 +232,7 @@ export interface AISettings {
 
 // Activity / Audit Log Types
 export interface ActivityEntityRef {
-  type: 'task' | 'transaction' | 'contact' | 'project' | 'routine';
+  type: 'task' | 'transaction' | 'contact' | 'project' | 'routine' | 'debt' | 'goal';
   id: string;
   label?: string;
 }
@@ -268,7 +268,14 @@ export interface Activity {
     | 'routine_completed'
     | 'routine_skipped'
     | 'routine_paused'
-    | 'routine_resumed';
+    | 'routine_resumed'
+    | 'debt_added'
+    | 'debt_updated'
+    | 'debt_deleted'
+    | 'debt_paid'
+    | 'goal_added'
+    | 'goal_updated'
+    | 'goal_deleted';
   entity?: ActivityEntityRef;
   meta?: Record<string, any>;
 }

@@ -50,6 +50,7 @@ interface AppContextType {
   updateAccount: (id: string, updates: Partial<Account>) => Promise<void>;
   deleteAccount: (id: string) => Promise<void>;
   updateDebt: (id: string, updates: Partial<Debt>) => Promise<void>;
+  deleteDebt: (id: string) => Promise<void>;
   updateGoal: (id: string, updates: Partial<Goal>) => Promise<void>;
   payDebt: (debtId: string, accountId: string, amount: number) => Promise<void>;
   allocateToGoal: (goalId: string, accountId: string, amount: number) => Promise<void>;
@@ -154,17 +155,21 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   const { toast } = useToast();
   const [loadingStates, setLoadingStates] = useState({
     global: true,
-    projects: false,
-    tasks: false,
-    routines: false,
-    notes: false,
-    todoLists: false,
-    finances: false,
-    contacts: false,
-    clockify: false,
-    plaky: false,
-    pomodoro: false
+    projects: true,
+    tasks: true,
+    notes: true,
+    todoLists: true,
+    accounts: true,
+    transactions: true,
+    routines: true,
+    contacts: true,
+    clockify: true,
+    debts: true,
+    goals: true,
+    receivables: true,
+    activities: true
   });
+  const [recentOperations, setRecentOperations] = useState<Set<string>>(new Set());
   const [actorName, setActorName] = useState('System');
 
   // Helper function to handle errors consistently
@@ -363,47 +368,171 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (!user) return;
     
     console.log('Loading all data for user:', user.id);
-    setLoadingStates(prev => ({
-      ...prev,
-      global: true
-    }));
+    console.log('🔄 [LOAD DATA] Recent operations:', Array.from(recentOperations));
+    
+    setLoadingStates(prev => ({ ...prev, global: true }));
+    
     try {
-      // Load all data in parallel for better performance
+      // Check if user session is valid
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !session) {
+        console.error('Invalid session, redirecting to login');
+        setLoadingStates(prev => ({ ...prev, global: false }));
+        return;
+      }
+      // Load critical data first (tasks, projects, accounts) for faster initial render
+      const criticalDataPromise = Promise.all([
+        supabase.from('projects').select('*').eq('user_id', user.id),
+        supabase.from('tasks').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(100),
+        // Only reload accounts if we don't have any in state (initial load)
+        accounts.length === 0 ? supabase.from('accounts').select('*').eq('user_id', user.id) : Promise.resolve({ data: accounts, error: null }),
+        supabase.from('transactions').select('id, user_id, account_id, type, amount, description, category, date, created_at').eq('user_id', user.id).order('date', { ascending: false }).limit(50)
+      ]);
+      
+      // Load secondary data in parallel
+      const secondaryDataPromise = Promise.all([
+        supabase.from('routines').select('*').eq('user_id', user.id).is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('routine_completions').select('*').eq('user_id', user.id).gte('date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]),
+        supabase.from('notes').select('*').eq('user_id', user.id).order('updated_at', { ascending: false }).limit(50),
+        supabase.from('contacts').select('*').eq('user_id', user.id),
+        supabase.from('contact_groups').select('*').eq('user_id', user.id),
+        supabase.from('clockify_time_entries').select('*').eq('user_id', user.id).order('start_time', { ascending: false }).limit(20),
+        supabase.from('debts').select('*').eq('user_id', user.id).is('deleted_at', null),
+        supabase.from('goals').select('*').eq('user_id', user.id),
+        supabase.from('receivables').select('*').eq('user_id', user.id),
+        supabase.from('pomodoro_settings').select('*').eq('user_id', user.id).single(),
+        supabase.from('ai_settings').select('*').eq('user_id', user.id).single(),
+        supabase.from('activities').select('*').eq('user_id', user.id).order('at', { ascending: false }).limit(50)
+      ]);
+      
+      // Load critical data first
       const [
-        { data: projectsData },
-        { data: tasksData },
+        { data: projectsData, error: projectsError },
+        { data: tasksData, error: tasksError },
+        { data: accountsData, error: accountsError },
+        { data: transactionsData, error: transactionsError }
+      ] = await criticalDataPromise;
+      
+      // Handle critical data errors
+      if (projectsError) console.error('Error loading projects:', projectsError);
+      if (tasksError) console.error('Error loading tasks:', tasksError);
+      if (accountsError) console.error('Error loading accounts:', accountsError);
+      if (transactionsError) {
+        console.error('Error loading transactions:', transactionsError);
+        // Don't fail completely if transactions fail, just set empty array
+        setTransactions([]);
+      }
+      
+      // Process critical data immediately
+      if (projectsData) {
+        setProjects(projectsData.map(p => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          color: p.color,
+          createdAt: new Date(p.created_at),
+          updatedAt: new Date(p.updated_at),
+        })));
+      }
+      
+      if (tasksData) {
+        console.log('Processing tasks data:', tasksData.length, 'tasks found');
+        const transformedTasks = tasksData.map(transformDbTask);
+        
+        // Process overdue tasks - move pending tasks from past dates to today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        console.log('Today date for comparison:', today);
+        
+        const processedTasks = transformedTasks.map(task => {
+          const taskDate = new Date(task.date);
+          taskDate.setHours(0, 0, 0, 0);
+          
+          console.log(`Task "${task.title}": date=${taskDate.toISOString()}, completed=${task.completed}, isOverdue=${task.isOverdue}`);
+          
+          // If task is not completed and date is before today, mark as overdue and move to today
+          if (!task.completed && taskDate < today) {
+            console.log(`Moving overdue task "${task.title}" to today`);
+            return {
+              ...task,
+              date: new Date(), // Move to today
+              isOverdue: true   // Mark as overdue
+            };
+          }
+          
+          return task;
+        });
+        
+        const overdueCount = processedTasks.filter(t => t.isOverdue && !t.completed).length;
+        console.log(`Found ${overdueCount} overdue tasks`);
+        
+        setTasks(processedTasks);
+        
+        // Update overdue tasks in database
+        const overdueTasks = processedTasks.filter(task => 
+          task.isOverdue && !tasksData.find(original => 
+            original.id === task.id && original.is_overdue
+          )
+        );
+        
+        console.log(`Updating ${overdueTasks.length} tasks in database`);
+        
+        // Batch update overdue tasks in database
+        if (overdueTasks.length > 0) {
+          overdueTasks.forEach(async (task) => {
+            try {
+              console.log(`Updating task ${task.id} in database`);
+              const { error } = await supabase
+                .from('tasks')
+                .update({
+                  date: new Date().toISOString().split('T')[0],
+                  is_overdue: true,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', task.id)
+                .eq('user_id', user.id);
+              
+              if (error) {
+                console.error('Database update error:', error);
+              } else {
+                console.log(`Successfully updated task ${task.id}`);
+              }
+            } catch (error) {
+              console.error('Error updating overdue task:', error);
+            }
+          });
+        }
+      }
+      
+      if (accountsData) {
+        setAccounts(accountsData.map(transformDbAccount));
+      }
+      
+      if (transactionsData) {
+        setTransactions(transactionsData.map(transformDbTransaction));
+      }
+      
+      // Update loading state for critical data
+      setLoadingStates(prev => ({
+        ...prev,
+        global: false
+      }));
+      
+      // Load secondary data
+      const [
         { data: routinesData, error: routinesError },
         { data: routineCompletionsData, error: routineCompletionsError },
         { data: notesData },
         { data: contactsData, error: contactsError },
         { data: contactGroupsData, error: contactGroupsError },
         { data: clockifyData, error: clockifyError },
-        { data: accountsData },
-        { data: transactionsData },
         { data: debtsData, error: debtsError },
         { data: goalsData, error: goalsError },
         { data: receivablesData, error: receivablesError },
         { data: pomodoroSettingsData },
         { data: aiSettingsData },
         { data: activitiesData, error: activitiesError }
-      ] = await Promise.all([
-        supabase.from('projects').select('*').eq('user_id', user.id),
-        supabase.from('tasks').select('*').eq('user_id', user.id),
-        supabase.from('routines').select('*').eq('user_id', user.id).is('deleted_at', null).order('created_at', { ascending: false }),
-        supabase.from('routine_completions').select('*').eq('user_id', user.id),
-        supabase.from('notes').select('*').eq('user_id', user.id),
-        supabase.from('contacts').select('*').eq('user_id', user.id),
-        supabase.from('contact_groups').select('*').eq('user_id', user.id),
-        supabase.from('clockify_time_entries').select('*').eq('user_id', user.id),
-        supabase.from('accounts').select('*').eq('user_id', user.id),
-        supabase.from('transactions').select('*').eq('user_id', user.id),
-        supabase.from('debts').select('*').eq('user_id', user.id),
-        supabase.from('goals').select('*').eq('user_id', user.id),
-        supabase.from('receivables').select('*').eq('user_id', user.id),
-        supabase.from('pomodoro_settings').select('*').eq('user_id', user.id).single(),
-        supabase.from('ai_settings').select('*').eq('user_id', user.id).single(),
-        supabase.from('activities').select('*').eq('user_id', user.id).order('at', { ascending: false }).limit(100)
-      ]);
+      ] = await secondaryDataPromise;
 
       // Handle errors
       if (routinesError) console.error('Error loading routines:', routinesError);
@@ -519,9 +648,25 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         setAccounts(accountsData.map(transformDbAccount));
       }
 
-      // Set transactions
-      if (transactionsData) {
-        setTransactions(transactionsData.map(transformDbTransaction));
+      if (transactionsData && !transactionsError) {
+        const transformedTransactions = transactionsData.map(transformDbTransaction);
+        setTransactions(transformedTransactions);
+        
+        // Recalculate account balances based on transactions
+        if (accountsData && transformedTransactions.length > 0) {
+          const updatedAccounts = accountsData.map(transformDbAccount).map(account => {
+            const accountTransactions = transformedTransactions.filter(t => t.accountId === account.id);
+            const calculatedBalance = accountTransactions.reduce((balance, transaction) => {
+              return transaction.type === 'deposit' 
+                ? balance + transaction.amount 
+                : balance - transaction.amount;
+            }, 0);
+            
+            return { ...account, balance: calculatedBalance };
+          });
+          
+          setAccounts(updatedAccounts);
+        }
       }
 
       // Set debts
@@ -996,16 +1141,32 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (!user) return;
     
     try {
+      console.log('Deleting account:', id);
+      
       const { error } = await supabase
         .from('accounts')
         .delete()
         .eq('id', id)
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Database deletion error:', error);
+        throw error;
+      }
       
-      setAccounts(prev => prev.filter(acc => acc.id !== id));
+      console.log('Account deleted from database, updating local state');
+      setAccounts(prev => {
+        const filtered = prev.filter(acc => acc.id !== id);
+        console.log('Accounts before filter:', prev.length, 'after filter:', filtered.length);
+        return filtered;
+      });
+      
+      toast({
+        title: "Conta excluída",
+        description: "A conta foi excluída com sucesso.",
+      });
     } catch (error) {
+      console.error('Error in deleteAccount:', error);
       handleError(error, 'deletar conta');
     }
   };
@@ -1014,6 +1175,31 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
     if (!user) return;
     
+    // Validate required fields
+    if (!transaction.accountId || !transaction.type || transaction.amount === undefined || transaction.amount === null || !transaction.description?.trim()) {
+      const missingFields = [];
+      if (!transaction.accountId) missingFields.push('accountId');
+      if (!transaction.type) missingFields.push('type');
+      if (transaction.amount === undefined || transaction.amount === null) missingFields.push('amount');
+      if (!transaction.description?.trim()) missingFields.push('description');
+      
+      handleError(new Error(`Missing required fields: ${missingFields.join(', ')}`), 'validar transação');
+      return;
+    }
+    
+    // Validate amount is positive
+    if (Number(transaction.amount) <= 0) {
+      handleError(new Error('Amount must be greater than 0'), 'validar transação');
+      return;
+    }
+    
+    // Validate account exists
+    const account = accounts.find(a => a.id === transaction.accountId);
+    if (!account) {
+      handleError(new Error('Account not found'), 'validar transação');
+      return;
+    }
+    
     try {
       const { data, error } = await supabase
         .from('transactions')
@@ -1021,9 +1207,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           user_id: user.id,
           account_id: transaction.accountId,
           type: transaction.type,
-          amount: transaction.amount,
-          description: transaction.description,
-          category: transaction.category,
+          amount: Number(transaction.amount), // Ensure it's a number
+          description: transaction.description.trim(), // Ensure it's not empty
+          category: transaction.category || null, // Handle optional field
           date: transaction.date.toISOString(),
         })
         .select()
@@ -1034,14 +1220,33 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       const newTransaction = transformDbTransaction(data);
       setTransactions(prev => [...prev, newTransaction]);
 
-      // Update account balance
-      setAccounts(prev => prev.map(account => {
-        if (account.id === transaction.accountId) {
-          const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
-          return { ...account, balance: account.balance + balanceChange, updatedAt: new Date() };
+          // Update account balance in database first
+      const account = accounts.find(a => a.id === transaction.accountId);
+      if (account) {
+        const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
+        const newBalance = account.balance + balanceChange;
+        
+        const { error: balanceError } = await supabase
+          .from('accounts')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', transaction.accountId)
+          .eq('user_id', user.id);
+
+        if (balanceError) {
+          console.error('Error updating account balance:', balanceError);
+          throw balanceError;
         }
-        return account;
-      }));
+
+        // Update local state
+        setAccounts(prev => prev.map(acc => 
+          acc.id === transaction.accountId 
+            ? { ...acc, balance: newBalance, updatedAt: new Date() }
+            : acc
+        ));
+      }
 
       await logActivity({
         action: 'transaction_added',
@@ -1054,14 +1259,26 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    if (!user) return;
+    
     try {
+      // Get original transaction to calculate balance difference
+      const originalTransaction = transactions.find(t => t.id === id);
+      if (!originalTransaction) throw new Error('Transaction not found');
+      
       const { data, error } = await supabase
         .from('transactions')
         .update({
-          ...updates,
+          description: updates.description,
+          amount: updates.amount,
+          type: updates.type,
+          category: updates.category,
+          date: updates.date?.toISOString(),
+          account_id: updates.accountId,
           updated_at: new Date().toISOString()
-        } as any)
+        })
         .eq('id', id)
+        .eq('user_id', user.id)
         .select()
         .single();
 
@@ -1071,6 +1288,41 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setTransactions(prev => 
         prev.map(tx => tx.id === id ? updatedTransaction : tx)
       );
+      
+      // Update account balance if amount or type changed
+      if (updates.amount !== undefined || updates.type !== undefined) {
+        const account = accounts.find(a => a.id === (updates.accountId || originalTransaction.accountId));
+        if (account) {
+          // Reverse original transaction effect
+          const originalChange = originalTransaction.type === 'deposit' ? originalTransaction.amount : -originalTransaction.amount;
+          // Apply new transaction effect
+          const newChange = (updates.type || originalTransaction.type) === 'deposit' 
+            ? (updates.amount || originalTransaction.amount) 
+            : -(updates.amount || originalTransaction.amount);
+          
+          const balanceDifference = newChange - originalChange;
+          const newBalance = account.balance + balanceDifference;
+          
+          const { error: balanceError } = await supabase
+            .from('accounts')
+            .update({ 
+              balance: newBalance,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', account.id)
+            .eq('user_id', user.id);
+
+          if (balanceError) {
+            console.error('Error updating account balance:', balanceError);
+          } else {
+            setAccounts(prev => prev.map(acc => 
+              acc.id === account.id 
+                ? { ...acc, balance: newBalance, updatedAt: new Date() }
+                : acc
+            ));
+          }
+        }
+      }
     } catch (error) {
       handleError(error, 'atualizar transação');
       throw error;
@@ -1078,13 +1330,46 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   };
 
   const deleteTransaction = async (id: string) => {
+    if (!user) return;
+    
     try {
+      // Get transaction to reverse balance change
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) throw new Error('Transaction not found');
+      
       const { error } = await supabase
         .from('transactions')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('user_id', user.id);
 
       if (error) throw error;
+      
+      // Reverse the balance change
+      const account = accounts.find(a => a.id === transaction.accountId);
+      if (account) {
+        const balanceChange = transaction.type === 'deposit' ? -transaction.amount : transaction.amount;
+        const newBalance = account.balance + balanceChange;
+        
+        const { error: balanceError } = await supabase
+          .from('accounts')
+          .update({ 
+            balance: newBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', account.id)
+          .eq('user_id', user.id);
+
+        if (balanceError) {
+          console.error('Error updating account balance:', balanceError);
+        } else {
+          setAccounts(prev => prev.map(acc => 
+            acc.id === account.id 
+              ? { ...acc, balance: newBalance, updatedAt: new Date() }
+              : acc
+          ));
+        }
+      }
       
       setTransactions(prev => prev.filter(tx => tx.id !== id));
       
@@ -1093,7 +1378,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         entity: {
           type: 'transaction',
           id,
-          label: `Transaction ${id}`
+          label: transaction.description
         }
       });
     } catch (error) {
@@ -1110,6 +1395,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   // Load data on mount
   useEffect(() => {
     if (user) {
+      console.log('🔄 [USEEFFECT] Triggering loadAllData for user:', user.id);
       loadAllData();
     } else {
       setLoadingStates(prev => ({
@@ -1281,6 +1567,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       }
     },
     updateDebt: async (id: string, updates: Partial<Debt>) => {
+      if (!user) return;
+      
       try {
         const { error } = await supabase
           .from('debts')
@@ -1291,7 +1579,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             due_date: updates.dueDate?.toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq('id', id);
+          .eq('id', id)
+          .eq('user_id', user.id);
 
         if (error) throw error;
         
@@ -1300,14 +1589,109 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         ));
         
         toast({
-          title: "Débito atualizado",
-          description: "Débito foi atualizado com sucesso.",
+          title: "Dívida atualizada",
+          description: "A dívida foi atualizada com sucesso.",
         });
       } catch (error) {
         console.error('Error updating debt:', error);
         toast({
           title: "Erro",
-          description: "Não foi possível atualizar o débito.",
+          description: "Não foi possível atualizar a dívida.",
+          variant: "destructive",
+        });
+      }
+    },
+    deleteDebt: async (id: string) => {
+      if (!user) return;
+      
+      const debtToDelete = debts.find(d => d.id === id);
+      if (!debtToDelete) {
+        toast({
+          title: "Erro",
+          description: "Dívida não encontrada.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Remove from local state immediately
+        setDebts(prev => prev.filter(debt => debt.id !== id));
+
+        // Try multiple deletion strategies
+        let deletionSuccess = false;
+        let lastError: any = null;
+
+        // Strategy 1: Soft delete (mark as deleted)
+        try {
+          const { error: softDeleteError } = await supabase
+            .from('debts')
+            .update({ 
+              deleted_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', id)
+            .eq('user_id', user.id);
+
+          if (!softDeleteError) {
+            deletionSuccess = true;
+            console.log('✅ Soft delete successful');
+          } else {
+            lastError = softDeleteError;
+          }
+        } catch (e) {
+          lastError = e;
+        }
+
+        // Strategy 2: Hard delete (if soft delete failed)
+        if (!deletionSuccess) {
+          try {
+            const { error: hardDeleteError } = await supabase
+              .from('debts')
+              .delete()
+              .eq('id', id)
+              .eq('user_id', user.id);
+
+            if (!hardDeleteError) {
+              deletionSuccess = true;
+              console.log('✅ Hard delete successful');
+            } else {
+              lastError = hardDeleteError;
+            }
+          } catch (e) {
+            lastError = e;
+          }
+        }
+
+        if (!deletionSuccess) {
+          // Restore debt if all strategies failed
+          setDebts(prev => [...prev, debtToDelete]);
+          throw lastError || new Error('Falha ao deletar dívida');
+        }
+
+        toast({
+          title: "Dívida excluída",
+          description: "A dívida foi excluída com sucesso.",
+        });
+
+        // Log activity
+        await logActivity({
+          action: 'debt_deleted',
+          entity: { type: 'debt', id, label: debtToDelete.name }
+        });
+
+      } catch (error) {
+        console.error('Error deleting debt:', error);
+        
+        // Ensure debt is restored on error
+        setDebts(prev => {
+          const exists = prev.find(d => d.id === id);
+          return exists ? prev : [...prev, debtToDelete];
+        });
+
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a dívida.",
           variant: "destructive",
         });
       }
@@ -1376,6 +1760,21 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         if (accountError) throw accountError;
 
+        // Create transaction for debt payment
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .insert({
+            user_id: user.id,
+            account_id: accountId,
+            type: 'withdrawal',
+            amount: amount,
+            description: `Pagamento: ${debt.name}`,
+            category: 'Dívida',
+            date: new Date().toISOString().split('T')[0]
+          });
+
+        if (transactionError) throw transactionError;
+
         // Update local state
         setDebts(prev => prev.map(d => 
           d.id === debtId ? { ...d, remainingAmount: newRemainingAmount, updatedAt: new Date() } : d
@@ -1385,9 +1784,22 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           a.id === accountId ? { ...a, balance: a.balance - amount, updatedAt: new Date() } : a
         ));
         
+        // Add transaction to local state
+        const newTransaction = {
+          id: `debt-payment-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          accountId,
+          type: 'withdrawal' as const,
+          amount,
+          description: `Pagamento: ${debt.name}`,
+          category: 'Dívida',
+          date: new Date(),
+          createdAt: new Date()
+        };
+        setTransactions(prev => [newTransaction, ...prev]);
+        
         toast({
           title: "Pagamento realizado",
-          description: `Pagamento de R$ ${amount.toFixed(2)} foi realizado com sucesso.`,
+          description: `Pagamento de R$ ${amount.toFixed(2)} para ${debt.name} foi realizado com sucesso.`,
         });
       } catch (error) {
         console.error('Error paying debt:', error);
@@ -2789,10 +3201,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       // Implementation for updateAccount
       notImplemented('updateAccount');
     },
-    deleteAccount: async (id: string) => {
-      // Implementation for deleteAccount
-      notImplemented('deleteAccount');
-    },
+    deleteAccount,
 
     // Activity Tracking
     activities,
