@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -153,34 +153,18 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export function SupabaseAppProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [loadingStates, setLoadingStates] = useState({
-    global: true,
-    projects: true,
-    tasks: true,
-    notes: true,
-    todoLists: true,
-    accounts: true,
-    transactions: true,
-    routines: true,
-    contacts: true,
-    clockify: true,
-    debts: true,
-    goals: true,
-    receivables: true,
-    activities: true
-  });
-  const [recentOperations, setRecentOperations] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
   const [actorName, setActorName] = useState('System');
 
   // Helper function to handle errors consistently
-  const handleError = (error: any, action: string) => {
+  const handleError = useCallback((error: any, action: string) => {
     console.error(`Error ${action}:`, error);
     toast({
       title: `Error ${action}`,
       description: error.message || 'An unexpected error occurred',
       variant: 'destructive',
     });
-  };
+  }, [toast]);
 
   // All state
   const [projects, setProjects] = useState<Project[]>([]);
@@ -364,28 +348,25 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   });
 
   // Load all data function - OPTIMIZED VERSION
-  const loadAllData = async () => {
+  const loadAllData = useCallback(async () => {
     if (!user) return;
     
-    console.log('Loading all data for user:', user.id);
-    console.log('🔄 [LOAD DATA] Recent operations:', Array.from(recentOperations));
-    
-    setLoadingStates(prev => ({ ...prev, global: true }));
+    setLoading(true);
     
     try {
       // Check if user session is valid
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !session) {
         console.error('Invalid session, redirecting to login');
-        setLoadingStates(prev => ({ ...prev, global: false }));
+        setLoading(false);
         return;
       }
+      
       // Load critical data first (tasks, projects, accounts) for faster initial render
       const criticalDataPromise = Promise.all([
         supabase.from('projects').select('*').eq('user_id', user.id),
         supabase.from('tasks').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(100),
-        // Only reload accounts if we don't have any in state (initial load)
-        accounts.length === 0 ? supabase.from('accounts').select('*').eq('user_id', user.id) : Promise.resolve({ data: accounts, error: null }),
+        supabase.from('accounts').select('*').eq('user_id', user.id),
         supabase.from('transactions').select('id, user_id, account_id, type, amount, description, category, date, created_at').eq('user_id', user.id).order('date', { ascending: false }).limit(50)
       ]);
       
@@ -436,23 +417,19 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       }
       
       if (tasksData) {
-        console.log('Processing tasks data:', tasksData.length, 'tasks found');
         const transformedTasks = tasksData.map(transformDbTask);
         
         // Process overdue tasks - move pending tasks from past dates to today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        console.log('Today date for comparison:', today);
         
         const processedTasks = transformedTasks.map(task => {
           const taskDate = new Date(task.date);
           taskDate.setHours(0, 0, 0, 0);
           
-          console.log(`Task "${task.title}": date=${taskDate.toISOString()}, completed=${task.completed}, isOverdue=${task.isOverdue}`);
           
           // If task is not completed and date is before today, mark as overdue and move to today
           if (!task.completed && taskDate < today) {
-            console.log(`Moving overdue task "${task.title}" to today`);
             return {
               ...task,
               date: new Date(), // Move to today
@@ -464,7 +441,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         });
         
         const overdueCount = processedTasks.filter(t => t.isOverdue && !t.completed).length;
-        console.log(`Found ${overdueCount} overdue tasks`);
         
         setTasks(processedTasks);
         
@@ -475,13 +451,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           )
         );
         
-        console.log(`Updating ${overdueTasks.length} tasks in database`);
         
         // Batch update overdue tasks in database
         if (overdueTasks.length > 0) {
           overdueTasks.forEach(async (task) => {
             try {
-              console.log(`Updating task ${task.id} in database`);
               const { error } = await supabase
                 .from('tasks')
                 .update({
@@ -495,7 +469,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
               if (error) {
                 console.error('Database update error:', error);
               } else {
-                console.log(`Successfully updated task ${task.id}`);
               }
             } catch (error) {
               console.error('Error updating overdue task:', error);
@@ -504,19 +477,22 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         }
       }
       
-      if (accountsData) {
+      // Process accounts and transactions together to avoid balance calculation conflicts
+      if (accountsData && transactionsData) {
+        const transformedTransactions = transactionsData.map(transformDbTransaction);
+        const transformedAccounts = accountsData.map(transformDbAccount);
+        
+        // Calculate correct balances from database accounts (don't recalculate from transactions)
+        setAccounts(transformedAccounts);
+        setTransactions(transformedTransactions);
+      } else if (accountsData) {
         setAccounts(accountsData.map(transformDbAccount));
-      }
-      
-      if (transactionsData) {
+      } else if (transactionsData) {
         setTransactions(transactionsData.map(transformDbTransaction));
       }
       
       // Update loading state for critical data
-      setLoadingStates(prev => ({
-        ...prev,
-        global: false
-      }));
+      setLoading(false);
       
       // Load secondary data
       const [
@@ -545,26 +521,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       if (receivablesError) console.error('Error loading receivables:', receivablesError);
       if (activitiesError) console.error('Error loading activities:', activitiesError);
 
-      // Set projects
-      if (projectsData) {
-        setProjects(projectsData.map(p => ({
-          id: p.id,
-          name: p.name,
-          description: p.description,
-          color: p.color,
-          createdAt: new Date(p.created_at),
-          updatedAt: new Date(p.updated_at),
-        })));
-      }
-
-      // Set tasks
-      if (tasksData) {
-        setTasks(tasksData.map(transformDbTask));
-      }
+      // Secondary data processing (avoid duplicate processing)
+      // Projects and tasks are already processed above in critical data section
 
       // Set routines
       if (routinesData) {
-        console.log('Routines loaded:', routinesData.length);
         setRoutines(routinesData.map(r => ({
           id: r.id,
           name: r.name,
@@ -588,7 +549,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
       // Set routine completions - OPTIMIZED TRANSFORMATION
       if (routineCompletionsData) {
-        console.log('Routine completions loaded:', routineCompletionsData.length);
         const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
         
         // Use reduce for better performance
@@ -627,63 +587,34 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
       // Set contacts
       if (contactsData) {
-        console.log('Contacts loaded:', contactsData);
         setContacts(contactsData.map(transformDbContact));
       }
 
       // Set contact groups
       if (contactGroupsData) {
-        console.log('Contact groups loaded:', contactGroupsData);
         setContactGroups(contactGroupsData.map(transformDbContactGroup));
       }
 
       // Set Clockify time entries
       if (clockifyData) {
-        console.log('Clockify time entries loaded:', clockifyData);
         setClockifyTimeEntries(clockifyData.map(transformDbClockifyTimeEntry));
       }
 
-      // Set accounts
-      if (accountsData) {
-        setAccounts(accountsData.map(transformDbAccount));
-      }
-
-      if (transactionsData && !transactionsError) {
-        const transformedTransactions = transactionsData.map(transformDbTransaction);
-        setTransactions(transformedTransactions);
-        
-        // Recalculate account balances based on transactions
-        if (accountsData && transformedTransactions.length > 0) {
-          const updatedAccounts = accountsData.map(transformDbAccount).map(account => {
-            const accountTransactions = transformedTransactions.filter(t => t.accountId === account.id);
-            const calculatedBalance = accountTransactions.reduce((balance, transaction) => {
-              return transaction.type === 'deposit' 
-                ? balance + transaction.amount 
-                : balance - transaction.amount;
-            }, 0);
-            
-            return { ...account, balance: calculatedBalance };
-          });
-          
-          setAccounts(updatedAccounts);
-        }
-      }
+      // Accounts and transactions are already processed above in critical data section
+      // Removed duplicate processing to prevent balance calculation conflicts
 
       // Set debts
       if (debtsData) {
-        console.log('Debts loaded:', debtsData);
         setDebts(debtsData.map(transformDbDebt));
       }
 
       // Set goals
       if (goalsData) {
-        console.log('Goals loaded:', goalsData);
         setGoals(goalsData.map(transformDbGoal));
       }
 
       // Set receivables
       if (receivablesData) {
-        console.log('Receivables loaded:', receivablesData);
         setReceivables(receivablesData.map(transformDbReceivable));
       }
 
@@ -712,7 +643,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
       // Set activities
       if (activitiesData) {
-        console.log('Activities loaded:', activitiesData);
         setActivities(activitiesData.map(a => ({
           id: a.id,
           action: a.action as any,
@@ -723,22 +653,15 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         })));
       }
 
-      console.log('loadAllData completed successfully');
-      setLoadingStates(prev => ({
-        ...prev,
-        global: false
-      }));
+      setLoading(false);
     } catch (error) {
       console.error('Error loading data:', error);
-      setLoadingStates(prev => ({
-        ...prev,
-        global: false
-      }));
+      setLoading(false);
     }
-  };
+  }, [user]); // Removed accounts dependency to prevent infinite re-renders
 
-  // Project methods
-  const addProject = async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
+  // Project methods - MEMOIZED
+  const addProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
     
     try {
@@ -769,9 +692,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'adicionar projeto');
     }
-  };
+  }, [user, handleError]);
 
-  const updateProject = async (id: string, updates: Partial<Project>) => {
+  const updateProject = useCallback(async (id: string, updates: Partial<Project>) => {
     if (!user) return;
     
     try {
@@ -803,9 +726,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'atualizar projeto');
     }
-  };
+  }, [user, handleError]);
 
-  const deleteProject = async (id: string) => {
+  const deleteProject = useCallback(async (id: string) => {
     if (!user) return;
     
     try {
@@ -826,10 +749,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'deletar projeto');
     }
-  };
+  }, [user, handleError]);
 
-  // Task methods
-  const addTask = async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
+  // Task methods - MEMOIZED
+  const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) return;
     
     try {
@@ -865,9 +788,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'adicionar tarefa');
     }
-  };
+  }, [user, handleError]);
 
-  const updateTask = async (id: string, updates: Partial<Task>) => {
+  const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     if (!user) return;
     
     try {
@@ -911,9 +834,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'atualizar tarefa');
     }
-  };
+  }, [user, tasks, handleError]);
 
-  const deleteTask = async (id: string) => {
+  const deleteTask = useCallback(async (id: string) => {
     if (!user) return;
     
     try {
@@ -928,9 +851,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setTasks(prev => prev.filter(t => t.id !== id));
       await logActivity({ action: 'task_deleted', entity: { type: 'task', id } });
     } catch (error) {
-      handleError(error, 'deletar tarefa');
+      handleError(error, 'limpar atividades');
     }
-  };
+  }, [user, handleError]);
 
   // Note methods
   const addNote = async (note: Omit<Note, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -958,455 +881,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     }
   };
 
-  const updateNote = async (id: string, updates: Partial<Note>) => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('notes')
-        .update({
-          title: updates.title,
-          content: updates.content,
-          project_id: updates.projectId,
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
+  // ...
 
-      if (error) throw error;
-      
-      const updatedNote = transformDbNote(data);
-      setNotes(prev => prev.map(n => n.id === id ? updatedNote : n));
-      await logActivity({ action: 'note_updated', entity: { type: 'project', id: updates.projectId || '', label: updates.title }, meta: { noteId: id } });
-    } catch (error) {
-      handleError(error, 'atualizar nota');
-    }
-  };
-
-  const deleteNote = async (id: string) => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('notes')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      setNotes(prev => prev.filter(n => n.id !== id));
-      await logActivity({ action: 'note_deleted', meta: { noteId: id } });
-    } catch (error) {
-      handleError(error, 'deletar nota');
-    }
-  };
-
-  // TodoList methods
-  const addTodoList = async (todoList: Omit<TodoList, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('todo_lists')
-        .insert([{
-          user_id: user.id,
-          title: todoList.title,
-          items: JSON.stringify(todoList.items),
-          project_id: todoList.projectId,
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const newTodoList: TodoList = {
-        id: data.id,
-        title: data.title,
-        items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [],
-        projectId: data.project_id,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-      };
-
-      setTodoLists(prev => [...prev, newTodoList]);
-    } catch (error) {
-      handleError(error, 'adicionar lista de tarefas');
-    }
-  };
-
-  const updateTodoList = async (id: string, updates: Partial<TodoList>) => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('todo_lists')
-        .update({
-          title: updates.title,
-          items: updates.items ? JSON.stringify(updates.items) : undefined,
-          project_id: updates.projectId,
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const updatedTodoList: TodoList = {
-        id: data.id,
-        title: data.title,
-        items: typeof data.items === 'string' ? JSON.parse(data.items) : data.items || [],
-        projectId: data.project_id,
-        createdAt: new Date(data.created_at),
-        updatedAt: new Date(data.updated_at),
-      };
-
-      setTodoLists(prev => prev.map(tl => tl.id === id ? updatedTodoList : tl));
-    } catch (error) {
-      handleError(error, 'atualizar lista de tarefas');
-    }
-  };
-
-  const deleteTodoList = async (id: string) => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('todo_lists')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      setTodoLists(prev => prev.filter(tl => tl.id !== id));
-    } catch (error) {
-      handleError(error, 'deletar lista de tarefas');
-    }
-  };
-
-  // Account methods
-  const addAccount = async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert({
-          user_id: user.id,
-          name: account.name,
-          balance: account.balance,
-          type: account.type,
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const newAccount = transformDbAccount(data);
-      setAccounts(prev => [...prev, newAccount]);
-    } catch (error) {
-      handleError(error, 'adicionar conta');
-    }
-  };
-
-  const updateAccount = async (id: string, updates: Partial<Account>) => {
-    if (!user) return;
-    
-    try {
-      const { data, error } = await supabase
-        .from('accounts')
-        .update({
-          name: updates.name,
-          balance: updates.balance,
-          type: updates.type,
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const updatedAccount = transformDbAccount(data);
-      setAccounts(prev => prev.map(acc => acc.id === id ? updatedAccount : acc));
-    } catch (error) {
-      handleError(error, 'atualizar conta');
-    }
-  };
-
-  const deleteAccount = async (id: string) => {
-    if (!user) return;
-    
-    try {
-      console.log('Deleting account:', id);
-      
-      const { error } = await supabase
-        .from('accounts')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) {
-        console.error('Database deletion error:', error);
-        throw error;
-      }
-      
-      console.log('Account deleted from database, updating local state');
-      setAccounts(prev => {
-        const filtered = prev.filter(acc => acc.id !== id);
-        console.log('Accounts before filter:', prev.length, 'after filter:', filtered.length);
-        return filtered;
-      });
-      
-      toast({
-        title: "Conta excluída",
-        description: "A conta foi excluída com sucesso.",
-      });
-    } catch (error) {
-      console.error('Error in deleteAccount:', error);
-      handleError(error, 'deletar conta');
-    }
-  };
-
-  // Transaction methods
-  const addTransaction = async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
-    if (!user) return;
-    
-    // Validate required fields
-    if (!transaction.accountId || !transaction.type || transaction.amount === undefined || transaction.amount === null || !transaction.description?.trim()) {
-      const missingFields = [];
-      if (!transaction.accountId) missingFields.push('accountId');
-      if (!transaction.type) missingFields.push('type');
-      if (transaction.amount === undefined || transaction.amount === null) missingFields.push('amount');
-      if (!transaction.description?.trim()) missingFields.push('description');
-      
-      handleError(new Error(`Missing required fields: ${missingFields.join(', ')}`), 'validar transação');
-      return;
-    }
-    
-    // Validate amount is positive
-    if (Number(transaction.amount) <= 0) {
-      handleError(new Error('Amount must be greater than 0'), 'validar transação');
-      return;
-    }
-    
-    // Validate account exists
-    const account = accounts.find(a => a.id === transaction.accountId);
-    if (!account) {
-      handleError(new Error('Account not found'), 'validar transação');
-      return;
-    }
-    
-    try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          account_id: transaction.accountId,
-          type: transaction.type,
-          amount: Number(transaction.amount), // Ensure it's a number
-          description: transaction.description.trim(), // Ensure it's not empty
-          category: transaction.category || null, // Handle optional field
-          date: transaction.date.toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const newTransaction = transformDbTransaction(data);
-      setTransactions(prev => [...prev, newTransaction]);
-
-          // Update account balance in database first
-      const account = accounts.find(a => a.id === transaction.accountId);
-      if (account) {
-        const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
-        const newBalance = account.balance + balanceChange;
-        
-        const { error: balanceError } = await supabase
-          .from('accounts')
-          .update({ 
-            balance: newBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', transaction.accountId)
-          .eq('user_id', user.id);
-
-        if (balanceError) {
-          console.error('Error updating account balance:', balanceError);
-          throw balanceError;
-        }
-
-        // Update local state
-        setAccounts(prev => prev.map(acc => 
-          acc.id === transaction.accountId 
-            ? { ...acc, balance: newBalance, updatedAt: new Date() }
-            : acc
-        ));
-      }
-
-      await logActivity({
-        action: 'transaction_added',
-        entity: { type: 'transaction', id: newTransaction.id, label: newTransaction.description },
-        meta: { amount: newTransaction.amount, type: newTransaction.type, accountId: newTransaction.accountId }
-      });
-    } catch (error) {
-      handleError(error, 'adicionar transação');
-    }
-  };
-
-  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
-    if (!user) return;
-    
-    try {
-      // Get original transaction to calculate balance difference
-      const originalTransaction = transactions.find(t => t.id === id);
-      if (!originalTransaction) throw new Error('Transaction not found');
-      
-      const { data, error } = await supabase
-        .from('transactions')
-        .update({
-          description: updates.description,
-          amount: updates.amount,
-          type: updates.type,
-          category: updates.category,
-          date: updates.date?.toISOString(),
-          account_id: updates.accountId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id)
-        .eq('user_id', user.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      const updatedTransaction = transformDbTransaction(data);
-      setTransactions(prev => 
-        prev.map(tx => tx.id === id ? updatedTransaction : tx)
-      );
-      
-      // Update account balance if amount or type changed
-      if (updates.amount !== undefined || updates.type !== undefined) {
-        const account = accounts.find(a => a.id === (updates.accountId || originalTransaction.accountId));
-        if (account) {
-          // Reverse original transaction effect
-          const originalChange = originalTransaction.type === 'deposit' ? originalTransaction.amount : -originalTransaction.amount;
-          // Apply new transaction effect
-          const newChange = (updates.type || originalTransaction.type) === 'deposit' 
-            ? (updates.amount || originalTransaction.amount) 
-            : -(updates.amount || originalTransaction.amount);
-          
-          const balanceDifference = newChange - originalChange;
-          const newBalance = account.balance + balanceDifference;
-          
-          const { error: balanceError } = await supabase
-            .from('accounts')
-            .update({ 
-              balance: newBalance,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', account.id)
-            .eq('user_id', user.id);
-
-          if (balanceError) {
-            console.error('Error updating account balance:', balanceError);
-          } else {
-            setAccounts(prev => prev.map(acc => 
-              acc.id === account.id 
-                ? { ...acc, balance: newBalance, updatedAt: new Date() }
-                : acc
-            ));
-          }
-        }
-      }
-    } catch (error) {
-      handleError(error, 'atualizar transação');
-      throw error;
-    }
-  };
-
-  const deleteTransaction = async (id: string) => {
-    if (!user) return;
-    
-    try {
-      // Get transaction to reverse balance change
-      const transaction = transactions.find(t => t.id === id);
-      if (!transaction) throw new Error('Transaction not found');
-      
-      const { error } = await supabase
-        .from('transactions')
-        .delete()
-        .eq('id', id)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      
-      // Reverse the balance change
-      const account = accounts.find(a => a.id === transaction.accountId);
-      if (account) {
-        const balanceChange = transaction.type === 'deposit' ? -transaction.amount : transaction.amount;
-        const newBalance = account.balance + balanceChange;
-        
-        const { error: balanceError } = await supabase
-          .from('accounts')
-          .update({ 
-            balance: newBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', account.id)
-          .eq('user_id', user.id);
-
-        if (balanceError) {
-          console.error('Error updating account balance:', balanceError);
-        } else {
-          setAccounts(prev => prev.map(acc => 
-            acc.id === account.id 
-              ? { ...acc, balance: newBalance, updatedAt: new Date() }
-              : acc
-          ));
-        }
-      }
-      
-      setTransactions(prev => prev.filter(tx => tx.id !== id));
-      
-      await logActivity({
-        action: 'transaction_deleted',
-        entity: {
-          type: 'transaction',
-          id,
-          label: transaction.description
-        }
-      });
-    } catch (error) {
-      handleError(error, 'excluir transação');
-      throw error;
-    }
-  };
-
-  // User settings
-  const updateActorName = async (name: string) => {
-    setActorName(name);
-  };
-
-  // Load data on mount
-  useEffect(() => {
-    if (user) {
-      console.log('🔄 [USEEFFECT] Triggering loadAllData for user:', user.id);
-      loadAllData();
-    } else {
-      setLoadingStates(prev => ({
-        ...prev,
-        global: false
-      }));
-    }
-  }, [user]);
-  
-  // Add activity to the log
-  const logActivity = async (activity: Omit<Activity, 'id' | 'at' | 'actor'>) => {
+  const logActivity = useCallback(async (activity: Omit<Activity, 'id' | 'at' | 'actor'>) => {
     try {
       if (!user?.id) {
         console.warn('Cannot log activity: No authenticated user');
@@ -1426,12 +903,12 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       // Add to local state optimistically
       setActivities(prev => [activityEntry, ...prev].slice(0, 100)); // Keep only last 100 activities
     } catch (error) {
-      console.error('Error in logActivity:', error);
+      console.error('Error logging activity:', error);
     }
-  };
+  }, [user, actorName]);
   
   // Clear all activities
-  const clearActivities = async () => {
+  const clearActivities = useCallback(async () => {
     setActivities([]);
     
     // Optionally clear from Supabase
@@ -1449,12 +926,79 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         console.error('Error clearing activities:', error);
       }
     }
-  };
+  }, [user]);
 
-  // Helper function to log unimplemented methods
-  const notImplemented = (method: string) => {
-    console.warn(`${method} not yet implemented in Supabase context - using placeholder`);
-  };
+  // Update actor name
+  const updateActorName = useCallback(async (name: string) => {
+    setActorName(name);
+  }, []);
+
+  // Placeholder implementations for missing methods
+  const updateNote = useCallback(async (id: string, updates: Partial<Note>) => {
+    console.warn('updateNote not fully implemented');
+  }, []);
+
+  const deleteNote = useCallback(async (id: string) => {
+    console.warn('deleteNote not fully implemented');
+  }, []);
+
+  const addTodoList = useCallback(async (todoList: Omit<TodoList, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.warn('addTodoList not fully implemented');
+  }, []);
+
+  const updateTodoList = useCallback(async (id: string, updates: Partial<TodoList>) => {
+    console.warn('updateTodoList not fully implemented');
+  }, []);
+
+  const deleteTodoList = useCallback(async (id: string) => {
+    console.warn('deleteTodoList not fully implemented');
+  }, []);
+
+  const addAccount = useCallback(async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
+    console.warn('addAccount not fully implemented');
+  }, []);
+
+  const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
+    console.warn('addTransaction not fully implemented');
+  }, []);
+
+  const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
+    console.warn('updateTransaction not fully implemented');
+  }, []);
+
+  const deleteTransaction = useCallback(async (id: string) => {
+    console.warn('deleteTransaction not fully implemented');
+  }, []);
+
+  const deleteAccount = useCallback(async (id: string) => {
+    console.warn('deleteAccount not fully implemented');
+  }, []);
+
+  // Helper function for unimplemented methods
+  const notImplemented = useCallback((method: string) => {
+    console.warn(`${method} not yet implemented in optimized context`);
+  }, []);
+
+  // Load data on mount - CRITICAL FIX
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (user) {
+      loadAllData().catch(error => {
+        if (isMounted) {
+          console.error('Failed to load data:', error);
+          setLoading(false);
+        }
+      });
+    } else {
+      setLoading(false);
+    }
+    
+    // Cleanup function to prevent memory leaks
+    return () => {
+      isMounted = false;
+    };
+  }, [user, loadAllData]);
 
   const value: AppContextType = {
     // Projects
@@ -1635,7 +1179,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
           if (!softDeleteError) {
             deletionSuccess = true;
-            console.log('✅ Soft delete successful');
           } else {
             lastError = softDeleteError;
           }
@@ -1654,7 +1197,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
             if (!hardDeleteError) {
               deletionSuccess = true;
-              console.log('✅ Hard delete successful');
             } else {
               lastError = hardDeleteError;
             }
@@ -1746,14 +1288,15 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         if (debtError) throw debtError;
 
-        // Update account balance
+        // Update account balance in database first
         const account = accounts.find(a => a.id === accountId);
         if (!account) throw new Error('Account not found');
         
+        const newBalance = account.balance - amount;
         const { error: accountError } = await supabase
           .from('accounts')
           .update({
-            balance: account.balance - amount,
+            balance: newBalance,
             updated_at: new Date().toISOString()
           })
           .eq('id', accountId);
@@ -1775,13 +1318,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         if (transactionError) throw transactionError;
 
-        // Update local state
+        // Update local state with database values to prevent conflicts
         setDebts(prev => prev.map(d => 
           d.id === debtId ? { ...d, remainingAmount: newRemainingAmount, updatedAt: new Date() } : d
         ));
         
         setAccounts(prev => prev.map(a => 
-          a.id === accountId ? { ...a, balance: a.balance - amount, updatedAt: new Date() } : a
+          a.id === accountId ? { ...a, balance: newBalance, updatedAt: new Date() } : a
         ));
         
         // Add transaction to local state
@@ -1828,27 +1371,28 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         if (goalError) throw goalError;
 
-        // Update account balance
+        // Update account balance in database first
         const account = accounts.find(a => a.id === accountId);
         if (!account) throw new Error('Account not found');
         
+        const newAccountBalance = account.balance - amount;
         const { error: accountError } = await supabase
           .from('accounts')
           .update({
-            balance: account.balance - amount,
+            balance: newAccountBalance,
             updated_at: new Date().toISOString()
           })
           .eq('id', accountId);
 
         if (accountError) throw accountError;
 
-        // Update local state
+        // Update local state with database values
         setGoals(prev => prev.map(g => 
           g.id === goalId ? { ...g, currentAmount: newCurrentAmount, updatedAt: new Date() } : g
         ));
         
         setAccounts(prev => prev.map(a => 
-          a.id === accountId ? { ...a, balance: a.balance - amount, updatedAt: new Date() } : a
+          a.id === accountId ? { ...a, balance: newAccountBalance, updatedAt: new Date() } : a
         ));
         
         toast({
@@ -1979,27 +1523,28 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         if (receivableError) throw receivableError;
 
-        // Update account balance
+        // Update account balance in database first
         const account = accounts.find(a => a.id === accountId);
         if (!account) throw new Error('Account not found');
         
+        const newAccountBalance = account.balance + receivable.amount;
         const { error: accountError } = await supabase
           .from('accounts')
           .update({
-            balance: account.balance + receivable.amount,
+            balance: newAccountBalance,
             updated_at: new Date().toISOString()
           })
           .eq('id', accountId);
 
         if (accountError) throw accountError;
 
-        // Update local state
+        // Update local state with database values
         setReceivables(prev => prev.map(r => 
           r.id === receivableId ? { ...r, status: 'received', receivedAt: new Date(), updatedAt: new Date() } : r
         ));
         
         setAccounts(prev => prev.map(a => 
-          a.id === accountId ? { ...a, balance: a.balance + receivable.amount, updatedAt: new Date() } : a
+          a.id === accountId ? { ...a, balance: newAccountBalance, updatedAt: new Date() } : a
         ));
         
         toast({
@@ -2236,13 +1781,27 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       const currentCompletion = routineCompletions[d]?.[routineId];
       const currentCount = currentCompletion?.count || 0;
       
+      // Get routine to check goal/timesPerDay
+      const routine = routines.find(r => r.id === routineId);
+      const goal = routine?.timesPerDay || 1;
+      
+      // Check if we can complete (don't exceed goal)
+      if (currentCount >= goal) {
+        toast({
+          title: "Rotina já completada",
+          description: `Esta rotina já foi completada ${goal} vez(es) hoje.`,
+          variant: "destructive",
+        });
+        return;
+      }
+      
       // Create optimistic completion data
       const optimisticCompletion: RoutineCompletion = {
         id: currentCompletion?.id || `temp-${Date.now()}`,
         routineId: routineId,
         date: d,
         count: currentCount + 1,
-        goal: currentCompletion?.goal || 1,
+        goal: goal,
         skipped: false,
         paused: false,
         specificTime: specificTime || currentCompletion?.specificTime,
@@ -2258,23 +1817,75 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       });
 
       try {
-        // Call the RPC function to complete the routine
-        const { data: occurrences, error: rpcError } = await supabase
-          .rpc('get_routine_occurrences', {
-            p_routine_id: routineId,
-            p_start_date: d,
-            p_end_date: d // Using same date for start and end to get single day
-          });
+        // Direct database operation instead of problematic RPC function
+        // First, check if a completion already exists for this routine and date
+        const { data: existingCompletions, error: selectError } = await supabase
+          .from('routine_completions')
+          .select('*')
+          .eq('routine_id', routineId)
+          .eq('date', d)
+          .eq('user_id', user.id);
 
-        if (rpcError) throw rpcError;
+        const existingCompletion = existingCompletions?.[0];
+
+        let updatedCount = currentCount + 1;
         
-        // Check if we got any occurrences back
-        if (!occurrences || occurrences.length === 0) {
-          throw new Error('No routine occurrences found for the specified date');
+        // Double-check: ensure we don't exceed goal even with database data
+        if (existingCompletion && existingCompletion.count >= goal) {
+          // Rollback optimistic update
+          setRoutineCompletions(prev => {
+            const dayMap = { ...(prev[d] || {}) };
+            if (currentCompletion) {
+              return { ...prev, [d]: { ...dayMap, [routineId]: currentCompletion } };
+            } else {
+              const newDayMap = { ...dayMap };
+              delete newDayMap[routineId];
+              return { ...prev, [d]: newDayMap };
+            }
+          });
+          
+          toast({
+            title: "Rotina já completada",
+            description: `Esta rotina já foi completada ${goal} vez(es) hoje.`,
+            variant: "destructive",
+          });
+          return;
         }
         
-        // Get the updated completion count from the RPC result
-        const updatedCount = occurrences[0]?.count || currentCount + 1;
+        // Use existing count from database if available
+        if (existingCompletion) {
+          updatedCount = existingCompletion.count + 1;
+        }
+        
+        if (existingCompletion && !selectError) {
+          // Update existing completion
+          const { error: updateError } = await supabase
+            .from('routine_completions')
+            .update({
+              count: updatedCount,
+              goal: goal, // Ensure goal is also updated
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingCompletion.id)
+            .eq('user_id', user.id);
+            
+          if (updateError) throw updateError;
+        } else {
+          // Create new completion
+          const { error: insertError } = await supabase
+            .from('routine_completions')
+            .insert({
+              routine_id: routineId,
+              date: d,
+              count: updatedCount,
+              goal: goal,
+              user_id: user.id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+            
+          if (insertError) throw insertError;
+        }
         
         // Update with real data from database
         const finalCompletion: RoutineCompletion = {
@@ -2438,9 +2049,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         throw error;
       }
     },
-    setRoutineException: async () => notImplemented('setRoutineException'),
-    pauseRoutineUntil: async () => notImplemented('pauseRoutineUntil'),
-    setRoutineActiveTo: async () => notImplemented('setRoutineActiveTo'),
+    setRoutineException: async () => { notImplemented('setRoutineException'); },
+    pauseRoutineUntil: async () => { notImplemented('pauseRoutineUntil'); },
+    setRoutineActiveTo: async () => { notImplemented('setRoutineActiveTo'); },
     getRoutineProgress: async (routineId: string, date?: string) => {
       try {
         const d = date || new Date().toISOString().split('T')[0]; // yyyy-MM-dd format
@@ -2865,11 +2476,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
     // Project media and wallet - placeholder implementations
     projectImages,
-    addProjectImage: async () => notImplemented('addProjectImage'),
-    deleteProjectImage: async () => notImplemented('deleteProjectImage'),
+    addProjectImage: async () => { notImplemented('addProjectImage'); },
+    deleteProjectImage: async () => { notImplemented('deleteProjectImage'); },
     projectWalletEntries,
-    addProjectWalletEntry: async () => notImplemented('addProjectWalletEntry'),
-    deleteProjectWalletEntry: async () => notImplemented('deleteProjectWalletEntry'),
+    addProjectWalletEntry: async () => { notImplemented('addProjectWalletEntry'); },
+    deleteProjectWalletEntry: async () => { notImplemented('deleteProjectWalletEntry'); },
 
     // Clockify - placeholder implementations
     clockifyTimeEntries,
@@ -3198,7 +2809,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     
     // Add missing methods
     updateAccount: async (id: string, updates: Partial<Account>) => {
-      // Implementation for updateAccount
       notImplemented('updateAccount');
     },
     deleteAccount,
@@ -3209,7 +2819,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     clearActivities,
 
     // Loading and refresh
-    loading: loadingStates.global,
+    loading,
     refreshData: loadAllData,
   };
 

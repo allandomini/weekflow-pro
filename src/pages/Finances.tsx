@@ -185,12 +185,12 @@ export default function Finances() {
     if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) return;
 
     // TODO: Implement updateTransaction in context
-    console.log('Update transaction:', editingTransaction.id, {
-      accountId: transactionForm.accountId,
-      type: transactionForm.type,
-      amount: parseFloat(transactionForm.amount),
-      description: `${transactionForm.description}${transactionForm.category ? ` • ${transactionForm.category}` : ""}`,
-    });
+    // updateTransaction(editingTransaction.id, {
+    //   accountId: transactionForm.accountId,
+    //   type: transactionForm.type,
+    //   amount: parseFloat(transactionForm.amount),
+    //   description: `${transactionForm.description}${transactionForm.category ? ` • ${transactionForm.category}` : ""}`,
+    // });
 
     setEditingTransaction(null);
     setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
@@ -221,7 +221,7 @@ export default function Finances() {
   const handleDeleteTransaction = (id: string) => {
     if (confirm("Tem certeza que deseja excluir esta transação?")) {
       // TODO: Implement deleteTransaction in context
-      console.log('Delete transaction:', id);
+      // Delete transaction: id
     }
   };
 

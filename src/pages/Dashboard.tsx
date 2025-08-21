@@ -434,7 +434,7 @@ export default function Dashboard() {
         // For now, we don't support uncompleting routines
         // This would require more complex logic to handle partial completions
         // The user can use the routines manager to reset completions if needed
-        console.log('Uncompleting routines is not supported yet');
+        // Uncompleting routines is not supported yet
       }
       return;
     }

@@ -53,7 +53,7 @@ export interface TodoItem {
 export interface Account {
   id: string;
   name: string;
-  balance: number;
+    balance: number;
   type: 'checking' | 'savings' | 'investment';
   createdAt: Date;
   updatedAt: Date;

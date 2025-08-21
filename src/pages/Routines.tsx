@@ -46,9 +46,6 @@ export default function Routines() {
 
   const activeRoutines = routines.filter(r => !r.deletedAt);
   
-  // Debug log
-  console.log('Routines state:', routines);
-  console.log('Active routines:', activeRoutines);
 
   const handleCreateRoutine = () => {
     setEditingRoutine(null);
