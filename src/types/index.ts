@@ -76,6 +76,8 @@ export interface Debt {
   totalAmount: number;
   remainingAmount: number;
   dueDate: Date;
+  status: 'active' | 'paid' | 'overdue';
+  paidAt?: Date;
   allocatedReceivableIds?: string[];
   createdAt: Date;
   updatedAt: Date;

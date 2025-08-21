@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
+import FinancialCalculator from '@/components/FinancialCalculator';
 import { 
   Wallet, 
   Plus, 
@@ -27,7 +28,13 @@ import {
   Trash,
   Pencil,
   CheckCircle2,
-  Clock
+  Clock,
+  Archive,
+  AlertTriangle,
+  Receipt,
+  Calculator,
+  Shield,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -130,11 +137,18 @@ export default function Finances() {
   });
 
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
-  const totalDebts = debts.reduce((sum, debt) => sum + debt.remainingAmount, 0);
+  const activeDebts = debts.filter(debt => debt.status === 'active');
+  const paidDebts = debts.filter(debt => debt.status === 'paid');
+  const overdueDebts = debts.filter(debt => debt.status === 'overdue');
+  const totalActiveDebts = activeDebts.reduce((sum, debt) => sum + debt.remainingAmount, 0);
   const totalGoals = goals.reduce((sum, goal) => sum + goal.currentAmount, 0);
   const totalReceivablesPending = receivables
     .filter(r => r.status === 'pending')
     .reduce((sum, r) => sum + r.amount, 0);
+  
+  // Calculate financial health metrics
+  const netWorth = totalBalance - totalActiveDebts;
+  const debtToIncomeRatio = totalBalance > 0 ? (totalActiveDebts / totalBalance) * 100 : 0;
 
   const handleCreateAccount = () => {
     if (!accountForm.name.trim() || !accountForm.balance) return;
@@ -229,11 +243,16 @@ export default function Finances() {
     if (!debtForm.name.trim() || !debtForm.totalAmount || !debtForm.dueDate) return;
 
     const amount = parseFloat(debtForm.totalAmount);
+    const dueDate = new Date(debtForm.dueDate);
+    const today = new Date();
+    const status = dueDate < today ? 'overdue' : 'active';
+    
     addDebt({
       name: debtForm.name,
       totalAmount: amount,
       remainingAmount: amount,
-      dueDate: new Date(debtForm.dueDate)
+      dueDate,
+      status
     });
 
     setDebtForm({ name: "", totalAmount: "", dueDate: "" });
@@ -342,16 +361,18 @@ export default function Finances() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Finanças</h1>
-          <p className="text-muted-foreground">
-            Gerencie suas contas, dívidas e metas
-          </p>
-        </div>
+    <>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Finanças</h1>
+            <p className="text-muted-foreground">
+              Gerencie suas contas, dívidas e metas
+            </p>
+          </div>
         <div className="flex gap-2">
+          <FinancialCalculator />
           <Button variant="outline" onClick={() => setIsAccountDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Nova Conta
@@ -364,7 +385,7 @@ export default function Finances() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
@@ -382,15 +403,33 @@ export default function Finances() {
 
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dívidas</CardTitle>
+            <CardTitle className="text-sm font-medium">Dívidas Ativas</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {totalDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {totalActiveDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {debts.length} dívida{debts.length !== 1 ? 's' : ''}
+              {activeDebts.length} ativa{activeDebts.length !== 1 ? 's' : ''}
+              {overdueDebts.length > 0 && (
+                <span className="text-red-600 ml-1">• {overdueDebts.length} atrasada{overdueDebts.length !== 1 ? 's' : ''}</span>
+              )}
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Patrimônio Líquido</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${netWorth >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {netWorth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {netWorth >= 0 ? 'Situação positiva' : 'Necessita atenção'}
             </p>
           </CardContent>
         </Card>
@@ -594,25 +633,60 @@ export default function Finances() {
         </TabsContent>
 
         <TabsContent value="debts">
-          <div className="space-y-4">
-            <div className="flex justify-end">
-              <Button onClick={() => setIsDebtDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
+          <div className="space-y-6">
+            <div className="flex justify-between items-center">
+              <div className="flex gap-2">
+                <Badge variant={overdueDebts.length > 0 ? "destructive" : "secondary"}>
+                  {activeDebts.length} Ativa{activeDebts.length !== 1 ? 's' : ''}
+                </Badge>
+                {overdueDebts.length > 0 && (
+                  <Badge variant="destructive">
+                    {overdueDebts.length} Atrasada{overdueDebts.length !== 1 ? 's' : ''}
+                  </Badge>
+                )}
+                {paidDebts.length > 0 && (
+                  <Badge variant="secondary" className="bg-green-100 text-green-800">
+                    {paidDebts.length} Paga{paidDebts.length !== 1 ? 's' : ''}
+                  </Badge>
+                )}
+              </div>
+              <Button onClick={() => setIsDebtDialogOpen(true)} className="gap-2">
+                <Receipt className="w-4 h-4" />
                 Nova Dívida
               </Button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {debts.map((debt) => {
+            
+            {/* Active and Overdue Debts */}
+            {(activeDebts.length > 0 || overdueDebts.length > 0) && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-red-600" />
+                  Dívidas Pendentes
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {activeDebts.concat(overdueDebts).map((debt) => {
                 const progress = ((debt.totalAmount - debt.remainingAmount) / debt.totalAmount) * 100;
                 const allocatedSum = getAllocatedSum(debt);
                 const projectedRemaining = debt.remainingAmount - allocatedSum;
+                const isOverdue = debt.status === 'overdue';
+                const daysUntilDue = Math.ceil((debt.dueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                
                 return (
-                  <Card key={debt.id} className="shadow-elegant">
+                  <Card key={debt.id} className={`shadow-elegant ${isOverdue ? 'border-red-300 bg-red-50' : ''}`}>
                     <CardHeader>
                       <CardTitle className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <CreditCard className="w-5 h-5 text-destructive" />
-                          {debt.name}
+                          {isOverdue ? (
+                            <AlertTriangle className="w-5 h-5 text-red-600" />
+                          ) : (
+                            <CreditCard className="w-5 h-5 text-destructive" />
+                          )}
+                          <span className={isOverdue ? 'text-red-800' : ''}>{debt.name}</span>
+                          {isOverdue && (
+                            <Badge variant="destructive" className="text-xs">
+                              {Math.abs(daysUntilDue)} dias atrasado
+                            </Badge>
+                          )}
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -706,7 +780,56 @@ export default function Finances() {
                   </Card>
                 );
               })}
-            </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Paid Debts Section */}
+            {paidDebts.length > 0 && (
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <Archive className="w-5 h-5 text-green-600" />
+                  Dívidas Quitadas
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {paidDebts.map((debt) => {
+                    const paidDate = debt.paidAt || debt.updatedAt;
+                    return (
+                      <Card key={debt.id} className="shadow-elegant border-green-200 bg-green-50">
+                        <CardHeader>
+                          <CardTitle className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="w-5 h-5 text-green-600" />
+                              <span className="text-green-800">{debt.name}</span>
+                              <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                                QUITADA
+                              </Badge>
+                            </div>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="space-y-3">
+                            <div className="text-xl font-bold text-green-700">
+                              {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            </div>
+                            <div className="text-sm text-green-600">
+                              Valor total quitado
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <Calendar className="w-4 h-4" />
+                              Paga em {format(paidDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                            </div>
+                            <div className="w-full bg-green-200 rounded-full h-2">
+                              <div className="bg-green-600 h-2 rounded-full w-full" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -1059,9 +1182,12 @@ export default function Finances() {
       <Dialog open={isDebtDialogOpen} onOpenChange={setIsDebtDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova Dívida</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
+              Nova Dívida
+            </DialogTitle>
             <DialogDescription>
-              Registre uma nova dívida ou compromisso financeiro com data de vencimento.
+              Registre uma nova dívida ou compromisso financeiro. O sistema automaticamente detectará se está em atraso.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
@@ -1094,8 +1220,12 @@ export default function Finances() {
                 onChange={(e) => setDebtForm(prev => ({ ...prev, dueDate: e.target.value }))}
               />
             </div>
+            <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 mb-4">
+              💡 <strong>Dica:</strong> Dívidas com vencimento anterior a hoje serão marcadas como "em atraso" automaticamente.
+            </div>
             <div className="flex gap-3 pt-4">
-              <Button onClick={handleCreateDebt} className="flex-1">
+              <Button onClick={handleCreateDebt} className="flex-1 gap-2">
+                <Receipt className="w-4 h-4" />
                 Criar Dívida
               </Button>
               <Button variant="outline" onClick={() => setIsDebtDialogOpen(false)}>
@@ -1567,6 +1697,7 @@ export default function Finances() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </>
   );
 }

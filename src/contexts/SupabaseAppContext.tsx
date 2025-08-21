@@ -266,6 +266,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     totalAmount: parseFloat(dbDebt.total_amount),
     remainingAmount: parseFloat(dbDebt.remaining_amount),
     dueDate: new Date(dbDebt.due_date),
+    status: dbDebt.status || (parseFloat(dbDebt.remaining_amount) <= 0 ? 'paid' : 'active'),
+    paidAt: dbDebt.paid_at ? new Date(dbDebt.paid_at) : undefined,
     createdAt: new Date(dbDebt.created_at),
     updatedAt: new Date(dbDebt.updated_at),
   });
