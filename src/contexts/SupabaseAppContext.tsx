@@ -7,7 +7,7 @@ import {
   Debt, Goal, Contact, ContactGroup, Receivable, 
   ProjectImage, ProjectWalletEntry, ClockifyTimeEntry, 
   PlakyBoard, PlakyColumn, PlakyItem, PomodoroSession, PomodoroSettings, AISettings,
-  Activity, ActivityEntityRef, Routine, RoutineCompletion, RoutineExceptionRecord, RoutineBulkOperation
+  Activity, ActivityEntityRef, Routine, RoutineCompletion, RoutineException, RoutineExceptionRecord, RoutineBulkOperation
 } from '@/types';
 
 interface AppContextType {
@@ -369,7 +369,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         supabase.from('projects').select('*').eq('user_id', user.id),
         supabase.from('tasks').select('*').eq('user_id', user.id).order('date', { ascending: false }).limit(100),
         supabase.from('accounts').select('*').eq('user_id', user.id),
-        supabase.from('transactions').select('id, user_id, account_id, type, amount, description, category, date, created_at').eq('user_id', user.id).order('date', { ascending: false }).limit(50)
+        supabase.from('transactions').select('id, user_id, account_id, type, amount, description, category, date, created_at').eq('user_id', user.id).order('date', { ascending: false }).limit(100)
       ]);
       
       // Load secondary data in parallel
@@ -402,11 +402,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       if (accountsError) console.error('Error loading accounts:', accountsError);
       if (transactionsError) {
         console.error('Error loading transactions:', transactionsError);
-        // Don't fail completely if transactions fail, just set empty array
         setTransactions([]);
       }
       
-      // Process critical data immediately
+      // Set projects data
       if (projectsData) {
         setProjects(projectsData.map(p => ({
           id: p.id,
@@ -418,10 +417,48 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         })));
       }
       
+      // Set transactions data first
+      let transformedTransactions: Transaction[] = [];
+      if (transactionsData) {
+        transformedTransactions = transactionsData.map(t => ({
+          id: t.id,
+          accountId: t.account_id,
+          type: t.type as 'deposit' | 'withdrawal' | 'transfer',
+          amount: parseFloat(t.amount.toString()),
+          description: t.description,
+          category: t.category,
+          date: new Date(t.date),
+          createdAt: new Date(t.created_at),
+        }));
+        setTransactions(transformedTransactions);
+      }
+      
+      // Set accounts data and recalculate balances from transactions
+      if (accountsData) {
+        const accountsWithRecalculatedBalances = accountsData.map(dbAccount => {
+          const account = transformDbAccount(dbAccount);
+          
+          // Calculate balance from transactions
+          const accountTransactions = transformedTransactions.filter(t => t.accountId === account.id);
+          const calculatedBalance = accountTransactions.reduce((balance, transaction) => {
+            return transaction.type === 'deposit' 
+              ? balance + transaction.amount 
+              : balance - transaction.amount;
+          }, 0);
+          
+          // Use calculated balance if there are transactions, otherwise use stored balance
+          return {
+            ...account,
+            balance: accountTransactions.length > 0 ? calculatedBalance : account.balance
+          };
+        });
+        
+        setAccounts(accountsWithRecalculatedBalances);
+      }
+      
+      // Process tasks with overdue logic
       if (tasksData) {
         const transformedTasks = tasksData.map(transformDbTask);
-        
-        // Process overdue tasks - move pending tasks from past dates to today
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
@@ -429,20 +466,17 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           const taskDate = new Date(task.date);
           taskDate.setHours(0, 0, 0, 0);
           
-          
           // If task is not completed and date is before today, mark as overdue and move to today
           if (!task.completed && taskDate < today) {
             return {
               ...task,
-              date: new Date(), // Move to today
-              isOverdue: true   // Mark as overdue
+              date: new Date(),
+              isOverdue: true
             };
           }
           
           return task;
         });
-        
-        const overdueCount = processedTasks.filter(t => t.isOverdue && !t.completed).length;
         
         setTasks(processedTasks);
         
@@ -452,7 +486,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             original.id === task.id && original.is_overdue
           )
         );
-        
         
         // Batch update overdue tasks in database
         if (overdueTasks.length > 0) {
@@ -470,7 +503,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
               
               if (error) {
                 console.error('Database update error:', error);
-              } else {
               }
             } catch (error) {
               console.error('Error updating overdue task:', error);
@@ -478,189 +510,123 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           });
         }
       }
-      
-      // Process accounts and transactions together to avoid balance calculation conflicts
-      if (accountsData && transactionsData) {
-        const transformedTransactions = transactionsData.map(transformDbTransaction);
-        const transformedAccounts = accountsData.map(transformDbAccount);
-        
-        // Calculate correct balances from database accounts (don't recalculate from transactions)
-        setAccounts(transformedAccounts);
-        setTransactions(transformedTransactions);
-      } else if (accountsData) {
-        setAccounts(accountsData.map(transformDbAccount));
-      } else if (transactionsData) {
-        setTransactions(transactionsData.map(transformDbTransaction));
-      }
-      
-      // Update loading state for critical data
+    
+      // Set loading to false after critical data is loaded for faster UI response
       setLoading(false);
       
-      // Load secondary data
-      const [
-        { data: routinesData, error: routinesError },
-        { data: routineCompletionsData, error: routineCompletionsError },
+      // Continue loading secondary data in background
+      secondaryDataPromise.then(async ([
+        { data: routinesData },
+        { data: routineCompletionsData },
         { data: notesData },
-        { data: contactsData, error: contactsError },
-        { data: contactGroupsData, error: contactGroupsError },
-        { data: clockifyData, error: clockifyError },
-        { data: debtsData, error: debtsError },
-        { data: goalsData, error: goalsError },
-        { data: receivablesData, error: receivablesError },
+        { data: contactsData },
+        { data: contactGroupsData },
+        { data: clockifyData },
+        { data: debtsData },
+        { data: goalsData },
+        { data: receivablesData },
         { data: pomodoroSettingsData },
         { data: aiSettingsData },
-        { data: activitiesData, error: activitiesError }
-      ] = await secondaryDataPromise;
-
-      // Handle errors
-      if (routinesError) console.error('Error loading routines:', routinesError);
-      if (routineCompletionsError) console.error('Error loading routine completions:', routineCompletionsError);
-      if (contactsError) console.error('Error loading contacts:', contactsError);
-      if (contactGroupsError) console.error('Error loading contact groups:', contactGroupsError);
-      if (clockifyError) console.error('Error loading clockify time entries:', clockifyError);
-      if (debtsError) console.error('Error loading debts:', debtsError);
-      if (goalsError) console.error('Error loading goals:', goalsError);
-      if (receivablesError) console.error('Error loading receivables:', receivablesError);
-      if (activitiesError) console.error('Error loading activities:', activitiesError);
-
-      // Secondary data processing (avoid duplicate processing)
-      // Projects and tasks are already processed above in critical data section
-
-      // Set routines
-      if (routinesData) {
-        setRoutines(routinesData.map(r => ({
-          id: r.id,
-          name: r.name,
-          description: r.description,
-          color: r.color,
-          timesPerDay: r.times_per_day,
-          specificTimes: r.specific_times || [],
-          weekdays: r.weekdays || [],
-          durationDays: r.duration_days || null,
-          priority: (r.priority as 'low' | 'medium' | 'high') || 'medium',
-          schedule: typeof r.schedule === 'string' ? JSON.parse(r.schedule) : r.schedule,
-          activeFrom: r.active_from,
-          activeTo: r.active_to || undefined,
-          pausedUntil: r.paused_until || undefined,
-          exceptions: typeof r.exceptions === 'string' ? JSON.parse(r.exceptions) : r.exceptions,
-          createdAt: new Date(r.created_at),
-          updatedAt: new Date(r.updated_at),
-          deletedAt: r.deleted_at || null,
-        })));
-      }
-
-      // Set routine completions - OPTIMIZED TRANSFORMATION
-      if (routineCompletionsData) {
-        const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
+        { data: activitiesData }
+      ]) => {
+        // Process secondary data without blocking UI
+        if (routinesData) {
+          setRoutines(routinesData.map(r => ({
+            id: r.id,
+            name: r.name,
+            description: r.description,
+            color: r.color || '#3B82F6',
+            timesPerDay: r.times_per_day || 1,
+            specificTimes: Array.isArray(r.specific_times) ? r.specific_times : 
+                          (typeof r.specific_times === 'string' ? JSON.parse(r.specific_times || '[]') : []),
+            weekdays: Array.isArray(r.weekdays) ? r.weekdays : 
+                     (typeof r.weekdays === 'string' ? JSON.parse(r.weekdays || '[]') : []),
+            durationDays: r.duration_days,
+            priority: (r.priority as 'low' | 'medium' | 'high') || 'medium',
+            schedule: typeof r.schedule === 'object' ? r.schedule : {},
+            activeFrom: r.active_from,
+            activeTo: r.active_to,
+            pausedUntil: r.paused_until,
+            exceptions: typeof r.exceptions === 'object' && r.exceptions ? r.exceptions as Record<string, RoutineException> : {},
+            deletedAt: r.deleted_at,
+            createdAt: new Date(r.created_at),
+            updatedAt: new Date(r.updated_at)
+          })));
+        }
         
-        // Use reduce for better performance
-        routineCompletionsData.reduce((acc, completion) => {
-          const date = completion.date;
-          const routineId = completion.routine_id;
-          
-          if (!acc[date]) {
-            acc[date] = {};
-          }
-          
-          acc[date][routineId] = {
-            id: completion.id,
-            routineId: completion.routine_id,
-            date: completion.date,
-            count: completion.count,
-            goal: completion.goal,
-            skipped: completion.skipped,
-            paused: completion.paused,
-            specificTime: completion.specific_time || undefined,
-            completedAt: completion.completed_at ? new Date(completion.completed_at) : undefined,
-            createdAt: new Date(completion.created_at),
-            updatedAt: new Date(completion.updated_at)
-          };
-          
-          return acc;
-        }, completionsMap);
+        if (routineCompletionsData) {
+          const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
+          routineCompletionsData.forEach(completion => {
+            if (!completionsMap[completion.routine_id]) {
+              completionsMap[completion.routine_id] = {};
+            }
+            completionsMap[completion.routine_id][completion.date] = {
+              id: completion.id,
+              routineId: completion.routine_id,
+              date: completion.date,
+              completedAt: new Date(completion.completed_at),
+              specificTime: completion.specific_time || undefined,
+              count: 1,
+              goal: 1,
+              skipped: false,
+              paused: false,
+              createdAt: new Date(completion.created_at),
+              updatedAt: new Date(completion.updated_at)
+            };
+          });
+          setRoutineCompletions(completionsMap);
+        }
         
-        setRoutineCompletions(completionsMap);
-      }
-
-      // Set notes
-      if (notesData) {
-        setNotes(notesData.map(transformDbNote));
-      }
-
-      // Set contacts
-      if (contactsData) {
-        setContacts(contactsData.map(transformDbContact));
-      }
-
-      // Set contact groups
-      if (contactGroupsData) {
-        setContactGroups(contactGroupsData.map(transformDbContactGroup));
-      }
-
-      // Set Clockify time entries
-      if (clockifyData) {
-        setClockifyTimeEntries(clockifyData.map(transformDbClockifyTimeEntry));
-      }
-
-      // Accounts and transactions are already processed above in critical data section
-      // Removed duplicate processing to prevent balance calculation conflicts
-
-      // Set debts
-      if (debtsData) {
-        setDebts(debtsData.map(transformDbDebt));
-      }
-
-      // Set goals
-      if (goalsData) {
-        setGoals(goalsData.map(transformDbGoal));
-      }
-
-      // Set receivables
-      if (receivablesData) {
-        setReceivables(receivablesData.map(transformDbReceivable));
-      }
-
-      // Set pomodoro settings
-      if (pomodoroSettingsData) {
-        setPomodoroSettings({
-          workDuration: pomodoroSettingsData.work_duration,
-          shortBreakDuration: pomodoroSettingsData.short_break_duration,
-          longBreakDuration: pomodoroSettingsData.long_break_duration,
-          longBreakInterval: pomodoroSettingsData.long_break_interval,
-          autoStartBreaks: pomodoroSettingsData.auto_start_breaks,
-          autoStartWork: pomodoroSettingsData.auto_start_work,
-          soundEnabled: pomodoroSettingsData.sound_enabled,
-        });
-      }
-
-      // Set AI settings
-      if (aiSettingsData) {
-        setAISettings({
-          enabled: aiSettingsData.enabled,
-          deepAnalysis: aiSettingsData.deep_analysis,
-          model: aiSettingsData.model,
-          maxContextItems: aiSettingsData.max_context_items,
-        });
-      }
-
-      // Set activities
-      if (activitiesData) {
-        setActivities(activitiesData.map(a => ({
-          id: a.id,
-          action: a.action as any,
-          actor: 'user',
-          entity: a.entity as any,
-          meta: a.meta as Record<string, any>,
-          at: new Date(a.at),
-        })));
-      }
-
-      setLoading(false);
+        if (notesData) {
+          setNotes(notesData.map(n => ({
+            id: n.id,
+            title: n.title,
+            content: n.content,
+            projectId: n.project_id,
+            createdAt: new Date(n.created_at),
+            updatedAt: new Date(n.updated_at)
+          })));
+        }
+        
+        if (contactsData) {
+          setContacts(contactsData.map(transformDbContact));
+        }
+        
+        if (contactGroupsData) {
+          setContactGroups(contactGroupsData.map(transformDbContactGroup));
+        }
+        
+        if (debtsData) {
+          setDebts(debtsData.map(transformDbDebt));
+        }
+        
+        if (goalsData) {
+          setGoals(goalsData.map(transformDbGoal));
+        }
+        
+        if (receivablesData) {
+          setReceivables(receivablesData.map(transformDbReceivable));
+        }
+        
+        if (activitiesData) {
+          setActivities(activitiesData.map(a => ({
+            id: a.id,
+            action: a.action as Activity['action'],
+            entity: (typeof a.entity === 'object' && a.entity ? a.entity as unknown : { type: 'unknown', id: '', label: '' }) as ActivityEntityRef,
+            at: new Date(a.at),
+            actor: a.actor
+          })));
+        }
+      }).catch(error => {
+        console.error('Error loading secondary data:', error);
+      });
+      
     } catch (error) {
       console.error('Error loading data:', error);
+      handleError(error, 'carregar dados');
       setLoading(false);
     }
-  }, [user]); // Removed accounts dependency to prevent infinite re-renders
+}, [user, transformDbTask, transformDbAccount, handleError]);
 
   // Project methods - MEMOIZED
   const addProject = useCallback(async (project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -690,7 +656,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       };
 
       setProjects(prev => [...prev, newProject]);
-      await logActivity({ action: 'project_added', entity: { type: 'project', id: newProject.id, label: newProject.name } });
+      // TODO: Re-add logActivity call after function is properly declared
     } catch (error) {
       handleError(error, 'adicionar projeto');
     }
@@ -957,24 +923,220 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   }, []);
 
   const addAccount = useCallback(async (account: Omit<Account, 'id' | 'createdAt' | 'updatedAt'>) => {
-    console.warn('addAccount not fully implemented');
-  }, []);
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('accounts')
+        .insert({
+          user_id: user.id,
+          name: account.name,
+          balance: account.balance,
+          type: account.type,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const newAccount = transformDbAccount(data);
+      setAccounts(prev => [...prev, newAccount]);
+      await logActivity({ 
+        action: 'transaction_added', 
+        entity: { type: 'transaction', id: newAccount.id, label: newAccount.name } 
+      });
+    } catch (error) {
+      handleError(error, 'adicionar conta');
+    }
+  }, [user, handleError, logActivity]);
 
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
-    console.warn('addTransaction not fully implemented');
-  }, []);
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .insert({
+          user_id: user.id,
+          account_id: transaction.accountId,
+          type: transaction.type,
+          amount: transaction.amount,
+          description: transaction.description,
+          category: transaction.category,
+          date: transaction.date.toISOString(),
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const newTransaction: Transaction = {
+        id: data.id,
+        accountId: data.account_id,
+        type: data.type as 'deposit' | 'withdrawal' | 'transfer',
+        amount: parseFloat(data.amount.toString()),
+        description: data.description,
+        category: data.category,
+        date: new Date(data.date),
+        createdAt: new Date(data.created_at),
+      };
+      
+      setTransactions(prev => [...prev, newTransaction]);
+      
+      // Update account balance optimistically
+      setAccounts(prev => prev.map(account => {
+        if (account.id === transaction.accountId) {
+          const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
+          return { ...account, balance: account.balance + balanceChange };
+        }
+        return account;
+      }));
+      
+      await logActivity({ 
+        action: 'transaction_added', 
+        entity: { type: 'transaction', id: newTransaction.id, label: newTransaction.description } 
+      });
+    } catch (error) {
+      handleError(error, 'adicionar transação');
+    }
+  }, [user, handleError, logActivity]);
 
   const updateTransaction = useCallback(async (id: string, updates: Partial<Transaction>) => {
-    console.warn('updateTransaction not fully implemented');
-  }, []);
+    if (!user) return;
+    
+    try {
+      const updateData: any = {};
+      if (updates.accountId) updateData.account_id = updates.accountId;
+      if (updates.type) updateData.type = updates.type;
+      if (updates.amount !== undefined) updateData.amount = updates.amount;
+      if (updates.description) updateData.description = updates.description;
+      if (updates.category) updateData.category = updates.category;
+      if (updates.date) updateData.date = updates.date.toISOString();
+      
+      const { data, error } = await supabase
+        .from('transactions')
+        .update(updateData)
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      const updatedTransaction: Transaction = {
+        id: data.id,
+        accountId: data.account_id,
+        type: data.type as 'deposit' | 'withdrawal' | 'transfer',
+        amount: parseFloat(data.amount.toString()),
+        description: data.description,
+        category: data.category,
+        date: new Date(data.date),
+        createdAt: new Date(data.created_at),
+      };
+      
+      setTransactions(prev => prev.map(t => t.id === id ? updatedTransaction : t));
+      
+      // Update account balance optimistically if amount or type changed
+      if (updates.amount !== undefined || updates.type) {
+        const originalTransaction = transactions.find(t => t.id === id);
+        if (originalTransaction) {
+          setAccounts(prev => prev.map(account => {
+            // Reverse original transaction
+            if (account.id === originalTransaction.accountId) {
+              const originalChange = originalTransaction.type === 'deposit' ? -originalTransaction.amount : originalTransaction.amount;
+              const newChange = updatedTransaction.type === 'deposit' ? updatedTransaction.amount : -updatedTransaction.amount;
+              return { ...account, balance: account.balance + originalChange + newChange };
+            }
+            // Apply new transaction to different account if accountId changed
+            if (updates.accountId && account.id === updates.accountId && account.id !== originalTransaction.accountId) {
+              const newChange = updatedTransaction.type === 'deposit' ? updatedTransaction.amount : -updatedTransaction.amount;
+              return { ...account, balance: account.balance + newChange };
+            }
+            return account;
+          }));
+        }
+      }
+      
+      await logActivity({ 
+        action: 'transaction_updated', 
+        entity: { type: 'transaction', id: updatedTransaction.id, label: updatedTransaction.description } 
+      });
+    } catch (error) {
+      handleError(error, 'atualizar transação');
+    }
+  }, [user, handleError, logActivity, transformDbAccount]);
 
   const deleteTransaction = useCallback(async (id: string) => {
-    console.warn('deleteTransaction not fully implemented');
-  }, []);
+    if (!user) return;
+    
+    try {
+      // Get transaction details before deletion for balance adjustment
+      const transaction = transactions.find(t => t.id === id);
+      if (!transaction) {
+        throw new Error('Transação não encontrada');
+      }
+      
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setTransactions(prev => prev.filter(t => t.id !== id));
+      
+      // Update account balance by reversing the transaction
+      setAccounts(prev => prev.map(account => {
+        if (account.id === transaction.accountId) {
+          const balanceChange = transaction.type === 'deposit' ? -transaction.amount : transaction.amount;
+          return { ...account, balance: account.balance + balanceChange };
+        }
+        return account;
+      }));
+      
+      await logActivity({ 
+        action: 'transaction_deleted', 
+        entity: { type: 'transaction', id: transaction.id, label: transaction.description } 
+      });
+    } catch (error) {
+      handleError(error, 'excluir transação');
+    }
+  }, [user, transactions, handleError, logActivity]);
 
   const deleteAccount = useCallback(async (id: string) => {
-    console.warn('deleteAccount not fully implemented');
-  }, []);
+    if (!user) return;
+    
+    try {
+      // Check if account has transactions
+      const accountTransactions = transactions.filter(t => t.accountId === id);
+      if (accountTransactions.length > 0) {
+        throw new Error('Não é possível excluir uma conta que possui transações. Exclua as transações primeiro.');
+      }
+      
+      const account = accounts.find(a => a.id === id);
+      if (!account) {
+        throw new Error('Conta não encontrada');
+      }
+      
+      const { error } = await supabase
+        .from('accounts')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      
+      await logActivity({ 
+        action: 'transaction_deleted', 
+        entity: { type: 'transaction', id: account.id, label: account.name } 
+      });
+    } catch (error) {
+      handleError(error, 'excluir conta');
+    }
+  }, [user, accounts, transactions, handleError, logActivity]);
 
   // Helper function for unimplemented methods
   const notImplemented = useCallback((method: string) => {
@@ -1000,7 +1162,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     return () => {
       isMounted = false;
     };
-  }, [user, loadAllData]);
+  }, [user]); // Remove loadAllData dependency to prevent infinite re-renders
 
   const value: AppContextType = {
     // Projects

@@ -63,6 +63,8 @@ export default function Finances() {
     updateReceivable,
     receiveReceivable,
     deleteAccount,
+    updateTransaction,
+    deleteTransaction,
     updateDebt,
     deleteDebt,
     deleteReceivable
@@ -194,21 +196,24 @@ export default function Finances() {
     setIsTransactionDialogOpen(false);
   };
 
-  const handleSaveTransaction = () => {
+  const handleSaveTransaction = async () => {
     if (!editingTransaction) return;
     if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) return;
 
-    // TODO: Implement updateTransaction in context
-    // updateTransaction(editingTransaction.id, {
-    //   accountId: transactionForm.accountId,
-    //   type: transactionForm.type,
-    //   amount: parseFloat(transactionForm.amount),
-    //   description: `${transactionForm.description}${transactionForm.category ? ` • ${transactionForm.category}` : ""}`,
-    // });
+    try {
+      await updateTransaction(editingTransaction.id, {
+        accountId: transactionForm.accountId,
+        type: transactionForm.type,
+        amount: parseFloat(transactionForm.amount),
+        description: `${transactionForm.description}${transactionForm.category ? ` • ${transactionForm.category}` : ""}`,
+      });
 
-    setEditingTransaction(null);
-    setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
-    setIsTransactionDialogOpen(false);
+      setEditingTransaction(null);
+      setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
+      setIsTransactionDialogOpen(false);
+    } catch (error) {
+      console.error('Erro ao atualizar transação:', error);
+    }
   };
 
   const openEditTransaction = (t: Transaction) => {
@@ -232,10 +237,13 @@ export default function Finances() {
     setIsTransactionDialogOpen(true);
   };
 
-  const handleDeleteTransaction = (id: string) => {
+  const handleDeleteTransaction = async (id: string) => {
     if (confirm("Tem certeza que deseja excluir esta transação?")) {
-      // TODO: Implement deleteTransaction in context
-      // Delete transaction: id
+      try {
+        await deleteTransaction(id);
+      } catch (error) {
+        console.error('Erro ao excluir transação:', error);
+      }
     }
   };
 
