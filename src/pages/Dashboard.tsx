@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/SupabaseAppContext';
 import { useRoutinesOptimized } from '../hooks/useRoutinesOptimized';
+import { useAnimations } from '../contexts/AnimationContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const { routines, routineCompletions, completeRoutine, getRoutineProgress } = useRoutinesOptimized();
   
   const { toast } = useToast();
+  const { animationsEnabled } = useAnimations();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -478,36 +480,20 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in-up">
-      {/* Header */}
-      <div className="flex items-center justify-between animate-fade-in-left">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground transition-colors duration-200">Dashboard</h1>
-          <p className="text-muted-foreground transition-colors duration-200">
-            {format(today, "EEEE, d 'de' MMMM 'de' yyyy", { locale: ptBR })}
-          </p>
+    <div className={`space-y-6 ${animationsEnabled ? 'animate-fade-in' : ''}`}>
+      <div className={`flex items-center justify-between ${animationsEnabled ? 'animate-slide-down' : ''}`}>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setIsTaskDialogOpen(true)} className="shadow-elegant">
+            <Plus className="h-4 w-4 mr-2" />
+            Nova Tarefa
+          </Button>
         </div>
-        <Button 
-          variant="default" 
-          onClick={handleCreateTask} 
-          className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Nova Tarefa
-        </Button>
-        <Button 
-          variant="outline" 
-          onClick={() => navigate('/routines')} 
-          className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
-        >
-          <Settings className="w-4 h-4 mr-2" />
-          Gerenciar Rotinas
-        </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '100ms' }}>
+        <Card className={`modern-card ${animationsEnabled ? 'animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]' : ''}`} style={animationsEnabled ? { animationDelay: '100ms' } : {}}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-foreground">Tarefas Hoje</CardTitle>
             <CheckSquare className="h-4 w-4 text-muted-foreground transition-colors duration-200" />

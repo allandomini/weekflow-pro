@@ -1,11 +1,12 @@
-import { Toaster } from "./components/ui/toaster";
-import { TooltipProvider } from "./components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { SupabaseAppProvider } from "./contexts/SupabaseAppContext";
-
+import { AuthProvider } from './hooks/useAuth';
+import { SupabaseAppProvider } from './contexts/SupabaseAppContext';
+import { AnimationProvider } from './contexts/AnimationContext';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from './components/ui/toaster';
+import { TooltipProvider } from './components/ui/tooltip';
+import { Layout } from './components/Layout';
 import { useAuth } from "./hooks/useAuth";
-import { Layout } from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Projects from "./pages/Projects";
@@ -44,37 +45,39 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <SupabaseAppProvider>
-      <TooltipProvider>
-        <Toaster />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/*" element={
-              <ProtectedRoute>
-                <Layout>
-                  <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/calendar" element={<Calendar />} />
-                    <Route path="/projects" element={<Projects />} />
-                    <Route path="/projects/:projectId" element={<ProjectDetail />} />
-                    <Route path="/routines" element={<Routines />} />
-                    <Route path="/finances" element={<Finances />} />
-                    <Route path="/network" element={<Network />} />
-                    <Route path="/clockify" element={<Clockify />} />
-                    <Route path="/plaky" element={<Plaky />} />
-                    <Route path="/historico" element={<Historico />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                  <GeminiChat />
-                </Layout>
-              </ProtectedRoute>
-            } />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </SupabaseAppProvider>
+    <AnimationProvider>
+      <SupabaseAppProvider>
+        <TooltipProvider>
+          <Toaster />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/*" element={
+                <ProtectedRoute>
+                  <Layout>
+                    <Routes>
+                      <Route path="/" element={<Dashboard />} />
+                      <Route path="/calendar" element={<Calendar />} />
+                      <Route path="/projects" element={<Projects />} />
+                      <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                      <Route path="/routines" element={<Routines />} />
+                      <Route path="/finances" element={<Finances />} />
+                      <Route path="/network" element={<Network />} />
+                      <Route path="/clockify" element={<Clockify />} />
+                      <Route path="/plaky" element={<Plaky />} />
+                      <Route path="/historico" element={<Historico />} />
+                      <Route path="/settings" element={<Settings />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                    <GeminiChat />
+                  </Layout>
+                </ProtectedRoute>
+              } />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </SupabaseAppProvider>
+    </AnimationProvider>
   </QueryClientProvider>
 );
 

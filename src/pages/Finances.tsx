@@ -3,9 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
 import FinancialCalculator from '@/components/FinancialCalculator';
@@ -39,10 +41,8 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Account, Transaction, Debt, Goal, Receivable } from '@/types';
-import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function Finances() {
   const { 
@@ -88,6 +88,43 @@ export default function Finances() {
   const [selectedGoal, setSelectedGoal] = useState<any>(null);
   const [isAllocateGoalDialogOpen, setIsAllocateGoalDialogOpen] = useState(false);
   const [selectedReceivable, setSelectedReceivable] = useState<Receivable | null>(null);
+  const [deleteAccountDialog, setDeleteAccountDialog] = useState<{
+    isOpen: boolean;
+    account: Account | null;
+    hasTransactions: boolean;
+    transactionCount: number;
+  }>({
+    isOpen: false,
+    account: null,
+    hasTransactions: false,
+    transactionCount: 0
+  });
+
+  const handleDeleteAccountClick = (account: Account) => {
+    const accountTransactions = transactions.filter(t => t.accountId === account.id);
+    setDeleteAccountDialog({
+      isOpen: true,
+      account,
+      hasTransactions: accountTransactions.length > 0,
+      transactionCount: accountTransactions.length
+    });
+  };
+
+  const handleConfirmDeleteAccount = () => {
+    if (deleteAccountDialog.account) {
+      // @ts-ignore added in context
+      typeof deleteAccount === 'function' && deleteAccount(
+        deleteAccountDialog.account.id, 
+        deleteAccountDialog.hasTransactions
+      );
+      setDeleteAccountDialog({
+        isOpen: false,
+        account: null,
+        hasTransactions: false,
+        transactionCount: 0
+      });
+    }
+  };
 
   const [accountForm, setAccountForm] = useState({
     name: "",
@@ -182,8 +219,20 @@ export default function Finances() {
   };
 
   const handleCreateTransaction = () => {
-    if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) return;
+    console.log('handleCreateTransaction called');
+    console.log('transactionForm:', transactionForm);
+    
+    if (!transactionForm.accountId || !transactionForm.amount || !transactionForm.description) {
+      console.log('Validation failed:', {
+        accountId: transactionForm.accountId,
+        amount: transactionForm.amount,
+        description: transactionForm.description
+      });
+      return;
+    }
 
+    console.log('Validation passed, calling addTransaction');
+    
     addTransaction({
       accountId: transactionForm.accountId,
       type: transactionForm.type,
@@ -341,12 +390,17 @@ export default function Finances() {
     setSelectedGoal(null);
   };
 
-  const handleAllocateAdvance = () => {
+  const handleAllocateAdvance = async () => {
     if (!selectedDebt) return;
-    updateDebt(selectedDebt.id, { ...selectedDebt, allocatedReceivableIds: selectedReceivableIds });
-    setIsAllocateAdvanceDialogOpen(false);
-    setSelectedReceivableIds([]);
-    setSelectedDebt(null);
+    
+    try {
+      await updateDebt(selectedDebt.id, { ...selectedDebt, allocatedReceivableIds: selectedReceivableIds });
+      setIsAllocateAdvanceDialogOpen(false);
+      setSelectedReceivableIds([]);
+      setSelectedDebt(null);
+    } catch (error) {
+      console.error('Error allocating advance:', error);
+    }
   };
 
   const getAccountById = (accountId: string) => {
@@ -510,12 +564,9 @@ export default function Finances() {
                         setAccountForm({ name: account.name, balance: String(account.balance), type: account.type });
                         setIsAccountDialogOpen(true);
                       }}>Editar</Button>
-                      <Button variant="ghost" size="sm" onClick={() => {
-                        if (confirm('Excluir conta?')) {
-                          // @ts-ignore added in context
-                          typeof deleteAccount === 'function' && deleteAccount(account.id);
-                        }
-                      }}>Excluir</Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteAccountClick(account)}>
+                        Excluir
+                      </Button>
                     </div>
                     
                     <div>
@@ -1145,13 +1196,17 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="transactionDescription">Descrição</Label>
+              <Label htmlFor="transactionDescription">Descrição *</Label>
               <Input
                 id="transactionDescription"
                 value={transactionForm.description}
                 onChange={(e) => setTransactionForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição da transação"
+                placeholder="Descrição da transação (obrigatório)"
+                className={!transactionForm.description ? "border-red-500" : ""}
               />
+              {!transactionForm.description && (
+                <p className="text-sm text-red-500 mt-1">Campo obrigatório</p>
+              )}
             </div>
             <div>
               <Label>Categorias rápidas</Label>
@@ -1701,6 +1756,53 @@ export default function Finances() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Account Deletion Confirmation Dialog */}
+      <AlertDialog 
+        open={deleteAccountDialog.isOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteAccountDialog({
+              isOpen: false,
+              account: null,
+              hasTransactions: false,
+              transactionCount: 0
+            });
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Conta</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteAccountDialog.hasTransactions ? (
+                <>
+                  Esta conta possui <strong>{deleteAccountDialog.transactionCount}</strong> transação(ões).
+                  <br /><br />
+                  Deseja excluir a conta "<strong>{deleteAccountDialog.account?.name}</strong>" e <strong>TODAS</strong> as suas transações?
+                  <br /><br />
+                  ⚠️ Esta ação não pode ser desfeita!
+                </>
+              ) : (
+                <>
+                  Tem certeza que deseja excluir a conta "<strong>{deleteAccountDialog.account?.name}</strong>"?
+                  <br /><br />
+                  Esta ação não pode ser desfeita.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDeleteAccount}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteAccountDialog.hasTransactions ? 'Excluir Conta e Transações' : 'Excluir Conta'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

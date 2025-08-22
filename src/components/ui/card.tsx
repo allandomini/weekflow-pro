@@ -1,20 +1,30 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { useAnimations } from "@/contexts/AnimationContext"
 
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
-      className
-    )}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const { animationsEnabled } = useAnimations()
+  
+  const animationClasses = animationsEnabled 
+    ? "hover:shadow-md hover:-translate-y-1 transition-all duration-300 ease-out" 
+    : ""
+  
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "rounded-lg border bg-card text-card-foreground shadow-sm",
+        animationClasses,
+        className
+      )}
+      {...props}
+    />
+  )
+})
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<

@@ -954,6 +954,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (!user) return;
     
     try {
+      console.log('Adding transaction:', transaction);
+      
       const { data, error } = await supabase
         .from('transactions')
         .insert({
@@ -968,7 +970,12 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Transaction inserted:', data);
       
       const newTransaction: Transaction = {
         id: data.id,
@@ -987,6 +994,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setAccounts(prev => prev.map(account => {
         if (account.id === transaction.accountId) {
           const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
+          console.log(`Updating account ${account.id} balance: ${account.balance} ${transaction.type === 'deposit' ? '+' : '-'} ${transaction.amount} = ${account.balance + balanceChange}`);
           return { ...account, balance: account.balance + balanceChange };
         }
         return account;
@@ -996,7 +1004,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         action: 'transaction_added', 
         entity: { type: 'transaction', id: newTransaction.id, label: newTransaction.description } 
       });
+      
+      console.log('Transaction added successfully');
     } catch (error) {
+      console.error('Error in addTransaction:', error);
       handleError(error, 'adicionar transação');
     }
   }, [user, handleError, logActivity]);
@@ -1104,21 +1115,39 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     }
   }, [user, transactions, handleError, logActivity]);
 
-  const deleteAccount = useCallback(async (id: string) => {
+  const deleteAccount = useCallback(async (id: string, forceDelete: boolean = false) => {
     if (!user) return;
     
     try {
-      // Check if account has transactions
-      const accountTransactions = transactions.filter(t => t.accountId === id);
-      if (accountTransactions.length > 0) {
-        throw new Error('Não é possível excluir uma conta que possui transações. Exclua as transações primeiro.');
-      }
-      
       const account = accounts.find(a => a.id === id);
       if (!account) {
         throw new Error('Conta não encontrada');
       }
       
+      // Check if account has transactions
+      const accountTransactions = transactions.filter(t => t.accountId === id);
+      if (accountTransactions.length > 0 && !forceDelete) {
+        throw new Error('Não é possível excluir uma conta que possui transações. Exclua as transações primeiro.');
+      }
+      
+      // If forceDelete is true, delete all transactions first
+      if (forceDelete && accountTransactions.length > 0) {
+        console.log(`Deleting ${accountTransactions.length} transactions for account ${account.name}`);
+        
+        // Delete transactions from database
+        const { error: transactionError } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('account_id', id)
+          .eq('user_id', user.id);
+
+        if (transactionError) throw transactionError;
+        
+        // Update local state
+        setTransactions(prev => prev.filter(t => t.accountId !== id));
+      }
+      
+      // Delete the account
       const { error } = await supabase
         .from('accounts')
         .delete()
@@ -1136,7 +1165,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } catch (error) {
       handleError(error, 'excluir conta');
     }
-  }, [user, accounts, transactions, handleError, logActivity]);
+  }, [user, transactions, accounts, handleError, logActivity]);
 
   // Helper function for unimplemented methods
   const notImplemented = useCallback((method: string) => {
@@ -1285,6 +1314,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             total_amount: updates.totalAmount,
             remaining_amount: updates.remainingAmount,
             due_date: updates.dueDate?.toISOString(),
+            allocated_receivable_ids: updates.allocatedReceivableIds,
             updated_at: new Date().toISOString()
           })
           .eq('id', id)

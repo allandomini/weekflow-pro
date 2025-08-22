@@ -6,11 +6,13 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useAnimations } from "@/contexts/AnimationContext";
 
 export default function Settings() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
   const [notifications, setNotifications] = useState<boolean>(() => localStorage.getItem("notifications") !== "false");
   const { aiSettings, updateAISettings, actorName, updateActorName } = useAppContext();
+  const { animationsEnabled, toggleAnimations } = useAnimations();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -100,6 +102,13 @@ export default function Settings() {
                   <SelectItem value="domini-dark">Escuro (Domini)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label>Animações</Label>
+                <p className="text-sm text-muted-foreground">Habilita/Desabilita animações e transições na interface.</p>
+              </div>
+              <Switch checked={animationsEnabled} onCheckedChange={toggleAnimations} />
             </div>
             <div>
               <Label>Nome do Ator (Histórico)</Label>

@@ -1,5 +1,6 @@
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { useAnimations } from "@/contexts/AnimationContext";
 import { ReactNode, useEffect, useState } from "react";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/button";
@@ -14,11 +15,13 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-export function Layout({ children }: LayoutProps) {
-  const [isDominiDark, setIsDominiDark] = useState(false);
+export function Layout({ children }: { children: ReactNode }) {
+  const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
+  const [isDominiDark, setIsDominiDark] = useState<boolean>(false);
   const { signOut } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { animationsEnabled } = useAnimations();
 
   const handleLogout = async () => {
     try {
@@ -63,13 +66,13 @@ export function Layout({ children }: LayoutProps) {
       <div className="min-h-screen flex w-full bg-gradient-subtle">
         <AppSidebar />
         <div className="flex-1 flex flex-col">
-          <header className="h-14 border-b border-border bg-card/80 backdrop-blur-md flex items-center px-6 shadow-soft transition-all duration-300">
-            <SidebarTrigger className="mr-4 transition-transform duration-200 hover:scale-105" />
-            <div className="flex items-center gap-3 animate-fade-in-left">
+          <header className={`h-14 border-b border-border bg-card/80 backdrop-blur-md flex items-center px-6 shadow-soft transition-all duration-300 ${animationsEnabled ? 'animate-slide-down' : ''}`}>
+            <SidebarTrigger className={`mr-4 transition-transform duration-200 ${animationsEnabled ? 'hover:scale-105' : ''}`} />
+            <div className={`flex items-center gap-3 ${animationsEnabled ? 'animate-fade-in-left' : ''}`}>
               <img src={logoUrl} alt="Logo" className="h-8 w-auto drop-shadow-sm dark:invert" />
               <h1 className="text-xl font-semibold text-foreground transition-colors duration-200">Domini Horus</h1>
             </div>
-            <div className="ml-auto flex items-center gap-2 animate-fade-in-right">
+            <div className={`ml-auto flex items-center gap-2 ${animationsEnabled ? 'animate-fade-in-right' : ''}`}>
               <Button 
                 variant="outline" 
                 size="icon" 
@@ -90,9 +93,8 @@ export function Layout({ children }: LayoutProps) {
               </Button>
             </div>
           </header>
-          <main className="flex-1 p-6 animate-fade-in-up">
-            <NotificationCenter />
-            <div className="animate-scale-in">
+          <main className="flex-1 p-6 overflow-auto bg-background/50 backdrop-blur-sm">
+            <div className={animationsEnabled ? 'animate-fade-in-up' : ''}>
               {children}
             </div>
           </main>

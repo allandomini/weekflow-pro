@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
-import { Calendar } from './ui/calendar';
-import { Badge } from './ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Label } from './ui/label';
-import { Input } from './ui/input';
-import { Trash2, Calendar as CalendarIcon, SkipForward, Pause, Play } from 'lucide-react';
-import { Routine } from '../types';
-import { useAppContext } from '../contexts/SupabaseAppContext';
+import React, { useState, useEffect } from 'react';
+import { Calendar } from '@/components/ui/calendar';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { useAppContext } from '@/contexts/SupabaseAppContext';
+import { useAnimations } from '@/contexts/AnimationContext';
+import { Routine } from '@/types';
+import { CalendarDays, Clock, Target, Zap, Calendar as CalendarIcon, Trash2, SkipForward, Pause } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -20,12 +22,18 @@ interface RoutinesManagerProps {
 
 export default function RoutinesManager({ routine, onClose }: RoutinesManagerProps) {
   const { bulkDeleteRoutineOccurrences, bulkSkipRoutinePeriod, getRoutineOccurrences } = useAppContext();
+  const { animationsEnabled } = useAnimations();
   const [isOpen, setIsOpen] = useState(true);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [startDate, setStartDate] = useState<Date>(new Date());
   const [endDate, setEndDate] = useState<Date>(addDays(new Date(), 7));
   const [operationType, setOperationType] = useState<'delete' | 'skip'>('delete');
   const [isLoading, setIsLoading] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    type: 'delete' | 'skip';
+    count: number;
+  }>({ open: false, type: 'delete', count: 0 });
 
   const handleClose = () => {
     setIsOpen(false);
@@ -47,10 +55,20 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
     });
   };
 
-  const handleBulkOperation = async () => {
+  const handleBulkOperationClick = () => {
     if (selectedDates.length === 0) return;
     
+    setConfirmDialog({
+      open: true,
+      type: operationType,
+      count: selectedDates.length
+    });
+  };
+
+  const handleConfirmBulkOperation = async () => {
+    setConfirmDialog({ open: false, type: 'delete', count: 0 });
     setIsLoading(true);
+    
     try {
       const dateStrings = selectedDates.map(d => d.toISOString().split('T')[0]);
       
@@ -211,7 +229,7 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                 </div>
 
                 <Button
-                  onClick={handleBulkOperation}
+                  onClick={handleBulkOperationClick}
                   disabled={selectedDates.length === 0 || isLoading}
                   className={`w-full ${
                     operationType === 'delete' 
@@ -298,6 +316,42 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
           </div>
         </div>
       </DialogContent>
+      
+      <AlertDialog open={confirmDialog.open} onOpenChange={(open) => 
+        setConfirmDialog(prev => ({ ...prev, open }))
+      }>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirmDialog.type === 'delete' ? 'Confirmar Exclusão' : 'Confirmar Pausa'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialog.type === 'delete' ? (
+                <>
+                  Você está prestes a <strong>excluir permanentemente</strong> {confirmDialog.count} ocorrência(s) da rotina "{routine.name}".
+                  <br /><br />
+                  Esta ação não pode ser desfeita. Deseja continuar?
+                </>
+              ) : (
+                <>
+                  Você está prestes a <strong>pausar</strong> a rotina "{routine.name}" por {confirmDialog.count} dia(s).
+                  <br /><br />
+                  A rotina não será executada nas datas selecionadas. Deseja continuar?
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmBulkOperation}
+              className={confirmDialog.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700'}
+            >
+              {confirmDialog.type === 'delete' ? 'Excluir' : 'Pausar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
