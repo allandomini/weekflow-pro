@@ -15,6 +15,7 @@ import Network from "./pages/Network";
 import NotFound from "./pages/NotFound";
 import Settings from "./pages/Settings";
 import ProjectDetail from "./pages/ProjectDetail";
+import ProjectCanvas from "./pages/ProjectCanvas";
 import Clockify from "./pages/Clockify";
 import Plaky from "./pages/Plaky";
 import Auth from "./pages/Auth";
@@ -60,6 +61,7 @@ const App = () => (
                       <Route path="/calendar" element={<Calendar />} />
                       <Route path="/projects" element={<Projects />} />
                       <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                      <Route path="/projects/:projectId/canvas" element={<ProjectCanvas />} />
                       <Route path="/routines" element={<Routines />} />
                       <Route path="/finances" element={<Finances />} />
                       <Route path="/network" element={<Network />} />

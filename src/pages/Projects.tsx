@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FolderOpen, Plus, Edit, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, Edit, Trash2, Briefcase, Target, Lightbulb, Zap, Star, Heart } from "lucide-react";
 import { Project } from "@/types";
 
 export default function Projects() {
@@ -14,23 +14,23 @@ export default function Projects() {
   const { projects, addProject, updateProject, deleteProject } = useAppContext();
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [projectForm, setProjectForm] = useState({ name: "", color: "#3B82F6" });
+  const [projectForm, setProjectForm] = useState({ name: "", color: "#3B82F6", icon: "folder" });
 
   const handleCreateProject = () => {
     setEditingProject(null);
-    setProjectForm({ name: "", color: "#3B82F6" });
+    setProjectForm({ name: "", color: "#3B82F6", icon: "folder" });
     setIsProjectDialogOpen(true);
   };
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
-    setProjectForm({ name: project.name, color: project.color });
+    setProjectForm({ name: project.name, color: project.color, icon: project.icon || "folder" });
     setIsProjectDialogOpen(true);
   };
 
   const handleSaveProject = () => {
     if (!projectForm.name.trim()) return;
-    const data = { name: projectForm.name, color: projectForm.color };
+    const data = { name: projectForm.name, color: projectForm.color, icon: projectForm.icon };
     editingProject ? updateProject(editingProject.id, data) : addProject(data);
     setIsProjectDialogOpen(false);
     setEditingProject(null);
@@ -47,6 +47,21 @@ export default function Projects() {
     "#06B6D4", "#84CC16", "#F97316", "#EC4899", "#6366F1"
   ];
 
+  const iconOptions = [
+    { icon: Briefcase, name: "briefcase" },
+    { icon: Target, name: "target" },
+    { icon: Lightbulb, name: "lightbulb" },
+    { icon: Zap, name: "zap" },
+    { icon: Star, name: "star" },
+    { icon: Heart, name: "heart" },
+    { icon: FolderOpen, name: "folder" }
+  ];
+
+  const getProjectIcon = (iconName: string) => {
+    const iconOption = iconOptions.find(opt => opt.name === iconName);
+    return iconOption ? iconOption.icon : FolderOpen;
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -60,7 +75,7 @@ export default function Projects() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
         {projects.length === 0 ? (
           <div className="col-span-full">
             <Card className="shadow-elegant">
@@ -73,25 +88,47 @@ export default function Projects() {
             </Card>
           </div>
         ) : (
-          projects.map((project) => (
-            <Card key={project.id} className="shadow-elegant hover:shadow-glow transition-all duration-300 cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3 truncate">
-                    <div className="w-4 h-4 rounded-full shadow-sm" style={{ backgroundColor: project.color }} />
-                    <CardTitle className="text-lg truncate">{project.name}</CardTitle>
-                  </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}><Edit className="w-4 h-4" /></Button>
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}><Trash2 className="w-4 h-4" /></Button>
-                  </div>
+          projects.map((project) => {
+            const IconComponent = getProjectIcon(project.icon || "folder");
+            return (
+              <Card 
+                key={project.id} 
+                className="aspect-square shadow-elegant hover:shadow-glow transition-all duration-300 cursor-pointer group relative overflow-hidden" 
+                onClick={() => navigate(`/projects/${project.id}/canvas`)}
+                style={{ backgroundColor: `${project.color}10` }}
+              >
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <IconComponent 
+                    className="w-20 h-20 opacity-10 group-hover:opacity-20 transition-opacity duration-300" 
+                    style={{ color: project.color }}
+                  />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">Clique para abrir o quadro do projeto</p>
-              </CardContent>
-            </Card>
-          ))
+                <CardContent className="h-full flex flex-col justify-between p-4 relative z-10">
+                  <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 bg-background/80 hover:bg-background"
+                      onClick={(e) => { e.stopPropagation(); handleEditProject(project); }}
+                    >
+                      <Edit className="w-3 h-3" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 w-8 p-0 bg-background/80 hover:bg-background"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteProject(project.id); }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  <div className="text-center">
+                    <h3 className="font-semibold text-foreground text-sm leading-tight">{project.name}</h3>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
 
@@ -120,7 +157,7 @@ export default function Projects() {
             </div>
             <div>
               <Label htmlFor="color">Cor do Projeto</Label>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 {colorOptions.map((color) => (
                   <button
                     key={color}
@@ -133,6 +170,25 @@ export default function Projects() {
                     style={{ backgroundColor: color }}
                     onClick={() => setProjectForm(prev => ({ ...prev, color }))}
                   />
+                ))}
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="icon">Ícone do Projeto</Label>
+              <div className="flex gap-2 mt-2 flex-wrap">
+                {iconOptions.map(({ icon: Icon, name }) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className={`w-10 h-10 rounded-lg border-2 flex items-center justify-center transition-all ${
+                      projectForm.icon === name 
+                        ? 'border-foreground bg-muted scale-110' 
+                        : 'border-border hover:border-muted-foreground hover:bg-muted/50'
+                    }`}
+                    onClick={() => setProjectForm(prev => ({ ...prev, icon: name }))}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </button>
                 ))}
               </div>
             </div>
