@@ -24,9 +24,28 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
   const [localCompletions, setLocalCompletions] = useState<Record<string, Record<string, RoutineCompletion>>>({});
   const [isCompleting, setIsCompleting] = useState<Set<string>>(new Set());
 
-  // Initialize local completions from context
+  // Initialize and sync local completions from context
   useEffect(() => {
-    setLocalCompletions(routineCompletions);
+    setLocalCompletions(prev => {
+      // Merge context completions with local optimistic updates
+      const merged = { ...routineCompletions };
+      
+      // Preserve any optimistic updates that haven't been synced yet
+      Object.keys(prev).forEach(date => {
+        Object.keys(prev[date]).forEach(routineId => {
+          const localCompletion = prev[date][routineId];
+          const contextCompletion = routineCompletions[date]?.[routineId];
+          
+          // If local completion has higher count, keep it (optimistic update)
+          if (!contextCompletion || localCompletion.count > contextCompletion.count) {
+            if (!merged[date]) merged[date] = {};
+            merged[date][routineId] = localCompletion;
+          }
+        });
+      });
+      
+      return merged;
+    });
   }, [routineCompletions]);
 
   // Memoized active routines
@@ -86,6 +105,24 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
 
       // Call the original function
       await completeRoutineOnce(routineId, date);
+      
+      // Force a refresh of routine completions to ensure UI is in sync
+      setTimeout(() => {
+        setLocalCompletions(prev => {
+          const updated = { ...prev };
+          if (updated[d] && updated[d][routineId]) {
+            // Mark as synced by updating the ID if it was temporary
+            if (updated[d][routineId].id.startsWith('temp-')) {
+              updated[d][routineId] = {
+                ...updated[d][routineId],
+                id: `synced-${Date.now()}`,
+                updatedAt: new Date()
+              };
+            }
+          }
+          return updated;
+        });
+      }, 100);
 
     } catch (error) {
       console.error('Error completing routine:', error);

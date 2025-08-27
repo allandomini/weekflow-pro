@@ -596,6 +596,24 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           setContactGroups(contactGroupsData.map(transformDbContactGroup));
         }
         
+        if (clockifyData) {
+          setClockifyTimeEntries(clockifyData.map(entry => ({
+            id: entry.id,
+            description: entry.description,
+            projectId: entry.project_id,
+            personIds: entry.person_ids ? (typeof entry.person_ids === 'string' ? JSON.parse(entry.person_ids) : []) : [],
+            startTime: new Date(entry.start_time),
+            endTime: entry.end_time ? new Date(entry.end_time) : undefined,
+            duration: entry.duration || 0,
+            billable: entry.billable || false,
+            hourlyRate: entry.hourly_rate || 0,
+            tags: entry.tags ? (typeof entry.tags === 'string' ? JSON.parse(entry.tags) : []) : [],
+            status: entry.status as 'active' | 'paused' | 'completed',
+            createdAt: new Date(entry.created_at),
+            updatedAt: new Date(entry.updated_at)
+          })));
+        }
+        
         if (debtsData) {
           setDebts(debtsData.map(transformDbDebt));
         }
@@ -2793,6 +2811,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     },
     startClockifyTimer: async (entry: Omit<ClockifyTimeEntry, 'id' | 'createdAt' | 'updatedAt'>) => {
       try {
+        const startTime = new Date();
         const { data, error } = await supabase
           .from('clockify_time_entries')
           .insert({
@@ -2800,7 +2819,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             description: entry.description,
             project_id: entry.projectId,
             person_ids: JSON.stringify(entry.personIds),
-            start_time: new Date().toISOString(),
+            start_time: startTime.toISOString(),
             end_time: null,
             duration: 0,
             billable: entry.billable,
@@ -2816,7 +2835,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         const newEntry: ClockifyTimeEntry = {
           ...entry,
           id: data.id,
-          startTime: new Date(),
+          startTime: startTime, // Use the same timestamp
           endTime: undefined,
           duration: 0,
           status: 'active',
@@ -2848,13 +2867,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         if (!entry) throw new Error('Entry not found');
         
         const endTime = new Date();
-        const duration = Math.floor((endTime.getTime() - entry.startTime.getTime()) / 1000);
+        const totalDuration = (entry.duration || 0) + Math.floor((endTime.getTime() - entry.startTime.getTime()) / 1000);
         
         const { error } = await supabase
           .from('clockify_time_entries')
           .update({
             end_time: endTime.toISOString(),
-            duration: duration,
+            duration: totalDuration,
             status: 'completed',
             updated_at: new Date().toISOString()
           })
@@ -2864,12 +2883,12 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         if (error) throw error;
         
         setClockifyTimeEntries(prev => prev.map(e => 
-          e.id === entryId ? { ...e, endTime, duration, status: 'completed', updatedAt: new Date() } : e
+          e.id === entryId ? { ...e, endTime, duration: totalDuration, status: 'completed', updatedAt: new Date() } : e
         ));
         
         toast({
           title: "Timer parado",
-          description: "Timer foi parado com sucesso.",
+          description: `Timer parado. Duração: ${Math.floor(totalDuration / 3600)}h ${Math.floor((totalDuration % 3600) / 60)}m ${totalDuration % 60}s`,
         });
       } catch (error) {
         console.error('Error stopping clockify timer:', error);
@@ -2885,14 +2904,14 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         const entry = clockifyTimeEntries.find(e => e.id === entryId);
         if (!entry) throw new Error('Entry not found');
         
-        const endTime = new Date();
-        const duration = Math.floor((endTime.getTime() - entry.startTime.getTime()) / 1000);
+        const pauseTime = new Date();
+        const sessionDuration = Math.floor((pauseTime.getTime() - entry.startTime.getTime()) / 1000);
+        const totalDuration = (entry.duration || 0) + sessionDuration;
         
         const { error } = await supabase
           .from('clockify_time_entries')
           .update({
-            end_time: endTime.toISOString(),
-            duration: duration,
+            duration: totalDuration,
             status: 'paused',
             updated_at: new Date().toISOString()
           })
@@ -2902,7 +2921,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         if (error) throw error;
         
         setClockifyTimeEntries(prev => prev.map(e => 
-          e.id === entryId ? { ...e, endTime, duration, status: 'paused', updatedAt: new Date() } : e
+          e.id === entryId ? { ...e, duration: totalDuration, status: 'paused', updatedAt: new Date() } : e
         ));
         
         toast({
