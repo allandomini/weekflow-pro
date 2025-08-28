@@ -25,10 +25,13 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
   const [isCompleting, setIsCompleting] = useState<Set<string>>(new Set());
 
   // Initialize and sync local completions from context
+  // This ensures data consistency and prevents tasks from being unchecked after refresh
   useEffect(() => {
     // Always prioritize context completions over local state to ensure data consistency
     // This fixes the issue where completed routines show as incomplete after refresh
-    setLocalCompletions(routineCompletions);
+    if (Object.keys(routineCompletions).length > 0) {
+      setLocalCompletions(routineCompletions);
+    }
   }, [routineCompletions]);
 
   // Memoized active routines
@@ -81,14 +84,24 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
         updatedAt: new Date()
       };
 
-      // Update local state immediately
+      // Update local state immediately for better UX
       setLocalCompletions(prev => {
         const dayMap = { ...(prev[d] || {}) };
         return { ...prev, [d]: { ...dayMap, [routineId]: optimisticCompletion } };
       });
 
-      // Call the original function
+      // Call the original function to persist to database
       await completeRoutineOnce(routineId, date);
+      
+      // Force a refresh of the data to ensure consistency
+      // This is crucial for the visual state to update correctly
+      setTimeout(async () => {
+        try {
+          await refreshData();
+        } catch (error) {
+          console.error('Error refreshing data after routine completion:', error);
+        }
+      }, 100);
       
     } catch (error) {
       // Rollback optimistic update on error
@@ -114,7 +127,7 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
         return newSet;
       });
     }
-  }, [completeRoutineOnce, activeRoutines, routineCompletions, isCompleting]);
+  }, [completeRoutineOnce, activeRoutines, routineCompletions, isCompleting, refreshData]);
 
   // Optimized get routine progress with local state
   const getRoutineProgress = useCallback((routineId: string, date?: string) => {

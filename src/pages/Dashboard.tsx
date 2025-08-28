@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/SupabaseAppContext';
 import { useRoutinesOptimized } from '../hooks/useRoutinesOptimized';
@@ -30,8 +30,8 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { tasks, projects, accounts, contacts, transactions, addTask, updateTask, deleteTask, addRoutine, skipRoutineDay, skipRoutineBetween, hardDeleteRoutine, routineLoading } = useAppContext();
   
-  // Use optimized routines hook
-  const { routines, routineCompletions, completeRoutine, getRoutineProgress } = useRoutinesOptimized();
+  // Use optimized routines hook - this provides better state management
+  const { routines, routineCompletions, completeRoutine, getRoutineProgress, loading: routinesLoading } = useRoutinesOptimized();
   
   const { toast } = useToast();
   const { animationsEnabled } = useAnimations();
@@ -81,6 +81,88 @@ export default function Dashboard() {
     return `${y}-${m}-${day}`;
   };
 
+  // Optimized getTasksForDay function that uses the optimized routines hook
+  const getTasksForDay = useCallback((day: Date) => {
+    const sameDayTasks = tasks.filter(task => task.date.toDateString() === day.toDateString());
+    
+    // Generate virtual routine occurrences based on routines definitions and completions
+    const dayStr = toYmd(day);
+    const virtuals: Task[] = [];
+    
+    console.log('🔍 getTasksForDay called for:', dayStr);
+    console.log('📊 Available routines:', routines.length);
+    console.log('📋 Routine completions for today:', routineCompletions[dayStr]);
+    
+    for (const r of routines) {
+      if (r.deletedAt) continue;
+      
+      // Active window checks
+      if (r.activeFrom && r.activeFrom > dayStr) continue;
+      if (r.activeTo && r.activeTo < dayStr) continue;
+      
+      // Get progress from the optimized hook - this ensures consistency
+      const progress = getRoutineProgress(r.id, dayStr);
+      console.log(`📈 Routine ${r.name} progress:`, progress);
+      
+      if (progress.skipped || progress.paused) continue;
+      
+      // Check weekday filter
+      const dow = day.getDay(); // 0-6 Sun-Sat
+      if (r.weekdays && r.weekdays.length > 0 && !r.weekdays.includes(dow)) continue;
+      
+      // Check duration limit
+      if (r.durationDays) {
+        const startDate = new Date(r.activeFrom);
+        const currentDate = new Date(dayStr);
+        const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= r.durationDays) continue;
+      }
+      
+      // Get specific times for this day
+      const times = r.specificTimes && r.specificTimes.length > 0 ? r.specificTimes : ['09:00'];
+      
+      // Create virtual tasks for each time slot
+      for (let i = 0; i < progress.goal; i++) {
+        // Check if this specific occurrence is completed
+        // Use the actual completion count from the hook
+        const isCompleted = i < progress.count;
+        console.log(`✅ Routine ${r.name} occurrence ${i}: completed = ${isCompleted} (count: ${progress.count}, goal: ${progress.goal})`);
+        
+        virtuals.push({
+          // Synthetic ID encoding routine occurrence
+          id: `routine:${r.id}:${dayStr}:${i}`,
+          title: r.name,
+          description: r.description,
+          completed: isCompleted,
+          projectId: undefined,
+          date: day,
+          startTime: i < times.length ? times[i] : `${i + 1}ª vez`,
+          endTime: undefined,
+          isRoutine: true,
+          isOverdue: false,
+          createdAt: day,
+          updatedAt: day,
+        });
+      }
+    }
+    
+    console.log('🎯 Total virtual tasks created:', virtuals.length);
+    console.log('📝 Final tasks for day:', [...sameDayTasks, ...virtuals].map(t => ({ id: t.id, title: t.title, completed: t.completed })));
+    
+    return [...sameDayTasks, ...virtuals];
+  }, [tasks, routines, getRoutineProgress, routineCompletions]); // Added routineCompletions dependency
+
+  // Memoized computed values for better performance - moved after getTasksForDay definition
+  const todayTasks = useMemo(() => getTasksForDay(today), [getTasksForDay]);
+  const completedToday = useMemo(() => todayTasks.filter(t => t.completed), [todayTasks]);
+  const totalBalance = useMemo(() => accounts.reduce((sum, acc) => sum + acc.balance, 0), [accounts]);
+
+  // Force re-render when routine completions change
+  useEffect(() => {
+    // This will trigger a re-render when routines or completions change
+    // The optimized hook handles the state management automatically
+    console.log('🔄 Routine completions updated:', routineCompletions);
+  }, [routines, routineCompletions, getTasksForDay]);
 
 
   const handleRequestDelete = (task: Task) => {
@@ -111,222 +193,6 @@ export default function Dashboard() {
   const weekStart = startOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekEnd = endOfWeek(currentWeekDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
-
-  const todayTasks = useMemo(() => {
-    const today = new Date();
-    return tasks.filter(task => {
-      const taskDate = new Date(task.date);
-      return taskDate.toDateString() === today.toDateString();
-    });
-  }, [tasks]);
-  const completedToday = useMemo(() => 
-    todayTasks.filter(task => task.completed),
-    [todayTasks]
-  );
-  const totalBalance = useMemo(() => 
-    accounts.reduce((sum, account) => sum + account.balance, 0),
-    [accounts]
-  );
-
-  const generateStephanyRecommendations = () => {
-    const newRecommendations = [];
-    
-    // Task analysis
-    const overdueTasks = tasks.filter(task => 
-      !task.completed && new Date(task.date) < new Date()
-    );
-    
-    if (overdueTasks.length > 0) {
-      newRecommendations.push({
-        id: 'overdue-tasks',
-        title: `📅 ${overdueTasks.length} tarefas em atraso`,
-        description: 'Stephany sugere priorizar essas tarefas para melhorar sua produtividade.',
-        type: 'tasks' as const,
-        priority: 'high' as const,
-        action: 'Revisar agora'
-      });
-    }
-
-    // Productivity insights
-    const completionRate = tasks.length > 0 ? (tasks.filter(t => t.completed).length / tasks.length * 100).toFixed(0) : 0;
-    if (Number(completionRate) < 70) {
-      newRecommendations.push({
-        id: 'low-completion',
-        title: `📊 Taxa de conclusão: ${completionRate}%`,
-        description: 'Stephany recomenda quebrar tarefas grandes em menores para aumentar a produtividade.',
-        type: 'productivity' as const,
-        priority: 'medium' as const,
-        action: 'Ver dicas'
-      });
-    }
-
-    // Financial insights
-    const expenses = transactions.filter(t => t.type === 'withdrawal');
-    const lastWeekExpenses = expenses.filter(t => 
-      new Date(t.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-    );
-    
-    if (lastWeekExpenses.length > 15) {
-      newRecommendations.push({
-        id: 'high-spending',
-        title: `💰 ${lastWeekExpenses.length} gastos esta semana`,
-        description: 'Stephany identificou um padrão de gastos elevado. Considere revisar seu orçamento.',
-        type: 'finance' as const,
-        priority: 'medium' as const,
-        action: 'Analisar gastos'
-      });
-    }
-
-    // Project insights
-    const projectsWithoutTasks = projects.filter(project => 
-      !tasks.some(task => task.projectId === project.id)
-    );
-    
-    if (projectsWithoutTasks.length > 0) {
-      newRecommendations.push({
-        id: 'empty-projects',
-        title: `🚀 ${projectsWithoutTasks.length} projetos precisam de tarefas`,
-        description: 'Stephany sugere adicionar tarefas ou arquivar projetos inativos.',
-        type: 'projects' as const,
-        priority: 'low' as const,
-        action: 'Organizar'
-      });
-    }
-
-    // Motivation boost
-    if (completedToday.length > 3) {
-      newRecommendations.push({
-        id: 'great-day',
-        title: `🎉 Excelente produtividade hoje!`,
-        description: `Stephany parabeniza: você completou ${completedToday.length} tarefas hoje. Continue assim!`,
-        type: 'productivity' as const,
-        priority: 'low' as const,
-        action: 'Celebrar'
-      });
-    }
-
-    setRecommendations(newRecommendations.slice(0, 4)); // Mostra no máximo 4 recomendações
-  };
-
-  useEffect(() => {
-    generateStephanyRecommendations();
-  }, [tasks, projects, transactions, completedToday.length]);
-
-  const getRecommendationIcon = (type: string) => {
-    switch (type) {
-      case 'productivity': return <TrendingUp className="w-4 h-4" />;
-      case 'finance': return <DollarSign className="w-4 h-4" />;
-      case 'tasks': return <CheckSquare className="w-4 h-4" />;
-      case 'projects': return <CalendarDays className="w-4 h-4" />;
-      default: return <Sparkles className="w-4 h-4" />;
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'high': return 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200';
-      case 'medium': return 'border-yellow-200 bg-yellow-50 text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200';
-      case 'low': return 'border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200';
-      default: return 'border-gray-200 bg-gray-50 text-gray-800 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200';
-    }
-  };
-
-  const [routineProgress, setRoutineProgress] = useState<Record<string, {goal: number; count: number; skipped: boolean; paused: boolean}>>({});
-
-  // Load routine progress for the current week
-  useEffect(() => {
-    const loadRoutineProgress = async () => {
-      const progress: Record<string, {goal: number; count: number; skipped: boolean; paused: boolean}> = {};
-      
-      // Get the start and end of the current week
-      const startOfWeekDate = startOfWeek(currentWeekDate, { weekStartsOn: 0 });
-      const endOfWeekDate = endOfWeek(currentWeekDate, { weekStartsOn: 0 });
-      
-      // For each day in the week
-      const days = eachDayOfInterval({ start: startOfWeekDate, end: endOfWeekDate });
-      
-      for (const day of days) {
-        const dayStr = toYmd(day);
-        for (const r of routines) {
-          if (r.deletedAt) continue;
-          // Active window checks
-          if (r.activeFrom && r.activeFrom > dayStr) continue;
-          if (r.activeTo && r.activeTo < dayStr) continue;
-          
-          try {
-            const progressData = await getRoutineProgress(r.id, dayStr);
-            progress[`${r.id}-${dayStr}`] = progressData;
-          } catch (error) {
-            console.error('Error loading routine progress:', error);
-            progress[`${r.id}-${dayStr}`] = { goal: 1, count: 0, skipped: false, paused: false };
-          }
-        }
-      }
-      
-      setRoutineProgress(prev => ({ ...prev, ...progress }));
-    };
-    
-    loadRoutineProgress();
-  }, [routines, currentWeekDate, getRoutineProgress, routineCompletions]);
-
-
-
-  const getTasksForDay = (day: Date) => {
-    const sameDayTasks = tasks.filter(task => task.date.toDateString() === day.toDateString());
-    // Generate virtual routine occurrences based on routines definitions and completions
-    const dayStr = toYmd(day);
-    const virtuals: Task[] = [];
-    
-    for (const r of routines) {
-      if (r.deletedAt) continue;
-      // Active window checks
-      if (r.activeFrom && r.activeFrom > dayStr) continue;
-      if (r.activeTo && r.activeTo < dayStr) continue;
-      
-      // Get progress from state
-      const progress = routineProgress[`${r.id}-${dayStr}`] || { goal: 1, count: 0, skipped: false, paused: false };
-      
-      if (progress.skipped || progress.paused) continue;
-      
-      // Check weekday filter
-      const dow = day.getDay(); // 0-6 Sun-Sat
-      if (r.weekdays && r.weekdays.length > 0 && !r.weekdays.includes(dow)) continue;
-      
-      // Check duration limit
-      if (r.durationDays) {
-        const startDate = new Date(r.activeFrom);
-        const currentDate = new Date(dayStr);
-        const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-        if (daysDiff >= r.durationDays) continue;
-      }
-      
-      // Get specific times for this day
-      const times = r.specificTimes && r.specificTimes.length > 0 ? r.specificTimes : ['09:00'];
-      
-      // Create virtual tasks for each time slot
-      for (let i = 0; i < progress.goal; i++) {
-        // Check if this specific occurrence is completed
-        const isCompleted = i < progress.count;
-        
-        virtuals.push({
-          // Synthetic ID encoding routine occurrence
-          id: `routine:${r.id}:${dayStr}:${i}`,
-          title: r.name,
-          description: r.description,
-          completed: isCompleted,
-          projectId: undefined,
-          date: day,
-          startTime: i < times.length ? times[i] : `${i + 1}ª vez`,
-          endTime: undefined,
-          isRoutine: true,
-          isOverdue: false,
-          createdAt: day,
-          updatedAt: day,
-        });
-      }
-    }
-    return [...sameDayTasks, ...virtuals];
-  };
 
   const getProjectById = (projectId?: string) => {
     return projects.find(p => p.id === projectId);
@@ -419,19 +285,8 @@ export default function Dashboard() {
         // Complete the routine - this will increment the count
         await completeRoutine(routineId, dateStr);
         
-        // Update local progress state immediately for better UX
-        setRoutineProgress(prev => {
-          const key = `${routineId}-${dateStr}`;
-          const current = prev[key] || { goal: 1, count: 0, skipped: false, paused: false };
-          const newCount = Math.min(current.count + 1, current.goal);
-          return {
-            ...prev,
-            [key]: {
-              ...current,
-              count: newCount
-            }
-          };
-        });
+        // The optimized hook handles state updates automatically
+        // No need for manual state management here
       } else {
         // For now, we don't support uncompleting routines
         // This would require more complex logic to handle partial completions
@@ -622,12 +477,20 @@ export default function Dashboard() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today)).length === 0 ? (
-                <p className="text-muted-foreground text-center py-4 transition-colors duration-200">
-                  Nenhuma tarefa para este dia
-                </p>
-              ) : (
+            {routinesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Carregando rotinas...</span>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today)).length === 0 ? (
+                  <p className="text-muted-foreground text-center py-4 transition-colors duration-200">
+                    Nenhuma tarefa para este dia
+                  </p>
+                ) : (
                 [...(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today))].sort((a, b) => {
                   const aKey = a.startTime || '';
                   const bKey = b.startTime || '';
@@ -711,6 +574,7 @@ export default function Dashboard() {
                 })
               )}
             </div>
+            )}
           </CardContent>
         </Card>
       </div>

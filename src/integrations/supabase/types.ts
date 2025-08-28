@@ -968,6 +968,9 @@ export type Database = {
           title: string
           updated_at: string
           user_id: string
+          priority: string
+          status: string
+          labels: any
         }
         Insert: {
           completed?: boolean
@@ -983,6 +986,9 @@ export type Database = {
           title: string
           updated_at?: string
           user_id: string
+          priority?: string
+          status?: string
+          labels?: any
         }
         Update: {
           completed?: boolean
@@ -998,6 +1004,9 @@ export type Database = {
           title?: string
           updated_at?: string
           user_id?: string
+          priority?: string
+          status?: string
+          labels?: any
         }
         Relationships: [
           {

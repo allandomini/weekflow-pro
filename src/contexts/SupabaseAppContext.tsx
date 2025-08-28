@@ -222,9 +222,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     isOverdue: dbTask.is_overdue,
     createdAt: new Date(dbTask.created_at),
     updatedAt: new Date(dbTask.updated_at),
-    priority: dbTask.priority || 'medium',
-    status: dbTask.status || 'todo',
-    labels: dbTask.labels || [],
+    priority: 'medium', // Default value since field doesn't exist in DB yet
+    status: 'todo', // Default value since field doesn't exist in DB yet
+    labels: [], // Default value since field doesn't exist in DB yet
   });
 
   // Transform database note to app note
@@ -767,39 +767,61 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
   // Task methods - MEMOIZED
   const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!user) return;
+    if (!user) {
+      console.log('❌ addTask: Usuário não autenticado');
+      return;
+    }
     
     try {
+      console.log('🚀 addTask: Iniciando criação da tarefa:', task);
+      
+      const taskData = {
+        user_id: user.id,
+        title: task.title,
+        description: task.description,
+        completed: task.completed,
+        project_id: task.projectId,
+        date: task.date.toISOString(),
+        start_time: task.startTime,
+        end_time: task.endTime,
+        is_routine: task.isRoutine,
+        is_overdue: task.isOverdue || false,
+      };
+      
+      console.log('💾 addTask: Dados para inserção no banco:', taskData);
+      
       const { data, error } = await supabase
         .from('tasks')
-        .insert({
-          user_id: user.id,
-          title: task.title,
-          description: task.description,
-          completed: task.completed,
-          project_id: task.projectId,
-          date: task.date.toISOString(),
-          start_time: task.startTime,
-          end_time: task.endTime,
-          is_routine: task.isRoutine,
-          is_overdue: task.isOverdue || false,
-          priority: task.priority,
-          status: task.status,
-          labels: task.labels,
-        })
+        .insert(taskData)
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ addTask: Erro do Supabase:', error);
+        throw error;
+      }
+      
+      console.log('✅ addTask: Tarefa criada no banco:', data);
       
       const newTask = transformDbTask(data);
-      setTasks(prev => [...prev, newTask]);
+      console.log('🔄 addTask: Tarefa transformada:', newTask);
+      
+      setTasks(prev => {
+        console.log('📊 addTask: Estado anterior das tarefas:', prev.length);
+        const newTasks = [...prev, newTask];
+        console.log('📊 addTask: Novo estado das tarefas:', newTasks.length);
+        return newTasks;
+      });
+      
       await logActivity({
         action: 'task_created',
         entity: { type: 'task', id: newTask.id, label: newTask.title },
         meta: { date: newTask.date }
       });
+      
+      console.log('🎉 addTask: Tarefa criada com sucesso e estado atualizado');
     } catch (error) {
+      console.error('💥 addTask: Erro geral:', error);
       handleError(error, 'adicionar tarefa');
     }
   }, [user, handleError]);
@@ -820,9 +842,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           end_time: updates.endTime,
           is_routine: updates.isRoutine,
           is_overdue: updates.isOverdue,
-          priority: updates.priority,
-          status: updates.status,
-          labels: updates.labels,
         })
         .eq('id', id)
         .eq('user_id', user.id)
@@ -2956,10 +2975,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       try {
         const entry = clockifyTimeEntries.find(e => e.id === entryId);
         if (!entry) throw new Error('Entry not found');
-        
+
         const endTime = new Date();
         const totalDuration = (entry.duration || 0) + Math.floor((endTime.getTime() - entry.startTime.getTime()) / 1000);
-        
+
         const { error } = await supabase
           .from('clockify_time_entries')
           .update({
@@ -2972,21 +2991,73 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           .eq('user_id', user?.id);
 
         if (error) throw error;
-        
-        setClockifyTimeEntries(prev => prev.map(e => 
+
+        setClockifyTimeEntries(prev => prev.map(e =>
           e.id === entryId ? { ...e, endTime, duration: totalDuration, status: 'completed', updatedAt: new Date() } : e
         ));
-        
+
+        // Auto-create a completed task based on the Clockify time entry
+        try {
+          console.log('🎯 CRIANDO TAREFA AUTOMATICAMENTE DO CLOCKIFY:', entry);
+          
+          const hours = Math.floor(totalDuration / 3600);
+          const minutes = Math.floor((totalDuration % 3600) / 60);
+          const seconds = totalDuration % 60;
+
+          // Use the entry's start date to ensure it's created on the correct day
+          const entryDate = new Date(entry.startTime);
+          entryDate.setHours(0, 0, 0, 0);
+          
+          console.log('📅 Data da entrada Clockify:', entry.startTime);
+          console.log('📅 Data normalizada para tarefa:', entryDate);
+          console.log('📅 Data atual:', new Date());
+          
+          // Format start and end times as HH:MM
+          const formatTime = (date: Date) => {
+            return date.toTimeString().slice(0, 5);
+          };
+          
+          const taskData = {
+            title: entry.description || 'Tarefa do Clockify',
+            description: `Registrado automaticamente do Clockify. Duração: ${hours}h ${minutes}m ${seconds}s`,
+            completed: true,
+            projectId: entry.projectId,
+            date: entryDate, // Use the entry's date
+            startTime: formatTime(entry.startTime),
+            endTime: formatTime(endTime),
+            isRoutine: false,
+            isOverdue: false
+          };
+          
+          console.log('📝 Dados da tarefa a ser criada:', taskData);
+          
+          await addTask(taskData);
+
+          console.log('✅ Tarefa criada com sucesso!');
+          
+          toast({
+            title: 'Tarefa concluída criada',
+            description: 'A tarefa do dia foi criada e marcada como concluída a partir do timer.'
+          });
+        } catch (taskErr) {
+          console.error('❌ Erro ao criar tarefa a partir do Clockify:', taskErr);
+          toast({
+            title: 'Aviso',
+            description: 'Timer parado, mas não foi possível criar a tarefa automaticamente.',
+            variant: 'destructive'
+          });
+        }
+
         toast({
-          title: "Timer parado",
-          description: `Timer parado. Duração: ${Math.floor(totalDuration / 3600)}h ${Math.floor((totalDuration % 3600) / 60)}m ${totalDuration % 60}s`,
+          title: 'Timer parado',
+          description: `${Math.floor(totalDuration / 3600)}h ${Math.floor((totalDuration % 3600) / 60)}m ${totalDuration % 60}s`,
         });
       } catch (error) {
         console.error('Error stopping clockify timer:', error);
         toast({
-          title: "Erro",
-          description: "Não foi possível parar o timer.",
-          variant: "destructive",
+          title: 'Erro',
+          description: 'Não foi possível parar o timer.',
+          variant: 'destructive',
         });
       }
     },
