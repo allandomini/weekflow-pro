@@ -557,17 +557,18 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         if (routineCompletionsData) {
           const completionsMap: Record<string, Record<string, RoutineCompletion>> = {};
           routineCompletionsData.forEach(completion => {
-            if (!completionsMap[completion.routine_id]) {
-              completionsMap[completion.routine_id] = {};
+            // Create map with date as primary key, then routine_id as secondary key
+            if (!completionsMap[completion.date]) {
+              completionsMap[completion.date] = {};
             }
-            completionsMap[completion.routine_id][completion.date] = {
+            completionsMap[completion.date][completion.routine_id] = {
               id: completion.id,
               routineId: completion.routine_id,
               date: completion.date,
               completedAt: new Date(completion.completed_at),
               specificTime: completion.specific_time || undefined,
-              count: 1,
-              goal: 1,
+              count: completion.count || 1, // Use actual count from database
+              goal: completion.goal || 1,   // Use actual goal from database
               skipped: false,
               paused: false,
               createdAt: new Date(completion.created_at),
@@ -768,13 +769,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   // Task methods - MEMOIZED
   const addTask = useCallback(async (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!user) {
-      console.log('❌ addTask: Usuário não autenticado');
       return;
     }
     
     try {
-      console.log('🚀 addTask: Iniciando criação da tarefa:', task);
-      
       const taskData = {
         user_id: user.id,
         title: task.title,
@@ -788,8 +786,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         is_overdue: task.isOverdue || false,
       };
       
-      console.log('💾 addTask: Dados para inserção no banco:', taskData);
-      
       const { data, error } = await supabase
         .from('tasks')
         .insert(taskData)
@@ -797,19 +793,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         .single();
 
       if (error) {
-        console.error('❌ addTask: Erro do Supabase:', error);
         throw error;
       }
       
-      console.log('✅ addTask: Tarefa criada no banco:', data);
-      
       const newTask = transformDbTask(data);
-      console.log('🔄 addTask: Tarefa transformada:', newTask);
       
       setTasks(prev => {
-        console.log('📊 addTask: Estado anterior das tarefas:', prev.length);
         const newTasks = [...prev, newTask];
-        console.log('📊 addTask: Novo estado das tarefas:', newTasks.length);
         return newTasks;
       });
       
@@ -818,10 +808,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         entity: { type: 'task', id: newTask.id, label: newTask.title },
         meta: { date: newTask.date }
       });
-      
-      console.log('🎉 addTask: Tarefa criada com sucesso e estado atualizado');
     } catch (error) {
-      console.error('💥 addTask: Erro geral:', error);
       handleError(error, 'adicionar tarefa');
     }
   }, [user, handleError]);
@@ -1059,8 +1046,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (!user) return;
     
     try {
-      console.log('Adding transaction:', transaction);
-      
       const { data, error } = await supabase
         .from('transactions')
         .insert({
@@ -1076,11 +1061,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         .single();
 
       if (error) {
-        console.error('Supabase error:', error);
         throw error;
       }
-      
-      console.log('Transaction inserted:', data);
       
       const newTransaction: Transaction = {
         id: data.id,
@@ -1099,7 +1081,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       setAccounts(prev => prev.map(account => {
         if (account.id === transaction.accountId) {
           const balanceChange = transaction.type === 'deposit' ? transaction.amount : -transaction.amount;
-          console.log(`Updating account ${account.id} balance: ${account.balance} ${transaction.type === 'deposit' ? '+' : '-'} ${transaction.amount} = ${account.balance + balanceChange}`);
           return { ...account, balance: account.balance + balanceChange };
         }
         return account;
@@ -1109,10 +1090,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         action: 'transaction_added', 
         entity: { type: 'transaction', id: newTransaction.id, label: newTransaction.description } 
       });
-      
-      console.log('Transaction added successfully');
     } catch (error) {
-      console.error('Error in addTransaction:', error);
       handleError(error, 'adicionar transação');
     }
   }, [user, handleError, logActivity]);
@@ -1237,8 +1215,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       
       // If forceDelete is true, delete all transactions first
       if (forceDelete && accountTransactions.length > 0) {
-        console.log(`Deleting ${accountTransactions.length} transactions for account ${account.name}`);
-        
         // Delete transactions from database
         const { error: transactionError } = await supabase
           .from('transactions')
@@ -1284,7 +1260,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (user) {
       // Force reset AI settings to use flash model on app load
       const currentSettings = JSON.parse(localStorage.getItem('aiSettings') || '{}');
-      console.log('🔍 Current AI settings on load:', currentSettings);
       
       // Always force flash model for now
       const updatedSettings = { 
@@ -1295,7 +1270,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
       };
       localStorage.setItem('aiSettings', JSON.stringify(updatedSettings));
       setAISettings(updatedSettings);
-      console.log('🔄 Forced AI settings to:', updatedSettings);
       
       loadAllData().catch(error => {
         if (isMounted) {
@@ -2998,8 +2972,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
 
         // Auto-create a completed task based on the Clockify time entry
         try {
-          console.log('🎯 CRIANDO TAREFA AUTOMATICAMENTE DO CLOCKIFY:', entry);
-          
           const hours = Math.floor(totalDuration / 3600);
           const minutes = Math.floor((totalDuration % 3600) / 60);
           const seconds = totalDuration % 60;
@@ -3007,10 +2979,6 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           // Use the entry's start date to ensure it's created on the correct day
           const entryDate = new Date(entry.startTime);
           entryDate.setHours(0, 0, 0, 0);
-          
-          console.log('📅 Data da entrada Clockify:', entry.startTime);
-          console.log('📅 Data normalizada para tarefa:', entryDate);
-          console.log('📅 Data atual:', new Date());
           
           // Format start and end times as HH:MM
           const formatTime = (date: Date) => {
@@ -3029,11 +2997,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
             isOverdue: false
           };
           
-          console.log('📝 Dados da tarefa a ser criada:', taskData);
-          
           await addTask(taskData);
-
-          console.log('✅ Tarefa criada com sucesso!');
           
           toast({
             title: 'Tarefa concluída criada',

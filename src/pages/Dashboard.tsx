@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/SupabaseAppContext';
 import { useRoutinesOptimized } from '../hooks/useRoutinesOptimized';
+import { useOffline } from '../hooks/useOffline';
 import { useAnimations } from '../contexts/AnimationContext';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -15,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../components/ui/checkbox';
 import RoutinesManager from '../components/RoutinesManager';
 import { RoutineLoadingIndicator } from '@/components/RoutineLoadingIndicator';
+import { OfflineStatus } from '../components/OfflineStatus';
 
 import { 
   ArrowLeft, Plus, Edit, Trash2, Settings, Calendar, Clock, 
@@ -32,6 +34,9 @@ export default function Dashboard() {
   
   // Use optimized routines hook - this provides better state management
   const { routines, routineCompletions, completeRoutine, getRoutineProgress, loading: routinesLoading } = useRoutinesOptimized();
+  
+  // Use offline functionality
+  const { isOnline, saveOffline, loadOffline, syncOfflineData } = useOffline();
   
   const { toast } = useToast();
   const { animationsEnabled } = useAnimations();
@@ -89,10 +94,6 @@ export default function Dashboard() {
     const dayStr = toYmd(day);
     const virtuals: Task[] = [];
     
-    console.log('🔍 getTasksForDay called for:', dayStr);
-    console.log('📊 Available routines:', routines.length);
-    console.log('📋 Routine completions for today:', routineCompletions[dayStr]);
-    
     for (const r of routines) {
       if (r.deletedAt) continue;
       
@@ -102,7 +103,6 @@ export default function Dashboard() {
       
       // Get progress from the optimized hook - this ensures consistency
       const progress = getRoutineProgress(r.id, dayStr);
-      console.log(`📈 Routine ${r.name} progress:`, progress);
       
       if (progress.skipped || progress.paused) continue;
       
@@ -126,7 +126,6 @@ export default function Dashboard() {
         // Check if this specific occurrence is completed
         // Use the actual completion count from the hook
         const isCompleted = i < progress.count;
-        console.log(`✅ Routine ${r.name} occurrence ${i}: completed = ${isCompleted} (count: ${progress.count}, goal: ${progress.goal})`);
         
         virtuals.push({
           // Synthetic ID encoding routine occurrence
@@ -146,9 +145,6 @@ export default function Dashboard() {
       }
     }
     
-    console.log('🎯 Total virtual tasks created:', virtuals.length);
-    console.log('📝 Final tasks for day:', [...sameDayTasks, ...virtuals].map(t => ({ id: t.id, title: t.title, completed: t.completed })));
-    
     return [...sameDayTasks, ...virtuals];
   }, [tasks, routines, getRoutineProgress, routineCompletions]); // Added routineCompletions dependency
 
@@ -161,7 +157,6 @@ export default function Dashboard() {
   useEffect(() => {
     // This will trigger a re-render when routines or completions change
     // The optimized hook handles the state management automatically
-    console.log('🔄 Routine completions updated:', routineCompletions);
   }, [routines, routineCompletions, getTasksForDay]);
 
 
@@ -282,8 +277,34 @@ export default function Dashboard() {
       const occurrenceIndex = parseInt(parts[3]);
       
       if (completed) {
-        // Complete the routine - this will increment the count
-        await completeRoutine(routineId, dateStr);
+        if (isOnline) {
+          // Complete the routine online
+          await completeRoutine(routineId, dateStr);
+        } else {
+          // Save offline when no internet connection
+          const offlineCompletions = loadOffline('routineCompletions') || {};
+          const dayCompletions = offlineCompletions[dateStr] || {};
+          
+          const currentCount = dayCompletions[routineId]?.count || 0;
+          dayCompletions[routineId] = {
+            id: `offline-${Date.now()}`,
+            routineId,
+            date: dateStr,
+            count: currentCount + 1,
+            goal: 1,
+            completedAt: new Date().toISOString(),
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          };
+          
+          offlineCompletions[dateStr] = dayCompletions;
+          saveOffline('routineCompletions', offlineCompletions);
+          
+          toast({
+            title: "Rotina completada offline",
+            description: "Será sincronizada quando voltar online.",
+          });
+        }
         
         // The optimized hook handles state updates automatically
         // No need for manual state management here
@@ -295,7 +316,27 @@ export default function Dashboard() {
       }
       return;
     }
-    updateTask(taskId, { completed });
+    
+    if (isOnline) {
+      updateTask(taskId, { completed });
+    } else {
+      // Save task completion offline
+      const offlineTasks = loadOffline('tasks') || [];
+      const taskIndex = offlineTasks.findIndex(t => t.id === taskId);
+      
+      if (taskIndex >= 0) {
+        offlineTasks[taskIndex].completed = completed;
+      } else {
+        offlineTasks.push({ id: taskId, completed, updatedAt: new Date().toISOString() });
+      }
+      
+      saveOffline('tasks', offlineTasks);
+      
+      toast({
+        title: "Tarefa atualizada offline",
+        description: "Será sincronizada quando voltar online.",
+      });
+    }
   };
 
   const handleEditTask = (task: Task) => {
@@ -883,6 +924,9 @@ export default function Dashboard() {
           onClose={handleCloseRoutinesManager}
         />
       )}
+
+      {/* Offline Status Component */}
+      <OfflineStatus />
     </div>
   );
 }

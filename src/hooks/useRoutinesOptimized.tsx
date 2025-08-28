@@ -27,10 +27,14 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
   // Initialize and sync local completions from context
   // This ensures data consistency and prevents tasks from being unchecked after refresh
   useEffect(() => {
+    console.log('🔄 useRoutinesOptimized: routineCompletions updated:', routineCompletions);
     // Always prioritize context completions over local state to ensure data consistency
     // This fixes the issue where completed routines show as incomplete after refresh
     if (Object.keys(routineCompletions).length > 0) {
+      console.log('📥 Setting local completions from context:', routineCompletions);
       setLocalCompletions(routineCompletions);
+    } else {
+      console.log('⚠️ No routine completions in context');
     }
   }, [routineCompletions]);
 
