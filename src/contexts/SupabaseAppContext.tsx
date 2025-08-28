@@ -201,8 +201,8 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   const [aiSettings, setAISettings] = useState<AISettings>({
     enabled: true,
     deepAnalysis: true,
-    model: 'gemini-1.5-pro',
-    maxContextItems: 100,
+    model: 'gemini-1.5-flash',
+    maxContextItems: 500,
   });
   
   // Activities state
@@ -626,6 +626,34 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           setReceivables(receivablesData.map(transformDbReceivable));
         }
         
+        // Load AI settings from Supabase or fallback to localStorage
+        if (aiSettingsData) {
+          const loadedSettings: AISettings = {
+            enabled: aiSettingsData.enabled ?? true,
+            deepAnalysis: aiSettingsData.deep_analysis ?? true,
+            model: aiSettingsData.model || 'gemini-1.5-flash',
+            maxContextItems: aiSettingsData.max_context_items || 500,
+          };
+          setAISettings(loadedSettings);
+          localStorage.setItem('aiSettings', JSON.stringify(loadedSettings));
+        } else {
+          // Fallback to localStorage if no Supabase data
+          const savedAISettings = localStorage.getItem('aiSettings');
+          if (savedAISettings) {
+            try {
+              const parsedSettings = JSON.parse(savedAISettings);
+              // Force update to use flash model if still using pro
+              if (parsedSettings.model === 'gemini-1.5-pro') {
+                parsedSettings.model = 'gemini-1.5-flash';
+                localStorage.setItem('aiSettings', JSON.stringify(parsedSettings));
+              }
+              setAISettings(parsedSettings);
+            } catch (error) {
+              console.error('Error parsing saved AI settings:', error);
+            }
+          }
+        }
+        
         if (activitiesData) {
           setActivities(activitiesData.map(a => ({
             id: a.id,
@@ -917,7 +945,47 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   // Update actor name
   const updateActorName = useCallback(async (name: string) => {
     setActorName(name);
+    localStorage.setItem('actorName', name);
   }, []);
+
+  // AI Settings management
+  const updateAISettings = useCallback(async (settings: Partial<AISettings>) => {
+    if (!user) return;
+    
+    try {
+      const updatedSettings = { ...aiSettings, ...settings };
+      
+      // Try to save to Supabase first - use upsert with onConflict
+      const { error } = await supabase
+        .from('ai_settings')
+        .upsert({
+          user_id: user.id,
+          enabled: updatedSettings.enabled,
+          deep_analysis: updatedSettings.deepAnalysis,
+          model: updatedSettings.model,
+          max_context_items: updatedSettings.maxContextItems,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'user_id'
+        });
+
+      if (error) {
+        console.warn('Failed to save AI settings to Supabase:', error);
+        // Continue with local storage as fallback
+      }
+      
+      // Always update local state and localStorage
+      setAISettings(updatedSettings);
+      localStorage.setItem('aiSettings', JSON.stringify(updatedSettings));
+      
+    } catch (error) {
+      console.error('Error updating AI settings:', error);
+      // Fallback to local storage only
+      const updatedSettings = { ...aiSettings, ...settings };
+      setAISettings(updatedSettings);
+      localStorage.setItem('aiSettings', JSON.stringify(updatedSettings));
+    }
+  }, [user, aiSettings]);
 
   // Placeholder implementations for missing methods
   const updateNote = useCallback(async (id: string, updates: Partial<Note>) => {
@@ -1190,11 +1258,26 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     console.warn(`${method} not yet implemented in optimized context`);
   }, []);
 
-  // Load data on mount - CRITICAL FIX
+  // Load all data when user changes
   useEffect(() => {
     let isMounted = true;
     
     if (user) {
+      // Force reset AI settings to use flash model on app load
+      const currentSettings = JSON.parse(localStorage.getItem('aiSettings') || '{}');
+      console.log('🔍 Current AI settings on load:', currentSettings);
+      
+      // Always force flash model for now
+      const updatedSettings = { 
+        enabled: true,
+        deepAnalysis: true,
+        model: 'gemini-1.5-flash',
+        maxContextItems: 500
+      };
+      localStorage.setItem('aiSettings', JSON.stringify(updatedSettings));
+      setAISettings(updatedSettings);
+      console.log('🔄 Forced AI settings to:', updatedSettings);
+      
       loadAllData().catch(error => {
         if (isMounted) {
           console.error('Failed to load data:', error);
@@ -1204,8 +1287,7 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     } else {
       setLoading(false);
     }
-    
-    // Cleanup function to prevent memory leaks
+
     return () => {
       isMounted = false;
     };
@@ -2064,9 +2146,13 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           return;
         }
         
-        // Use existing count from database if available
+        // Use existing count from database if available and ensure consistency
         if (existingCompletion) {
           updatedCount = existingCompletion.count + 1;
+          // Additional safety check
+          if (updatedCount > goal) {
+            throw new Error(`Não é possível completar: limite de ${goal} execuções já atingido.`);
+          }
         }
         
         if (existingCompletion && !selectError) {
@@ -2101,11 +2187,11 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
         
         // Update with real data from database
         const finalCompletion: RoutineCompletion = {
-          id: currentCompletion?.id || `db-${Date.now()}`,
+          id: existingCompletion?.id || currentCompletion?.id || `db-${Date.now()}`,
           routineId: routineId,
           date: d,
           count: updatedCount,
-          goal: optimisticCompletion.goal,
+          goal: goal,
           skipped: false,
           paused: false,
           specificTime: specificTime || currentCompletion?.specificTime,
@@ -2114,11 +2200,16 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
           updatedAt: new Date()
         };
         
-        // Update local state with real data
+        // Update local state with real data and force refresh
         setRoutineCompletions(prev => {
           const dayMap = { ...(prev[d] || {}) };
           return { ...prev, [d]: { ...dayMap, [routineId]: finalCompletion } };
         });
+        
+        // Force a data refresh to ensure consistency
+        setTimeout(() => {
+          loadAllData();
+        }, 500);
         
         // Get routine name for toast
         const routine = routines.find(r => r.id === routineId);
@@ -3007,14 +3098,9 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     resumePomodoro: async () => { notImplemented('resumePomodoro'); },
     stopPomodoro: async () => { notImplemented('stopPomodoro'); },
 
-    // AI / Assistant - placeholder implementations
-    aiSettings: {
-      enabled: true,
-      deepAnalysis: false,
-      model: 'gpt-4',
-      maxContextItems: 10,
-    },
-    updateAISettings: async () => { notImplemented('updateAISettings'); },
+    // AI / Assistant
+    aiSettings,
+    updateAISettings,
 
     // User Settings
     actorName: actorName || 'User',

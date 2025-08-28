@@ -623,12 +623,12 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {(selectedDate ? getTasksForDay(selectedDate) : todayTasks).length === 0 ? (
+              {(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today)).length === 0 ? (
                 <p className="text-muted-foreground text-center py-4 transition-colors duration-200">
                   Nenhuma tarefa para este dia
                 </p>
               ) : (
-                [...(selectedDate ? getTasksForDay(selectedDate) : todayTasks)].sort((a, b) => {
+                [...(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today))].sort((a, b) => {
                   const aKey = a.startTime || '';
                   const bKey = b.startTime || '';
                   return aKey.localeCompare(bKey);

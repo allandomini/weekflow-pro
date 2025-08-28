@@ -26,26 +26,9 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
 
   // Initialize and sync local completions from context
   useEffect(() => {
-    setLocalCompletions(prev => {
-      // Merge context completions with local optimistic updates
-      const merged = { ...routineCompletions };
-      
-      // Preserve any optimistic updates that haven't been synced yet
-      Object.keys(prev).forEach(date => {
-        Object.keys(prev[date]).forEach(routineId => {
-          const localCompletion = prev[date][routineId];
-          const contextCompletion = routineCompletions[date]?.[routineId];
-          
-          // If local completion has higher count, keep it (optimistic update)
-          if (!contextCompletion || localCompletion.count > contextCompletion.count) {
-            if (!merged[date]) merged[date] = {};
-            merged[date][routineId] = localCompletion;
-          }
-        });
-      });
-      
-      return merged;
-    });
+    // Always prioritize context completions over local state to ensure data consistency
+    // This fixes the issue where completed routines show as incomplete after refresh
+    setLocalCompletions(routineCompletions);
   }, [routineCompletions]);
 
   // Memoized active routines
@@ -56,7 +39,8 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
 
   // Optimized complete routine function with local state management
   const completeRoutine = useCallback(async (routineId: string, date?: string) => {
-    const completionKey = `${routineId}:${date || new Date().toISOString().split('T')[0]}`;
+    const d = date || new Date().toISOString().split('T')[0];
+    const completionKey = `${routineId}:${d}`;
     
     // Prevent duplicate completions
     if (isCompleting.has(completionKey)) {
@@ -66,34 +50,34 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
     setIsCompleting(prev => new Set(prev).add(completionKey));
 
     try {
-      // Get current progress
-      const progress = getRoutineProgress(routineId, date);
+      // Get current progress from context (most reliable source)
+      const contextCompletion = routineCompletions[d]?.[routineId];
       const routine = activeRoutines.find(r => r.id === routineId);
       
       if (!routine) {
         throw new Error('Routine not found');
       }
 
-      // Check if already completed
-      if (progress.count >= progress.goal) {
-        throw new Error('Routine already completed for this date');
+      const currentCount = contextCompletion?.count || 0;
+      const goal = routine.timesPerDay || 1;
+
+      // Check if already completed using context data
+      if (currentCount >= goal) {
+        throw new Error(`Esta rotina já foi completada ${goal} vez(es) hoje.`);
       }
 
-      // Optimistic update
-      const d = date || new Date().toISOString().split('T')[0];
-      const currentCompletion = localCompletions[d]?.[routineId];
-      
+      // Optimistic update with proper count
       const optimisticCompletion: RoutineCompletion = {
-        id: currentCompletion?.id || `temp-${Date.now()}`,
+        id: contextCompletion?.id || `temp-${Date.now()}`,
         routineId: routineId,
         date: d,
-        count: progress.count + 1,
-        goal: progress.goal,
+        count: currentCount + 1,
+        goal: goal,
         skipped: false,
         paused: false,
-        specificTime: currentCompletion?.specificTime,
+        specificTime: contextCompletion?.specificTime,
         completedAt: new Date(),
-        createdAt: currentCompletion?.createdAt || new Date(),
+        createdAt: contextCompletion?.createdAt || new Date(),
         updatedAt: new Date()
       };
 
@@ -106,25 +90,21 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
       // Call the original function
       await completeRoutineOnce(routineId, date);
       
-      // Force a refresh of routine completions to ensure UI is in sync
-      setTimeout(() => {
-        setLocalCompletions(prev => {
-          const updated = { ...prev };
-          if (updated[d] && updated[d][routineId]) {
-            // Mark as synced by updating the ID if it was temporary
-            if (updated[d][routineId].id.startsWith('temp-')) {
-              updated[d][routineId] = {
-                ...updated[d][routineId],
-                id: `synced-${Date.now()}`,
-                updatedAt: new Date()
-              };
-            }
-          }
-          return updated;
-        });
-      }, 100);
-
     } catch (error) {
+      // Rollback optimistic update on error
+      setLocalCompletions(prev => {
+        const dayMap = { ...(prev[d] || {}) };
+        if (routineCompletions[d]?.[routineId]) {
+          // Restore from context
+          return { ...prev, [d]: { ...dayMap, [routineId]: routineCompletions[d][routineId] } };
+        } else {
+          // Remove if no context data
+          const newDayMap = { ...dayMap };
+          delete newDayMap[routineId];
+          return { ...prev, [d]: newDayMap };
+        }
+      });
+      
       console.error('Error completing routine:', error);
       throw error;
     } finally {
@@ -134,7 +114,7 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
         return newSet;
       });
     }
-  }, [completeRoutineOnce, activeRoutines, localCompletions, isCompleting]);
+  }, [completeRoutineOnce, activeRoutines, routineCompletions, isCompleting]);
 
   // Optimized get routine progress with local state
   const getRoutineProgress = useCallback((routineId: string, date?: string) => {
@@ -150,18 +130,7 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
     const skipped = routine.exceptions?.[d]?.skip || false;
     const goal = routine.exceptions?.[d]?.overrideTimesPerDay || routine.timesPerDay;
 
-    // Check local completions first
-    const localCompletion = localCompletions[d]?.[routineId];
-    if (localCompletion) {
-      return { 
-        count: localCompletion.count, 
-        goal, 
-        skipped, 
-        paused 
-      };
-    }
-
-    // Fallback to context completions
+    // Prioritize context completions for consistency
     const contextCompletion = routineCompletions[d]?.[routineId];
     if (contextCompletion) {
       return { 
@@ -172,8 +141,19 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
       };
     }
 
+    // Fallback to local completions only if no context data
+    const localCompletion = localCompletions[d]?.[routineId];
+    if (localCompletion) {
+      return { 
+        count: localCompletion.count, 
+        goal, 
+        skipped, 
+        paused 
+      };
+    }
+
     return { count: 0, goal, skipped, paused };
-  }, [activeRoutines, localCompletions, routineCompletions]);
+  }, [activeRoutines, routineCompletions, localCompletions]);
 
   // Refresh routines
   const refreshRoutines = useCallback(async () => {
