@@ -46,43 +46,45 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AnimationProvider>
-      <SupabaseAppProvider>
-        <TooltipProvider>
-          <Toaster />
-          <BrowserRouter future={{
-            v7_startTransition: true,
-            v7_relativeSplatPath: true
-          }}>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/*" element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/calendar" element={<Calendar />} />
-                      <Route path="/projects" element={<Projects />} />
-                      <Route path="/projects/:projectId" element={<ProjectDetail />} />
-                      <Route path="/projects/:projectId/canvas" element={<ProjectCanvas />} />
-                      <Route path="/routines" element={<Routines />} />
-                      <Route path="/finances" element={<Finances />} />
-                      <Route path="/network" element={<Network />} />
-                      <Route path="/clockify" element={<Clockify />} />
-                      <Route path="/plaky" element={<Plaky />} />
-                      <Route path="/historico" element={<Historico />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                    <GeminiChat />
-                  </Layout>
-                </ProtectedRoute>
-              } />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
-      </SupabaseAppProvider>
-    </AnimationProvider>
+    <AuthProvider>
+      <AnimationProvider>
+        <SupabaseAppProvider>
+          <TooltipProvider>
+            <Toaster />
+            <BrowserRouter future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true
+            }}>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/*" element={
+                  <ProtectedRoute>
+                    <Layout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/calendar" element={<Calendar />} />
+                        <Route path="/projects" element={<Projects />} />
+                        <Route path="/projects/:projectId" element={<ProjectDetail />} />
+                        <Route path="/projects/:projectId/canvas" element={<ProjectCanvas />} />
+                        <Route path="/routines" element={<Routines />} />
+                        <Route path="/finances" element={<Finances />} />
+                        <Route path="/network" element={<Network />} />
+                        <Route path="/clockify" element={<Clockify />} />
+                        <Route path="/plaky" element={<Plaky />} />
+                        <Route path="/historico" element={<Historico />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                      <GeminiChat />
+                    </Layout>
+                  </ProtectedRoute>
+                } />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </SupabaseAppProvider>
+      </AnimationProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

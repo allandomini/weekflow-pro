@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useRoutinesOptimized } from "@/hooks/useRoutinesOptimized";
+import { format as formatDate } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +34,7 @@ import { Task } from "@/types";
 
 export default function Calendar() {
   const { tasks, projects, addTask, updateTask, deleteTask } = useAppContext();
+  const { routines, routineCompletions, completeRoutine, getRoutineProgress } = useRoutinesOptimized();
   const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -61,9 +64,67 @@ export default function Calendar() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const weeks = eachWeekOfInterval({ start: calendarStart, end: calendarEnd });
 
-  const getTasksForDay = (day: Date) => {
-    return tasks.filter(task => isSameDay(task.date, day));
+  // Helper: yyyy-MM-dd from local date
+  const toYmd = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
   };
+
+  const getTasksForDay = useCallback((day: Date) => {
+    const sameDayTasks = tasks.filter(task => isSameDay(task.date, day));
+    const dayStr = toYmd(day);
+    const virtuals: Task[] = [];
+    
+    for (const r of routines) {
+      if (r.deletedAt) continue;
+      
+      // Active window checks
+      if (r.activeFrom && r.activeFrom > dayStr) continue;
+      if (r.activeTo && r.activeTo < dayStr) continue;
+      
+      const progress = getRoutineProgress(r.id, dayStr);
+      if (progress.skipped || progress.paused) continue;
+      
+      // Check weekday filter (0-6, Sunday-Saturday)
+      const dow = day.getDay();
+      if (r.weekdays && r.weekdays.length > 0 && !r.weekdays.includes(dow)) continue;
+      
+      // Check duration limit
+      if (r.durationDays) {
+        const startDate = new Date(r.activeFrom);
+        const currentDate = new Date(dayStr);
+        const daysDiff = Math.floor((currentDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysDiff >= r.durationDays) continue;
+      }
+      
+      // Get specific times for this day or use default
+      const times = r.specificTimes && r.specificTimes.length > 0 ? r.specificTimes : ['09:00'];
+      
+      // Create virtual tasks for each time slot
+      for (let i = 0; i < progress.goal; i++) {
+        const isCompleted = i < progress.count;
+        
+        virtuals.push({
+          id: `routine:${r.id}:${dayStr}:${i}`,
+          title: r.name,
+          description: r.description,
+          completed: isCompleted,
+          projectId: undefined,
+          date: day,
+          startTime: i < times.length ? times[i] : `${i + 1}ª vez`,
+          endTime: undefined,
+          isRoutine: true,
+          isOverdue: false,
+          createdAt: day,
+          updatedAt: day,
+        });
+      }
+    }
+    
+    return [...sameDayTasks, ...virtuals];
+  }, [tasks, routines, getRoutineProgress]);
 
   const getProjectById = (projectId?: string) => {
     return projects.find(p => p.id === projectId);
@@ -164,8 +225,16 @@ export default function Calendar() {
     setEditingTask(null);
   };
 
-  const handleToggleTask = (taskId: string, completed: boolean) => {
-    updateTask(taskId, { completed });
+  const handleToggleTask = async (taskId: string, completed: boolean) => {
+    if (taskId.startsWith('routine:')) {
+      const [, routineId, dateStr] = taskId.split(':');
+      if (completed) {
+        await completeRoutine(routineId, dateStr);
+      }
+      // For uncompleting, you might want to handle it differently
+    } else {
+      updateTask(taskId, { completed });
+    }
   };
 
   const handleDeleteTask = (taskId: string) => {
@@ -321,10 +390,11 @@ export default function Calendar() {
               ))}
             </div>
             <div className="grid grid-cols-7 gap-1">
-              {eachDayOfInterval({ start: monthStart, end: monthEnd }).map((day) => {
+              {eachDayOfInterval({ start: calendarStart, end: calendarEnd }).map((day) => {
                 const dayTasks = getTasksForDay(day);
                 const isToday = isSameDay(day, new Date());
                 const isSelected = selectedDate && isSameDay(day, selectedDate);
+                const isCurrentMonth = isSameMonth(day, currentMonthDate);
                 
                 return (
                   <div 
@@ -336,10 +406,12 @@ export default function Calendar() {
                         : isToday 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-card hover:bg-accent/50'
+                    } ${
+                      !isCurrentMonth ? 'opacity-40' : ''
                     }`}
                   >
                     <div className={`text-sm font-medium ${
-                      isToday ? 'text-primary-foreground' : 'text-foreground'
+                      isToday ? 'text-primary-foreground' : isCurrentMonth ? 'text-foreground' : 'text-muted-foreground'
                     }`}>
                       {format(day, 'd')}
                     </div>

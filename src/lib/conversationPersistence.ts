@@ -23,7 +23,17 @@ class ConversationPersistence {
 
   // Generate new session ID
   generateSessionId(): string {
-    this.currentSessionId = crypto.randomUUID();
+    // Fallback for environments without crypto.randomUUID
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      this.currentSessionId = crypto.randomUUID();
+    } else {
+      // Manual UUID v4 generation
+      this.currentSessionId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
     return this.currentSessionId;
   }
 
