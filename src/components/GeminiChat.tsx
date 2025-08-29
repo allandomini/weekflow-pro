@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isGeminiConfigured, generateGeminiResponse, getGeminiCooldownRemaining } from "@/lib/gemini";
 import { isGroqConfigured, generateGroqResponse } from "@/lib/groq";
 import { conversationPersistence } from "@/lib/conversationPersistence";
+import ReactMarkdown from 'react-markdown';
 
 interface Message {
   id: string;
@@ -457,7 +458,13 @@ export function GeminiChat() {
               contextWithBridge = { ...context, conversationContext: bridge };
             }
             
-            response = await generateGeminiResponse(content, contextWithBridge, aiSettings.model);
+            // Convert messages to conversation history format
+            const conversationHistory = messages.map(msg => ({
+              role: msg.role,
+              content: msg.content
+            }));
+            
+            response = await generateGeminiResponse(content, contextWithBridge, aiSettings.model, conversationHistory);
             apiUsed = 'gemini';
             modelUsed = 'gemini';
           } catch (apiErr: any) {
@@ -656,7 +663,25 @@ export function GeminiChat() {
                         ? 'bg-primary text-primary-foreground' 
                         : 'bg-muted'
                     }`}>
-                      <p className="text-sm">{message.content}</p>
+                      {message.role === 'assistant' ? (
+                        <div className="text-sm prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-ul:my-1 prose-li:my-0">
+                          <ReactMarkdown 
+                            components={{
+                              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                              strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
+                              ul: ({ children }) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
+                              li: ({ children }) => <li className="text-sm">{children}</li>,
+                              h1: ({ children }) => <h1 className="text-base font-semibold mb-2">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-sm font-semibold mb-1">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-sm font-medium mb-1">{children}</h3>,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <p className="text-sm">{message.content}</p>
+                      )}
                       <p className="text-xs opacity-70 mt-1">
                         {message.timestamp.toLocaleTimeString()}
                       </p>

@@ -30,7 +30,8 @@ export function getGeminiCooldownRemaining(): number {
 export async function generateGeminiResponse(
   message: string,
   context: any,
-  model?: string
+  model?: string,
+  conversationHistory?: Array<{role: 'user' | 'assistant', content: string}>
 ): Promise<string> {
   if (!isGeminiConfigured()) {
     throw new Error("Gemini API key not configured");
@@ -50,7 +51,7 @@ export async function generateGeminiResponse(
   console.log('🤖 Using Gemini model:', modelName, 'from parameter:', model, 'default:', DEFAULT_MODEL);
   const genModel = genAI.getGenerativeModel({ model: modelName });
 
-  // Construct a helpful prompt including structured JSON context
+  // Construct conversation contents with history
   const systemPreamble = `You are an AI assistant embedded in a personal productivity app called Domini Horus!. You have access to detailed user data, but be smart about when to use it.
 
 Key instructions:
@@ -60,7 +61,7 @@ Key instructions:
 - When asked about specific topics, then use the detailed data to give precise insights
 - Always respond in Portuguese
 - Be helpful but not overwhelming - let the conversation flow naturally
- - If the user estiver frustrado (e.g., palavrões), responda com empatia, foque em ação prática e seja breve
+- If the user estiver frustrado (e.g., palavrões), responda com empatia, foque em ação prática e seja breve
 
 Examples:
 - "Olá" → Simple greeting response
@@ -73,16 +74,37 @@ Examples:
     return v;
   }, 2)}`;
 
-  const fullPrompt = `${systemPreamble}\n\nUsuário: ${message}${contextBlock}`;
+  // Build conversation contents with history
+  const contents: any[] = [];
+  
+  // Add system message as first user message
+  contents.push({
+    role: "user",
+    parts: [{ text: `${systemPreamble}${contextBlock}` }]
+  });
+  
+  // Add conversation history if available
+  if (conversationHistory && conversationHistory.length > 0) {
+    // Take last 10 messages to avoid token limits
+    const recentHistory = conversationHistory.slice(-10);
+    
+    for (const msg of recentHistory) {
+      contents.push({
+        role: msg.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: msg.content }]
+      });
+    }
+  }
+  
+  // Add current message
+  contents.push({
+    role: "user",
+    parts: [{ text: message }]
+  });
 
   try {
     const result = await genModel.generateContent({
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: fullPrompt }],
-        },
-      ],
+      contents: contents,
     });
 
     const text = result.response.text();

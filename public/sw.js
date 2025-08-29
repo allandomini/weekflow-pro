@@ -17,34 +17,56 @@ const STATIC_FILES = [
 
 // Estratégia de cache: Network First com fallback para cache
 async function networkFirst(request) {
+  // Skip caching for non-GET requests
+  if (request.method !== 'GET') {
+    return fetch(request);
+  }
+
   try {
     const response = await fetch(request);
-    const cache = await caches.open(DYNAMIC_CACHE);
-    cache.put(request, response.clone());
+    
+    // Only cache successful responses
+    if (response && response.status === 200) {
+      const cache = await caches.open(DYNAMIC_CACHE);
+      cache.put(request, response.clone());
+    }
+    
     return response;
   } catch (error) {
+    console.log('Network error, serving from cache:', error);
     const cachedResponse = await caches.match(request);
-    if (cachedResponse) {
-      return cachedResponse;
-    }
-    throw error;
+    return cachedResponse || new Response('Network error', { status: 408, statusText: 'Network error' });
   }
 }
 
 // Estratégia de cache: Cache First para recursos estáticos
 async function cacheFirst(request) {
-  const cachedResponse = await caches.match(request);
-  if (cachedResponse) {
-    return cachedResponse;
+  // Skip caching for non-GET requests
+  if (request.method !== 'GET') {
+    return fetch(request);
   }
-  
+
   try {
+    const cachedResponse = await caches.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+    
     const response = await fetch(request);
-    const cache = await caches.open(STATIC_CACHE);
-    cache.put(request, response.clone());
+    
+    // Only cache successful responses
+    if (response && response.status === 200) {
+      const cache = await caches.open(STATIC_CACHE);
+      cache.put(request, response.clone());
+    }
+    
     return response;
   } catch (error) {
-    throw error;
+    console.error('Cache first error:', error);
+    return new Response('Offline content not available', { 
+      status: 408, 
+      statusText: 'Offline content not available' 
+    });
   }
 }
 
@@ -83,6 +105,16 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
+  // Skip non-GET requests and chrome-extension URLs
+  if (request.method !== 'GET' || url.protocol === 'chrome-extension:') {
+    return;
+  }
+
+  // Skip Supabase realtime endpoint
+  if (url.hostname.includes('supabase') && url.pathname.includes('realtime')) {
+    return;
+  }
+
   // Cache de recursos estáticos (CSS, JS, imagens)
   if (request.destination === 'style' || 
       request.destination === 'script' || 
@@ -106,7 +138,7 @@ self.addEventListener('fetch', (event) => {
 
   // Fallback para outras requisições
   event.respondWith(fetch(request).catch(() => {
-    return caches.match(request);
+    return caches.match(request) || new Response('Not found', { status: 404 });
   }));
 });
 

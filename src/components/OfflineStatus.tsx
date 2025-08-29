@@ -48,16 +48,6 @@ export function OfflineStatus() {
         )}
       </div>
 
-      {/* Botão de Instalação PWA */}
-      <Button
-        onClick={installPWA}
-        size="sm"
-        variant="outline"
-        className="bg-white/90 backdrop-blur-sm shadow-lg hover:bg-white"
-      >
-        <Download className="w-4 h-4 mr-2" />
-        Instalar App
-      </Button>
 
       {/* Botão de Sincronização */}
       {!isOnline && (

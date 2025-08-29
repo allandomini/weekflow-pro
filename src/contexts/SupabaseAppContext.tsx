@@ -817,19 +817,111 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
     if (!user) return;
     
     try {
+      // Only include defined fields in the update
+      const updateData: Record<string, any> = {
+        updated_at: new Date().toISOString()
+      };
+
+      // Add only the fields that are actually being updated
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.description !== undefined) updateData.description = updates.description;
+      if (updates.completed !== undefined) updateData.completed = updates.completed;
+      if (updates.projectId !== undefined) updateData.project_id = updates.projectId;
+      if (updates.date !== undefined) updateData.date = updates.date;
+      if (updates.startTime !== undefined) updateData.start_time = updates.startTime;
+      if (updates.endTime !== undefined) updateData.end_time = updates.endTime;
+      if (updates.isRoutine !== undefined) updateData.is_routine = updates.isRoutine;
+      if (updates.isOverdue !== undefined) updateData.is_overdue = updates.isOverdue;
+
+      // Convert date to ISO string if it's a Date object
+      if (updateData.date instanceof Date) {
+        updateData.date = updateData.date.toISOString();
+      }
+
+      // For routine tasks, we need to handle the composite ID
+      if (id.startsWith('routine:')) {
+        const [_, routineId, date] = id.split(':');
+        
+        // For routine tasks, we only update the completion status in routine_completions
+        if (updates.completed !== undefined) {
+          // First, get the current completion record if it exists
+          const { data: existingCompletions, error: selectError } = await supabase
+            .from('routine_completions')
+            .select('*')
+            .eq('routine_id', routineId)
+            .eq('date', date)
+            .eq('user_id', user.id);
+            
+          if (selectError) throw selectError;
+          
+          const existingCompletion = existingCompletions?.[0];
+          
+          if (updates.completed) {
+            // Marking as completed - increment count if not already completed
+            if (existingCompletion) {
+              await supabase
+                .from('routine_completions')
+                .update({
+                  count: Math.min(existingCompletion.count + 1, existingCompletion.goal || 1),
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingCompletion.id);
+            } else {
+              // Create a new completion record
+              await supabase
+                .from('routine_completions')
+                .insert({
+                  routine_id: routineId,
+                  date,
+                  user_id: user.id,
+                  count: 1,
+                  goal: 1, // Default goal of 1 for single task completion
+                  completed_at: new Date().toISOString()
+                });
+            }
+          } else {
+            // Marking as not completed - we don't decrement the count as it's a binary state
+            // Instead, we'll just update the local state to reflect the change
+            if (existingCompletion) {
+              await supabase
+                .from('routine_completions')
+                .update({
+                  count: 0,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', existingCompletion.id);
+            }
+          }
+          
+          // Update local state optimistically
+          setTasks(prev => 
+            prev.map(t => 
+              t.id === id 
+                ? { ...t, completed: updates.completed, updatedAt: new Date() } 
+                : t
+            )
+          );
+          
+          return;
+        }
+        
+        // For non-completion updates to routine tasks, we'll just update the local state
+        // since routine tasks are primarily managed through completions
+        setTasks(prev => 
+          prev.map(t => 
+            t.id === id 
+              ? { ...t, ...updates, updatedAt: new Date() } 
+              : t
+          )
+        );
+        
+        return;
+      }
+
+      // Regular task update
       const { data, error } = await supabase
         .from('tasks')
-        .update({
-          title: updates.title,
-          description: updates.description,
-          completed: updates.completed,
-          project_id: updates.projectId,
-          date: updates.date?.toISOString(),
-          start_time: updates.startTime,
-          end_time: updates.endTime,
-          is_routine: updates.isRoutine,
-          is_overdue: updates.isOverdue,
-        })
+        .update(updateData)
         .eq('id', id)
         .eq('user_id', user.id)
         .select()
