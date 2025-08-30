@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { Button } from "@/components/ui/button";
@@ -21,16 +21,32 @@ import {
   Trash2,
   Edit,
   Clock,
-  RefreshCw
+  RefreshCw,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Send,
+  GripVertical,
+  DollarSign
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import ReactMarkdown from "react-markdown";
 
 interface TodoTask {
   id: string;
   text: string;
   completed: boolean;
   showInDashboard: boolean;
+  dueDate?: Date;
+}
+
+interface FinanceEntry {
+  id: string;
+  type: 'credit' | 'debit';
+  amount: number;
+  description: string;
+  date: Date;
 }
 
 interface CanvasItem {
@@ -52,91 +68,144 @@ export default function ProjectCanvas() {
     addProjectImage 
   } = useAppContext();
 
-  const project = useMemo(() => projects.find(p => p.id === projectId), [projects, projectId]);
-
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [isSideMenuOpen, setIsSideMenuOpen] = useState(false);
-  // Load canvas items from localStorage on initial render
-  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem(`projectCanvas_${projectId}`);
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          // Convert string dates back to Date objects
-          return parsed.map((item: any) => ({
-            ...item,
-            createdAt: new Date(item.createdAt),
-            data: {
-              ...item.data,
-              // Convert any date strings in data back to Date objects if needed
-              ...(item.data.dueDate && { dueDate: new Date(item.data.dueDate) })
-            }
-          }));
-        } catch (e) {
-          console.error('Failed to parse saved canvas items', e);
-          return [];
-        }
-      }
-    }
-    return [];
-  });
+  // Load canvas items from localStorage with error handling
+  const [canvasItems, setCanvasItems] = useState<CanvasItem[]>([]);
   const [draggedItem, setDraggedItem] = useState<CanvasItem | null>(null);
   const [editingItem, setEditingItem] = useState<CanvasItem | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [editingTask, setEditingTask] = useState<{ itemId: string; taskId: string } | null>(null);
+  const [dragHandle, setDragHandle] = useState<string | null>(null);
+  
+  // Canvas pan and zoom state
+  const [canvasTransform, setCanvasTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
+  const canvasRef = useRef<HTMLDivElement>(null);
 
   // Forms for different item types
-  const [todoForm, setTodoForm] = useState({ 
-    title: "",
-    tasks: [] as TodoTask[]
-  });
-  const [newTaskText, setNewTaskText] = useState("");
-  const [noteForm, setNoteForm] = useState({ title: "", content: "" });
-  interface FinanceFormData {
-    type: 'deposit' | 'withdrawal' | 'investment' | 'debt';
-    category: string;
-    amount: string;
-    description: string;
-    date: string;
-    expectedReturn: string;
-    riskLevel: 'low' | 'medium' | 'high';
-    status: 'pending' | 'completed' | 'cancelled';
-    isRecurring: boolean;
-    recurrence: {
-      frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
-      endDate: string;
-    };
+  const [todoForm, setTodoForm] = useState({ task: '', dueDate: '' });
+  const [noteForm, setNoteForm] = useState({ title: '', content: '' });
+  const [financeForm, setFinanceForm] = useState({ amount: '', type: 'credit' as 'credit' | 'debit', description: '' });
+  const [imageForm, setImageForm] = useState({ title: '', description: '', imageUrl: '', imageFile: null as File | null });
+  const [documentForm, setDocumentForm] = useState({ title: '', description: '', fileUrl: '', fileName: '', fileType: '', documentFile: null as File | null });
+  const [newTaskText, setNewTaskText] = useState('');
+  
+  const project = useMemo(() => {
+    const foundProject = projects.find(p => p.id === projectId);
+    if (projects.length > 0) {
+      setIsLoading(false);
+      if (!foundProject) {
+        setLoadError('Projeto não encontrado');
+      }
+    }
+    return foundProject;
+  }, [projects, projectId]);
+  
+  // Load canvas items after component mounts to avoid hydration issues
+  useEffect(() => {
+    if (typeof window !== 'undefined' && projectId) {
+      try {
+        const saved = localStorage.getItem(`projectCanvas_${projectId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const items = parsed.map((item: any) => ({
+            ...item,
+            createdAt: new Date(item.createdAt),
+            data: {
+              ...item.data,
+              ...(item.data.dueDate && { dueDate: new Date(item.data.dueDate) })
+            }
+          }));
+          setCanvasItems(items);
+        }
+      } catch (e) {
+        console.error('Failed to load canvas items:', e);
+        setLoadError('Erro ao carregar itens do projeto');
+      }
+    }
+  }, [projectId]);
+  
+  // Debounced save function to prevent performance issues
+  const saveCanvasItems = useCallback((items: CanvasItem[]) => {
+    if (typeof window !== 'undefined' && projectId) {
+      try {
+        // Use requestIdleCallback for better performance
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => {
+            localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(items));
+          });
+        } else {
+          // Fallback for browsers without requestIdleCallback
+          setTimeout(() => {
+            localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(items));
+          }, 0);
+        }
+      } catch (e) {
+        console.error('Failed to save canvas items:', e);
+        setLoadError('Erro ao salvar itens do projeto');
+      }
+    }
+  }, [projectId]);
+  
+  // Canvas event handlers
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isPanning) {
+      setCanvasTransform(prev => ({
+        ...prev,
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y
+      }));
+    } else if (isDragging && draggedItem) {
+      const canvasRect = e.currentTarget.getBoundingClientRect();
+      const newPosition = {
+        x: (e.clientX - canvasRect.left - dragOffset.x) / canvasTransform.scale,
+        y: (e.clientY - canvasRect.top - dragOffset.y) / canvasTransform.scale
+      };
+      
+      setCanvasItems(prev => {
+        const updated = prev.map(item => 
+          item.id === draggedItem.id 
+            ? { ...item, position: newPosition }
+            : item
+        );
+        saveCanvasItems(updated);
+        return updated;
+      });
+    }
+  }, [isPanning, isDragging, draggedItem, panStart, dragOffset, canvasTransform.scale, saveCanvasItems]);
+  
+  const handleCanvasMouseUp = useCallback(() => {
+    setIsPanning(false);
+    setIsDragging(false);
+    setDraggedItem(null);
+    setDragHandle(null);
+  }, []);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card>
+          <CardContent className="py-8 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Carregando projeto...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
-  const [financeForm, setFinanceForm] = useState<FinanceFormData>({
-    type: 'deposit',
-    category: 'outro',
-    amount: '',
-    description: '',
-    date: new Date().toISOString().split('T')[0],
-    expectedReturn: '',
-    riskLevel: 'medium',
-    status: 'pending',
-    isRecurring: false,
-    recurrence: {
-      frequency: 'monthly',
-      endDate: ''
-    }
-  });
-  const [routineForm, setRoutineForm] = useState({ 
-    title: "", 
-    description: "",
-    timesPerDay: 1,
-    weekdays: [] as number[]
-  });
-
-  if (!project) {
+  // Error or project not found
+  if (loadError || !project) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            Projeto não encontrado.
+            {loadError || 'Projeto não encontrado.'}
             <div className="mt-4">
               <Button variant="outline" onClick={() => navigate('/projects')}>
                 <ChevronLeft className="w-4 h-4 mr-2" /> Voltar para Projetos
@@ -147,6 +216,7 @@ export default function ProjectCanvas() {
       </div>
     );
   }
+
 
   const handleAddCanvasItem = (type: CanvasItem['type']) => {
     const newItem: CanvasItem = {
@@ -159,21 +229,14 @@ export default function ProjectCanvas() {
 
     setCanvasItems(prev => {
       const updated = [...prev, newItem];
-      // Save to localStorage
-      if (typeof window !== 'undefined' && projectId) {
-        try {
-          localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-        } catch (e) {
-          console.error('Failed to save canvas items', e);
-        }
-      }
+      saveCanvasItems(updated);
       return updated;
     });
     setEditingItem(newItem);
     setIsSideMenuOpen(false);
   };
 
-  const handleSaveItem = async (item: CanvasItem) => {
+  const handleSaveItem = (item: CanvasItem) => {
     if (!project) return;
     
     switch (item.type) {
@@ -186,7 +249,7 @@ export default function ProjectCanvas() {
               title: task.text,
               description: `Do projeto: ${project.name}`,
               projectId: project.id,
-              date: new Date(),
+              date: task.dueDate || new Date(),
               completed: false,
               isRoutine: false,
               isOverdue: false
@@ -198,26 +261,25 @@ export default function ProjectCanvas() {
           ...item,
           data: { 
             ...item.data, 
-            title: todoForm.title.trim(),
-            tasks: todoForm.tasks,
+            task: todoForm.task,
+            dueDate: todoForm.dueDate,
             saved: true 
           }
         };
         
         setCanvasItems(prev => {
           const updated = prev.map(i => i.id === item.id ? updatedTodo : i);
-          // Save to localStorage
-            if (typeof window !== 'undefined' && projectId) {
-              try {
-                localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-              } catch (e) {
-                console.error('Failed to save canvas items', e);
-              }
+          if (typeof window !== 'undefined' && projectId) {
+            try {
+              localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
+            } catch (e) {
+              console.error('Failed to save canvas items', e);
             }
-            return updated;
-          });
-        }
+          }
+          return updated;
+        });
         break;
+      }
       
       case 'note':
         if (noteForm.title.trim()) {
@@ -226,85 +288,95 @@ export default function ProjectCanvas() {
             content: noteForm.content,
             projectId: project.id
           });
-          
-          const updatedItem = {
-            ...item,
-            data: { ...noteForm, saved: true }
-          };
-          setCanvasItems(prev => {
-            const updated = prev.map(i => i.id === item.id ? updatedItem : i);
-            // Save to localStorage
-            if (typeof window !== 'undefined' && projectId) {
-              try {
-                localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-              } catch (e) {
-                console.error('Failed to save canvas items', e);
-              }
-            }
-            return updated;
-          });
         }
+        
+        const updatedNote = {
+          ...item,
+          data: { ...noteForm, saved: true }
+        };
+        setCanvasItems(prev => {
+          const updated = prev.map(i => i.id === item.id ? updatedNote : i);
+          saveCanvasItems(updated);
+          return updated;
+        });
         break;
       
-      case 'finance': {
-        const amount = parseFloat(financeForm.amount);
-        if (amount > 0) {
-          // Create the base wallet entry with required fields
-          const walletEntry = {
-            projectId: project.id,
-            type: financeForm.type === 'investment' || financeForm.type === 'debt' 
-              ? 'withdrawal' // Map investment and debt to withdrawal type
-              : financeForm.type as 'deposit' | 'withdrawal',
-            amount: financeForm.type === 'deposit' ? amount : -Math.abs(amount), // Make withdrawals negative
-            description: financeForm.description || `Transação de ${financeForm.type}`,
-            // Store additional metadata in a meta field
-            meta: {
-              originalType: financeForm.type,
-              category: financeForm.category,
-              date: financeForm.date,
-              expectedReturn: financeForm.expectedReturn ? parseFloat(financeForm.expectedReturn) : undefined,
-              riskLevel: financeForm.riskLevel,
-              status: financeForm.status,
-              isRecurring: financeForm.isRecurring,
-              recurrence: financeForm.isRecurring ? financeForm.recurrence : undefined
-            }
-          };
-
-          // Add the wallet entry
-          await addProjectWalletEntry(walletEntry);
-          
-          // Update the canvas item with the saved data
-          const updatedItem = {
-            ...item,
-            data: { 
-              ...financeForm,
-              amount: amount.toString(),
-              saved: true,
-              // Store the formatted date for display
-              formattedDate: new Date(financeForm.date).toLocaleDateString('pt-BR')
-            }
-          };
-          
-          // Update the canvas items state
-          setCanvasItems(prev => {
-            const updated = prev.map(i => i.id === item.id ? updatedItem : i);
-            // Save to localStorage
-            if (typeof window !== 'undefined' && projectId) {
-              try {
-                localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-              } catch (e) {
-                console.error('Failed to save canvas items', e);
-              }
-            }
-            return updated;
-          });
+      case 'finance':
+        const updatedFinance = {
+          ...item,
+          data: {
+            ...item.data,
+            entries: item.data.entries || [],
+            saved: true
+          }
+        };
+        setCanvasItems(prev => {
+          const updated = prev.map(i => i.id === item.id ? updatedFinance : i);
+          saveCanvasItems(updated);
+          return updated;
+        });
+        break;
+      case 'image': {
+        let imageUrl = imageForm.imageUrl;
+        
+        // If user uploaded a file, create object URL
+        if (imageForm.imageFile) {
+          imageUrl = URL.createObjectURL(imageForm.imageFile);
         }
+        
+        const updatedImage = {
+          ...item,
+          data: {
+            ...item.data,
+            title: imageForm.title,
+            description: imageForm.description,
+            imageUrl: imageUrl,
+            imageFile: imageForm.imageFile,
+            saved: true
+          }
+        };
+        setCanvasItems(prev => {
+          const updated = prev.map(i => i.id === item.id ? updatedImage : i);
+          saveCanvasItems(updated);
+          return updated;
+        });
+        break;
+      }
+      case 'document': {
+        let fileUrl = documentForm.fileUrl;
+        let fileName = documentForm.fileName;
+        let fileType = documentForm.fileType;
+        
+        // If user uploaded a file, create object URL and get file info
+        if (documentForm.documentFile) {
+          fileUrl = URL.createObjectURL(documentForm.documentFile);
+          fileName = documentForm.documentFile.name;
+          fileType = documentForm.documentFile.type;
+        }
+        
+        const updatedDocument = {
+          ...item,
+          data: {
+            ...item.data,
+            title: documentForm.title,
+            description: documentForm.description,
+            fileUrl: fileUrl,
+            fileName: fileName,
+            fileType: fileType,
+            documentFile: documentForm.documentFile,
+            saved: true
+          }
+        };
+        setCanvasItems(prev => {
+          const updated = prev.map(i => i.id === item.id ? updatedDocument : i);
+          saveCanvasItems(updated);
+          return updated;
+        });
         break;
       }
     }
     
     setEditingItem(null);
-    resetForms();
   };
 
   // Helper function to get recurrence label
@@ -319,25 +391,82 @@ export default function ProjectCanvas() {
   };
 
   const resetForms = () => {
-    setTodoForm({ title: "", tasks: [] });
-    setNewTaskText("");
-    setNoteForm({ title: "", content: "" });
+    setTodoForm({ task: '', dueDate: '' });
+    setNoteForm({ title: '', content: '' });
     setFinanceForm({
-      type: 'deposit',
-      category: 'outro',
       amount: '',
       description: '',
-      date: new Date().toISOString().split('T')[0],
-      expectedReturn: '',
-      riskLevel: 'medium',
-      status: 'pending',
-      isRecurring: false,
-      recurrence: {
-        frequency: 'monthly',
-        endDate: ''
-      }
+      type: 'credit'
     });
-    setRoutineForm({ title: "", description: "", timesPerDay: 1, weekdays: [] });
+    setImageForm({ title: '', description: '', imageUrl: '', imageFile: null });
+    setDocumentForm({ title: '', description: '', fileUrl: '', fileName: '', fileType: '', documentFile: null });
+  };
+
+  const addFinanceEntry = (itemId: string) => {
+    const amount = parseFloat(financeForm.amount);
+    if (!amount || amount <= 0) return;
+    
+    const newEntry: FinanceEntry = {
+      id: Date.now().toString(),
+      type: financeForm.type,
+      amount,
+      description: financeForm.description || (financeForm.type === 'credit' ? 'Crédito' : 'Débito'),
+      date: new Date()
+    };
+    
+    setCanvasItems(prev => {
+      const updated = prev.map(item => 
+        item.id === itemId 
+          ? { 
+              ...item, 
+              data: { 
+                ...item.data, 
+                entries: [...(item.data.entries || []), newEntry]
+              }
+            }
+          : item
+      );
+      if (typeof window !== 'undefined' && projectId) {
+        try {
+          localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to save canvas items', e);
+        }
+      }
+      return updated;
+    });
+    
+    setFinanceForm({ amount: '', description: '', type: 'credit' });
+  };
+
+  const deleteFinanceEntry = (itemId: string, entryId: string) => {
+    setCanvasItems(prev => {
+      const updated = prev.map(item => 
+        item.id === itemId 
+          ? {
+              ...item, 
+              data: {
+                ...item.data,
+                entries: item.data.entries?.filter((entry: FinanceEntry) => entry.id !== entryId) || []
+              }
+            }
+          : item
+      );
+      if (typeof window !== 'undefined' && projectId) {
+        try {
+          localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
+        } catch (e) {
+          console.error('Failed to save canvas items', e);
+        }
+      }
+      return updated;
+    });
+  };
+
+  const calculateTotal = (entries: FinanceEntry[]) => {
+    return entries.reduce((total, entry) => {
+      return total + (entry.type === 'credit' ? entry.amount : -entry.amount);
+    }, 0);
   };
 
   const handleDeleteItem = (itemId: string) => {
@@ -365,7 +494,34 @@ export default function ProjectCanvas() {
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent, item: CanvasItem) => {
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget && !isDragging) {
+      setIsPanning(true);
+      setPanStart({ x: e.clientX - canvasTransform.x, y: e.clientY - canvasTransform.y });
+      e.preventDefault();
+    }
+  };
+
+  const handleZoom = (delta: number) => {
+    setCanvasTransform(prev => ({
+      ...prev,
+      scale: Math.max(0.1, Math.min(3, prev.scale + delta))
+    }));
+  };
+
+  const resetCanvas = () => {
+    setCanvasTransform({ x: 0, y: 0, scale: 1 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      handleZoom(delta);
+    }
+  };
+
+  const handleDragHandleMouseDown = (e: React.MouseEvent, item: CanvasItem) => {
     if (editingItem?.id === item.id) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
@@ -375,43 +531,12 @@ export default function ProjectCanvas() {
     setDraggedItem(item);
     setDragOffset({ x: offsetX, y: offsetY });
     setIsDragging(true);
+    setDragHandle(item.id);
     
     e.preventDefault();
+    e.stopPropagation();
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !draggedItem) return;
-    
-    const canvasRect = e.currentTarget.getBoundingClientRect();
-    const newX = e.clientX - canvasRect.left - dragOffset.x;
-    const newY = e.clientY - canvasRect.top - dragOffset.y;
-    
-    setCanvasItems(prev => {
-      const updated = prev.map(item => 
-        item.id === draggedItem.id 
-          ? { ...item, position: { x: Math.max(0, newX), y: Math.max(0, newY) } }
-          : item
-      );
-      // Debounce the save to localStorage for drag operations
-      if (typeof window !== 'undefined' && projectId) {
-        clearTimeout((window as any).saveCanvasTimeout);
-        (window as any).saveCanvasTimeout = setTimeout(() => {
-          try {
-            localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-          } catch (e) {
-            console.error('Failed to save canvas items', e);
-          }
-        }, 500);
-      }
-      return updated;
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    setDraggedItem(null);
-    setDragOffset({ x: 0, y: 0 });
-  };
 
   const addTaskToTodo = (itemId: string) => {
     if (!newTaskText.trim()) return;
@@ -429,7 +554,6 @@ export default function ProjectCanvas() {
           ? { ...item, data: { ...item.data, tasks: [...(item.data.tasks || []), newTask] } }
           : item
       );
-      // Save to localStorage
       if (typeof window !== 'undefined' && projectId) {
         try {
           localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
@@ -441,6 +565,25 @@ export default function ProjectCanvas() {
     });
     
     setNewTaskText("");
+  };
+
+  const syncTasksToDashboard = (itemId: string) => {
+    const item = canvasItems.find(i => i.id === itemId);
+    if (!item || !project) return;
+    
+    const dashboardTasks = item.data.tasks?.filter((task: TodoTask) => task.showInDashboard && !task.completed) || [];
+    
+    dashboardTasks.forEach((task: TodoTask) => {
+      addTask({
+        title: task.text,
+        description: `Do projeto: ${project.name}`,
+        projectId: project.id,
+        date: task.dueDate || new Date(),
+        completed: false,
+        isRoutine: false,
+        isOverdue: false
+      });
+    });
   };
 
   const toggleTask = (itemId: string, taskId: string) => {
@@ -510,7 +653,6 @@ export default function ProjectCanvas() {
             }
           : item
       );
-      // Save to localStorage
       if (typeof window !== 'undefined' && projectId) {
         try {
           localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
@@ -522,12 +664,11 @@ export default function ProjectCanvas() {
     });
   };
 
-  const menuItems = [
+  const itemTypes = [
     { type: 'todo' as const, icon: ListChecks, label: 'To-Do', color: '#3B82F6' },
-    { type: 'note' as const, icon: StickyNote, label: 'Nota', color: '#10B981' },
-    { type: 'finance' as const, icon: Wallet, label: 'Finança', color: '#F59E0B' },
-    { type: 'routine' as const, icon: Calendar, label: 'Rotina', color: '#8B5CF6' },
-    { type: 'image' as const, icon: ImageIcon, label: 'Imagem', color: '#EC4899' },
+    { type: 'note' as const, icon: FileText, label: 'Nota', color: '#10B981' },
+    { type: 'finance' as const, icon: DollarSign, label: 'Finanças', color: '#F59E0B' },
+    { type: 'image' as const, icon: FileText, label: 'Imagem', color: '#EF4444' },
     { type: 'document' as const, icon: FileText, label: 'Documento', color: '#6366F1' },
   ];
 
@@ -538,26 +679,29 @@ export default function ProjectCanvas() {
       case 'todo':
         return (
           <Card 
-            className="w-80 shadow-lg select-none" 
-            onMouseDown={(e) => handleMouseDown(e, item)}
+            className="w-80 shadow-lg select-none relative" 
           >
+            {/* Drag Handle */}
+            <div 
+              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+              title="Arrastar card"
+            >
+              <GripVertical className="w-3 h-3 text-muted-foreground" />
+            </div>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <ListChecks className="w-4 h-4 text-blue-500" />
                   {isEditing ? (
                     <Input 
-                      value={item.data.title || ""}
-                      onChange={(e) => {
-                        setCanvasItems(prev => prev.map(i => 
-                          i.id === item.id ? { ...i, data: { ...i.data, title: e.target.value } } : i
-                        ));
-                      }}
+                      value={todoForm.task}
+                      onChange={(e) => setTodoForm(prev => ({ ...prev, task: e.target.value }))}
                       placeholder="Título do card"
                       className="h-7 text-sm font-semibold"
                     />
                   ) : (
-                    <CardTitle className="text-sm">{item.data.title || "To-Do"}</CardTitle>
+                    <CardTitle className="text-sm">{item.data.task || "To-Do"}</CardTitle>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -605,6 +749,12 @@ export default function ProjectCanvas() {
                           placeholder="Nome da tarefa"
                         />
                         <div className="flex items-center gap-2">
+                          <Input 
+                            type="date"
+                            value={task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''}
+                            onChange={(e) => updateTask(item.id, task.id, { dueDate: e.target.value ? new Date(e.target.value) : undefined })}
+                            className="h-6 text-xs flex-1"
+                          />
                           <Checkbox 
                             checked={task.showInDashboard}
                             onCheckedChange={(checked) => updateTask(item.id, task.id, { showInDashboard: !!checked })}
@@ -624,14 +774,21 @@ export default function ProjectCanvas() {
                       </div>
                     ) : (
                       <>
-                        <span 
-                          className={`flex-1 text-xs cursor-pointer ${
-                            task.completed ? 'line-through text-muted-foreground' : ''
-                          }`}
-                          onClick={() => setEditingTask({ itemId: item.id, taskId: task.id })}
-                        >
-                          {task.text}
-                        </span>
+                        <div className="flex-1">
+                          <span 
+                            className={`text-xs cursor-pointer block ${
+                              task.completed ? 'line-through text-muted-foreground' : ''
+                            }`}
+                            onClick={() => setEditingTask({ itemId: item.id, taskId: task.id })}
+                          >
+                            {task.text}
+                          </span>
+                          {task.dueDate && (
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(task.dueDate).toLocaleDateString('pt-BR')}
+                            </span>
+                          )}
+                        </div>
                         {task.showInDashboard && (
                           <Badge variant="outline" className="h-4 px-1 text-xs">Dashboard</Badge>
                         )}
@@ -675,13 +832,28 @@ export default function ProjectCanvas() {
                 </Button>
               </div>
               
-              {/* Botão salvar (apenas quando editando) */}
-              {isEditing && (
-                <div className="flex gap-2 pt-2">
-                  <Button size="sm" onClick={() => handleSaveItem(item)}>Salvar no Sistema</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Fechar</Button>
-                </div>
-              )}
+              {/* Botões de ação */}
+              <div className="flex gap-2 pt-2">
+                {isEditing ? (
+                  <>
+                    <Button size="sm" onClick={() => handleSaveItem(item)}>Salvar no Sistema</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Fechar</Button>
+                  </>
+                ) : (
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="w-full"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      syncTasksToDashboard(item.id);
+                    }}
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    Enviar para Dashboard
+                  </Button>
+                )}
+              </div>
               
               {item.data.saved && (
                 <Badge variant="secondary" className="mt-2">Salvo no Sistema</Badge>
@@ -693,9 +865,16 @@ export default function ProjectCanvas() {
       case 'note':
         return (
           <Card 
-            className="w-80 shadow-lg select-none" 
-            onMouseDown={(e) => handleMouseDown(e, item)}
+            className="w-80 max-h-96 shadow-lg select-none relative flex flex-col" 
           >
+            {/* Drag Handle */}
+            <div 
+              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+              title="Arrastar card"
+            >
+              <GripVertical className="w-3 h-3 text-muted-foreground" />
+            </div>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -728,10 +907,10 @@ export default function ProjectCanvas() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-3 flex-1 overflow-hidden flex flex-col">
               {isEditing ? (
                 <>
-                  <div>
+                  <div className="flex-shrink-0">
                     <Label>Título</Label>
                     <Input 
                       value={noteForm.title}
@@ -740,13 +919,322 @@ export default function ProjectCanvas() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
-                  <div>
-                    <Label>Conteúdo</Label>
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <Label>Conteúdo (Markdown)</Label>
                     <Textarea 
                       value={noteForm.content}
                       onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
-                      placeholder="Conteúdo da nota"
+                      placeholder="Escreva em markdown...\n\n**Negrito** *Itálico*\n# Título\n- Lista\n[Link](url)"
                       rows={4}
+                      onClick={(e) => e.stopPropagation()}
+                      className="font-mono text-sm flex-1 resize-none"
+                    />
+                  </div>
+                  {noteForm.content && (
+                    <div className="flex-shrink-0">
+                      <Label>Preview</Label>
+                      <div className="border rounded p-3 bg-muted/20 max-h-24 overflow-y-auto">
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <ReactMarkdown>
+                            {noteForm.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button 
+                      size="sm" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleSaveItem(item);
+                      }}
+                    >
+                      Salvar
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingItem(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col min-h-0">
+                  <h4 className="font-medium flex-shrink-0">{item.data.title || "Nova Nota"}</h4>
+                  {item.data.content && (
+                    <div className="mt-2 flex-1 overflow-y-auto">
+                      <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+                        <ReactMarkdown>
+                          {item.data.content}
+                        </ReactMarkdown>
+                      </div>
+                    </div>
+                  )}
+                  {item.data.saved && (
+                    <Badge variant="secondary" className="mt-2 flex-shrink-0">Salva</Badge>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+      case 'finance':
+        const entries = item.data.entries || [];
+        const total = calculateTotal(entries);
+        return (
+          <Card 
+            className="w-80 shadow-lg select-none relative" 
+          >
+            {/* Drag Handle */}
+            <div 
+              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+              title="Arrastar card"
+            >
+              <GripVertical className="w-3 h-3 text-muted-foreground" />
+            </div>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-4 h-4 text-yellow-500" />
+                  {isEditing ? (
+                    <Input 
+                      value={item.data.title || ""}
+                      onChange={(e) => {
+                        setCanvasItems(prev => prev.map(i => 
+                          i.id === item.id ? { ...i, data: { ...i.data, title: e.target.value } } : i
+                        ));
+                      }}
+                      placeholder="Nome do card"
+                      className="h-7 text-sm font-semibold"
+                    />
+                  ) : (
+                    <CardTitle className="text-sm">{item.data.title || "Finanças"}</CardTitle>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingItem(isEditing ? null : item);
+                    }}
+                  >
+                    <Edit className="w-3 h-3" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.id);
+                    }}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Total Display */}
+              <div className="text-center p-4 bg-muted/30 rounded-lg">
+                <p className="text-xs text-muted-foreground mb-1">Total</p>
+                <p className={`text-2xl font-bold ${
+                  total >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
+                  R$ {total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {/* Entries List */}
+              <div className="space-y-2 max-h-40 overflow-y-auto">
+                {entries.map((entry: FinanceEntry) => (
+                  <div key={entry.id} className="flex items-center justify-between p-2 bg-muted/20 rounded">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{entry.description}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.date.toLocaleDateString ? entry.date.toLocaleDateString('pt-BR') : new Date(entry.date).toLocaleDateString('pt-BR')}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={entry.type === 'credit' ? 'default' : 'destructive'} className="text-xs">
+                        {entry.type === 'credit' ? '+' : '-'}R$ {entry.amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 w-5 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteFinanceEntry(item.id, entry.id);
+                        }}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add Entry Form */}
+              <div className="space-y-2 pt-2 border-t">
+                <div className="flex gap-2">
+                  <Input 
+                    type="number"
+                    step="0.01"
+                    value={financeForm.amount}
+                    onChange={(e) => setFinanceForm(prev => ({ ...prev, amount: e.target.value }))}
+                    placeholder="Valor"
+                    className="flex-1 h-8 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <select 
+                    className="h-8 rounded border px-3 bg-card text-sm"
+                    value={financeForm.type}
+                    onChange={(e) => setFinanceForm(prev => ({ ...prev, type: e.target.value as 'credit' | 'debit' }))}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <option value="credit">Crédito</option>
+                    <option value="debit">Débito</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Input 
+                    value={financeForm.description}
+                    onChange={(e) => setFinanceForm(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Descrição (opcional)"
+                    className="flex-1 h-8 text-sm"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <Button 
+                    size="sm" 
+                    className="h-8 px-3"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      addFinanceEntry(item.id);
+                    }}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Save Button (apenas quando editando) */}
+              {isEditing && (
+                <div className="flex gap-2 pt-2">
+                  <Button size="sm" onClick={() => handleSaveItem(item)}>Salvar</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Fechar</Button>
+                </div>
+              )}
+              
+              {item.data.saved && (
+                <Badge variant="secondary" className="mt-2">Salvo</Badge>
+              )}
+            </CardContent>
+          </Card>
+        );
+
+
+      case 'image':
+        return (
+          <Card className="w-80 shadow-lg select-none relative">
+            {/* Drag Handle */}
+            <div 
+              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+              title="Arrastar card"
+            >
+              <GripVertical className="w-3 h-3 text-muted-foreground" />
+            </div>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <CardTitle className="text-sm">Imagem</CardTitle>
+                </div>
+                <div className="flex gap-1">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingItem(item);
+                      setImageForm({
+                        title: item.data.title || '',
+                        description: item.data.description || '',
+                        imageUrl: item.data.imageUrl || '',
+                        imageFile: null
+                      });
+                    }}
+                  >
+                    <Edit className="w-3 h-3" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.id);
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {isEditing ? (
+                <>
+                  <div>
+                    <Label>Título</Label>
+                    <Input 
+                      value={imageForm.title}
+                      onChange={(e) => setImageForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Título da imagem"
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </div>
+                  <div>
+                    <Label>Imagem</Label>
+                    <div className="space-y-2">
+                      <Input 
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setImageForm(prev => ({ ...prev, imageFile: file || null, imageUrl: '' }));
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="cursor-pointer"
+                      />
+                      <div className="text-xs text-muted-foreground text-center">ou</div>
+                      <Input 
+                        value={imageForm.imageUrl}
+                        onChange={(e) => setImageForm(prev => ({ ...prev, imageUrl: e.target.value, imageFile: null }))}
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Descrição</Label>
+                    <Textarea 
+                      value={imageForm.description}
+                      onChange={(e) => setImageForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descrição da imagem..."
+                      rows={3}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
@@ -774,9 +1262,26 @@ export default function ProjectCanvas() {
                 </>
               ) : (
                 <div>
-                  <h4 className="font-medium">{item.data.title || "Nova Nota"}</h4>
-                  {item.data.content && (
-                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{item.data.content}</p>
+                  <h4 className="font-medium">{item.data.title || "Nova Imagem"}</h4>
+                  {item.data.imageUrl && (
+                    <div className="mt-2">
+                      <img 
+                        src={item.data.imageUrl} 
+                        alt={item.data.title || 'Imagem'}
+                        className="w-full h-32 object-cover rounded border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(item.data.imageUrl, '_blank');
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                        title="Clique para ver em tamanho completo"
+                      />
+                    </div>
+                  )}
+                  {item.data.description && (
+                    <p className="text-sm text-muted-foreground mt-2">{item.data.description}</p>
                   )}
                   {item.data.saved && (
                     <Badge variant="secondary" className="mt-2">Salva</Badge>
@@ -787,19 +1292,22 @@ export default function ProjectCanvas() {
           </Card>
         );
 
-      case 'finance':
+      case 'document':
         return (
-          <Card 
-            className="w-96 shadow-lg select-none" 
-            onMouseDown={(e) => handleMouseDown(e, item)}
-          >
+          <Card className="w-80 shadow-lg select-none relative">
+            {/* Drag Handle */}
+            <div 
+              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+              title="Arrastar card"
+            >
+              <GripVertical className="w-3 h-3 text-muted-foreground" />
+            </div>
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-yellow-500" />
-                  <CardTitle className="text-sm">
-                    {isEditing ? 'Editar Transação' : 'Transação Financeira'}
-                  </CardTitle>
+                  <FileText className="w-4 h-4 text-purple-600" />
+                  <CardTitle className="text-sm">Documento</CardTitle>
                 </div>
                 <div className="flex gap-1">
                   <Button 
@@ -808,194 +1316,85 @@ export default function ProjectCanvas() {
                     className="h-6 w-6 p-0"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (isEditing) {
-                        setEditingItem(null);
-                        resetForms();
-                      } else {
-                        setEditingItem(item);
-                        setFinanceForm({
-                          ...item.data,
-                          amount: item.data.amount?.toString() || '',
-                          expectedReturn: item.data.expectedReturn?.toString() || '',
-                        });
-                      }
+                      setEditingItem(item);
+                      setDocumentForm({
+                        title: item.data.title || '',
+                        description: item.data.description || '',
+                        fileUrl: item.data.fileUrl || '',
+                        fileName: item.data.fileName || '',
+                        fileType: item.data.fileType || '',
+                        documentFile: null
+                      });
                     }}
                   >
-                    {isEditing ? <X className="w-3 h-3" /> : <Edit className="w-3 h-3" />}
+                    <Edit className="w-3 h-3" />
                   </Button>
-                  {!isEditing && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="h-6 w-6 p-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteItem(item.id);
-                      }}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  )}
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteItem(item.id);
+                    }}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
               {isEditing ? (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Tipo de Transação</Label>
-                      <select 
-                        className="w-full h-10 rounded border px-3 bg-card text-sm"
-                        value={financeForm.type}
-                        onChange={(e) => setFinanceForm(prev => ({ ...prev, type: e.target.value as any }))}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value="deposit">Depósito</option>
-                        <option value="withdrawal">Retirada</option>
-                        <option value="investment">Investimento</option>
-                        <option value="debt">Dívida</option>
-                      </select>
-                    </div>
-                    <div>
-                      <Label>Categoria</Label>
-                      <select 
-                        className="w-full h-10 rounded border px-3 bg-card text-sm"
-                        value={financeForm.category}
-                        onChange={(e) => setFinanceForm(prev => ({ ...prev, category: e.target.value }))}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <option value="salario">Salário</option>
-                        <option value="freelance">Freelance</option>
-                        <option value="investimento">Investimento</option>
-                        <option value="emprestimo">Empréstimo</option>
-                        <option value="outro">Outro</option>
-                      </select>
-                    </div>
+                <>
+                  <div>
+                    <Label>Título</Label>
+                    <Input 
+                      value={documentForm.title}
+                      onChange={(e) => setDocumentForm(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Título do documento"
+                      onClick={(e) => e.stopPropagation()}
+                    />
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label>Valor (R$)</Label>
+                  <div>
+                    <Label>Documento</Label>
+                    <div className="space-y-2">
                       <Input 
-                        type="number"
-                        step="0.01"
-                        value={financeForm.amount}
-                        onChange={(e) => setFinanceForm(prev => ({ ...prev, amount: e.target.value }))}
-                        placeholder="0.00"
+                        type="file"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          setDocumentForm(prev => ({ ...prev, documentFile: file || null, fileUrl: '', fileName: '', fileType: '' }));
+                        }}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full"
+                        className="cursor-pointer"
                       />
-                    </div>
-                    <div>
-                      <Label>Data</Label>
+                      <div className="text-xs text-muted-foreground text-center">ou</div>
                       <Input 
-                        type="date"
-                        value={financeForm.date}
-                        onChange={(e) => setFinanceForm(prev => ({ ...prev, date: e.target.value }))}
+                        value={documentForm.fileUrl}
+                        onChange={(e) => setDocumentForm(prev => ({ ...prev, fileUrl: e.target.value, documentFile: null }))}
+                        placeholder="https://exemplo.com/documento.pdf"
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full"
                       />
-                    </div>
-                  </div>
-
-                  {(financeForm.type === 'investment' || financeForm.type === 'debt') && (
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label>Retorno Esperado (%)</Label>
+                      {documentForm.fileUrl && (
                         <Input 
-                          type="number"
-                          step="0.1"
-                          value={financeForm.expectedReturn}
-                          onChange={(e) => setFinanceForm(prev => ({ ...prev, expectedReturn: e.target.value }))}
-                          placeholder="0.0"
+                          value={documentForm.fileName}
+                          onChange={(e) => setDocumentForm(prev => ({ ...prev, fileName: e.target.value }))}
+                          placeholder="Nome do arquivo"
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full"
                         />
-                      </div>
-                      <div>
-                        <Label>Nível de Risco</Label>
-                        <select 
-                          className="w-full h-10 rounded border px-3 bg-card text-sm"
-                          value={financeForm.riskLevel}
-                          onChange={(e) => setFinanceForm(prev => ({ ...prev, riskLevel: e.target.value as any }))}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="low">Baixo</option>
-                          <option value="medium">Médio</option>
-                          <option value="high">Alto</option>
-                        </select>
-                      </div>
+                      )}
                     </div>
-                  )}
-
+                  </div>
                   <div>
                     <Label>Descrição</Label>
                     <Textarea 
-                      value={financeForm.description}
-                      onChange={(e) => setFinanceForm(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Detalhes da transação"
+                      value={documentForm.description}
+                      onChange={(e) => setDocumentForm(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Descrição do documento..."
+                      rows={3}
                       onClick={(e) => e.stopPropagation()}
-                      rows={2}
                     />
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="recurring"
-                      checked={financeForm.isRecurring}
-                      onCheckedChange={(checked) => setFinanceForm(prev => ({ ...prev, isRecurring: !!checked }))}
-                    />
-                    <Label htmlFor="recurring" className="text-sm">Transação recorrente</Label>
-                  </div>
-
-                  {financeForm.isRecurring && (
-                    <div className="grid grid-cols-2 gap-4 bg-muted/30 p-3 rounded">
-                      <div>
-                        <Label>Frequência</Label>
-                        <select 
-                          className="w-full h-10 rounded border px-3 bg-card text-sm"
-                          value={financeForm.recurrence.frequency}
-                          onChange={(e) => setFinanceForm(prev => ({
-                            ...prev, 
-                            recurrence: { ...prev.recurrence, frequency: e.target.value as any }
-                          }))}
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <option value="daily">Diária</option>
-                          <option value="weekly">Semanal</option>
-                          <option value="monthly">Mensal</option>
-                          <option value="yearly">Anual</option>
-                        </select>
-                      </div>
-                      <div>
-                        <Label>Até</Label>
-                        <Input 
-                          type="date"
-                          value={financeForm.recurrence.endDate}
-                          onChange={(e) => setFinanceForm(prev => ({
-                            ...prev, 
-                            recurrence: { ...prev.recurrence, endDate: e.target.value }
-                          }))}
-                          onClick={(e) => e.stopPropagation()}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex justify-between pt-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setEditingItem(null);
-                        resetForms();
-                      }}
-                    >
-                      Cancelar
-                    </Button>
+                  <div className="flex gap-2">
                     <Button 
                       size="sm" 
                       onClick={(e) => {
@@ -1005,74 +1404,56 @@ export default function ProjectCanvas() {
                     >
                       Salvar
                     </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingItem(null);
+                      }}
+                    >
+                      Cancelar
+                    </Button>
                   </div>
-                </div>
+                </>
               ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <Badge variant="outline" className="mb-1">
-                        {item.data.type === 'deposit' ? 'Depósito' : 
-                         item.data.type === 'withdrawal' ? 'Retirada' :
-                         item.data.type === 'investment' ? 'Investimento' : 'Dívida'}
-                      </Badge>
-                      <h4 className="font-medium">
-                        {item.data.category || 'Sem categoria'}
-                      </h4>
-                      {item.data.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{item.data.description}</p>
+                <div>
+                  <h4 className="font-medium">{item.data.title || "Novo Documento"}</h4>
+                  {item.data.fileName && (
+                    <div className="mt-2 p-3 bg-muted/20 rounded border">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-sm font-medium truncate">{item.data.fileName}</span>
+                      </div>
+                      {item.data.fileType === 'application/pdf' && item.data.fileUrl && (
+                        <div className="mt-2">
+                          <iframe 
+                            src={item.data.fileUrl}
+                            className="w-full h-32 border rounded"
+                            title="PDF Preview"
+                          />
+                        </div>
+                      )}
+                      {item.data.fileUrl && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2 w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(item.data.fileUrl, '_blank');
+                          }}
+                        >
+                          Abrir Documento
+                        </Button>
                       )}
                     </div>
-                    <div className="text-right">
-                      <p className={`text-lg font-semibold ${
-                        item.data.type === 'deposit' ? 'text-green-600' : 
-                        item.data.type === 'withdrawal' ? 'text-red-600' :
-                        'text-yellow-600'
-                      }`}>
-                        {item.data.type === 'deposit' ? '+' : ''}
-                        {item.data.type === 'withdrawal' ? '-' : ''}
-                        R$ {parseFloat(item.data.amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(item.data.date).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-
-                  {(item.data.type === 'investment' || item.data.type === 'debt') && (
-                    <div className="mt-2 pt-2 border-t">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Retorno Esperado:</span>
-                        <span className="font-medium">
-                          {item.data.expectedReturn ? `${parseFloat(item.data.expectedReturn)}%` : 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-sm mt-1">
-                        <span className="text-muted-foreground">Risco:</span>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${
-                            item.data.riskLevel === 'high' ? 'bg-red-500/10 text-red-700 dark:text-red-400' :
-                            item.data.riskLevel === 'medium' ? 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400' :
-                            'bg-green-500/10 text-green-700 dark:text-green-400'
-                          }`}
-                        >
-                          {item.data.riskLevel === 'high' ? 'Alto' :
-                           item.data.riskLevel === 'medium' ? 'Médio' : 'Baixo'}
-                        </Badge>
-                      </div>
-                    </div>
                   )}
-
-                  {item.data.isRecurring && (
-                    <div className="mt-2 pt-2 border-t">
-                      <div className="flex items-center gap-2">
-                        <RefreshCw className="w-3 h-3 text-blue-500" />
-                        <span className="text-xs text-blue-600 dark:text-blue-400">
-                          Recorrente • {getRecurrenceLabel(item.data.recurrence?.frequency)}
-                        </span>
-                      </div>
-                    </div>
+                  {item.data.description && (
+                    <p className="text-sm text-muted-foreground mt-2">{item.data.description}</p>
+                  )}
+                  {item.data.saved && (
+                    <Badge variant="secondary" className="mt-2">Salvo</Badge>
                   )}
                 </div>
               )}
@@ -1084,7 +1465,7 @@ export default function ProjectCanvas() {
         return (
           <Card className="w-80 shadow-lg">
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">Em desenvolvimento...</p>
+              <p className="text-muted-foreground">Tipo de item não suportado</p>
             </CardContent>
           </Card>
         );
@@ -1105,38 +1486,83 @@ export default function ProjectCanvas() {
               <p className="text-sm text-muted-foreground">Canvas do Projeto</p>
             </div>
           </div>
-          <Button 
-            onClick={() => setIsSideMenuOpen(true)}
-            className="rounded-full w-12 h-12 p-0"
-          >
-            <Plus className="w-6 h-6" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Canvas Controls */}
+            <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => handleZoom(0.1)}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => handleZoom(-0.1)}
+                className="h-8 w-8 p-0"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={resetCanvas}
+                className="h-8 w-8 p-0"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+              <span className="text-xs text-muted-foreground px-2">
+                {Math.round(canvasTransform.scale * 100)}%
+              </span>
+            </div>
+            <Button 
+              onClick={() => setIsSideMenuOpen(true)}
+              className="rounded-full w-12 h-12 p-0"
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+          </div>
         </div>
       </div>
 
       {/* Canvas */}
       <div 
-        className="pt-20 min-h-screen relative bg-white dark:bg-black"
+        ref={canvasRef}
+        className="pt-20 min-h-screen relative bg-white dark:bg-black overflow-hidden"
         onClick={handleCanvasClick}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseUp}
+        onWheel={handleWheel}
+        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
       >
-        {canvasItems.map((item) => (
-          <div
-            key={item.id}
-            className={`absolute ${
-              isDragging && draggedItem?.id === item.id ? 'cursor-grabbing' : 'cursor-grab'
-            } ${editingItem?.id === item.id ? 'cursor-default' : ''}`}
-            style={{
-              left: item.position.x,
-              top: item.position.y,
-              zIndex: isDragging && draggedItem?.id === item.id ? 1000 : 1,
-            }}
-          >
-            {renderItemContent(item)}
-          </div>
-        ))}
+        <div 
+          className="relative"
+          style={{
+            transform: `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`,
+            transformOrigin: '0 0',
+            transition: isPanning || isDragging ? 'none' : 'transform 0.1s ease-out'
+          }}
+        >
+          {canvasItems.map((item) => (
+            <div
+              key={item.id}
+              className={`absolute ${
+                isDragging && draggedItem?.id === item.id ? 'cursor-grabbing' : 'cursor-default'
+              }`}
+              style={{
+                left: item.position.x,
+                top: item.position.y,
+                zIndex: isDragging && draggedItem?.id === item.id ? 1000 : 1,
+              }}
+            >
+              {renderItemContent(item)}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Side Menu */}
@@ -1160,7 +1586,7 @@ export default function ProjectCanvas() {
               </div>
             </div>
             <div className="p-4 space-y-2">
-              {menuItems.map((menuItem) => {
+              {itemTypes.map((menuItem) => {
                 const Icon = menuItem.icon;
                 return (
                   <Button

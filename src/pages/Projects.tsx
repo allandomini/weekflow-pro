@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FolderOpen, Plus, Edit, Trash2, Briefcase, Target, Lightbulb, Zap, Star, Heart } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { FolderOpen, Plus, Edit, Trash2, Briefcase, Target, Lightbulb, Zap, Star, Heart, Maximize2 } from "lucide-react";
 import { Project } from "@/types";
 
 export default function Projects() {
@@ -15,6 +16,7 @@ export default function Projects() {
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState({ name: "", color: "#3B82F6", icon: "folder" });
+  const [cardSize, setCardSize] = useState([200]); // Card size in pixels
 
   const handleCreateProject = () => {
     setEditingProject(null);
@@ -69,13 +71,32 @@ export default function Projects() {
           <h1 className="text-3xl font-bold text-foreground">Projetos</h1>
           <p className="text-muted-foreground">Organize suas tarefas em projetos</p>
         </div>
-        <Button variant="gradient" onClick={handleCreateProject} className="animate-glow">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Projeto
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 min-w-[200px]">
+            <Maximize2 className="w-4 h-4 text-muted-foreground" />
+            <Slider
+              value={cardSize}
+              onValueChange={setCardSize}
+              max={300}
+              min={150}
+              step={10}
+              className="flex-1"
+            />
+            <span className="text-sm text-muted-foreground w-12">{cardSize[0]}px</span>
+          </div>
+          <Button variant="gradient" onClick={handleCreateProject} className="animate-glow">
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Projeto
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+      <div 
+        className="grid gap-6"
+        style={{
+          gridTemplateColumns: `repeat(auto-fill, minmax(${cardSize[0]}px, 1fr))`
+        }}
+      >
         {projects.length === 0 ? (
           <div className="col-span-full">
             <Card className="shadow-elegant">
@@ -93,9 +114,13 @@ export default function Projects() {
             return (
               <Card 
                 key={project.id} 
-                className="aspect-square shadow-elegant hover:shadow-glow transition-all duration-300 cursor-pointer group relative overflow-hidden" 
+                className="shadow-elegant hover:shadow-glow transition-all duration-300 cursor-pointer group relative overflow-hidden" 
                 onClick={() => navigate(`/projects/${project.id}/canvas`)}
-                style={{ backgroundColor: `${project.color}10` }}
+                style={{ 
+                  backgroundColor: `${project.color}10`,
+                  width: `${cardSize[0]}px`,
+                  height: `${cardSize[0]}px`
+                }}
               >
                 <div className="absolute inset-0 flex items-center justify-center">
                   <IconComponent 
