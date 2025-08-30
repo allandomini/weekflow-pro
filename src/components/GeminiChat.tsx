@@ -30,7 +30,20 @@ interface Recommendation {
 }
 
 export function GeminiChat() {
-  const { tasks, projects, contacts, transactions, clockifyTimeEntries, aiSettings } = useAppContext();
+  const { 
+    tasks, 
+    projects, 
+    contacts, 
+    transactions, 
+    clockifyTimeEntries, 
+    aiSettings,
+    notes,
+    todoLists,
+    projectImages,
+    projectWalletEntries,
+    supabase,
+    user
+  } = useAppContext();
   const { toast } = useToast();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -215,6 +228,64 @@ export function GeminiChat() {
     return `Entendi! Com base nos seus dados:\n• ${context.tasks} tarefas (${context.completedTasks} completas)\n• ${context.projects} projetos\n• ${context.contacts} contatos\n• ${context.totalClockifyHours}h registradas\n\nSobre o que gostaria de conversar especificamente? 🤔`;
   }
 
+  // Function to load canvas data for projects from Supabase
+  const loadProjectCanvasData = async (projectId: string) => {
+    if (!projectId || !user || !supabase) return [];
+    
+    try {
+      // Query canvas_items table directly
+      const { data, error } = await (supabase as any)
+        .from('canvas_items')
+        .select('*')
+        .eq('project_id', projectId)
+        .eq('user_id', user.id);
+      
+      if (error) {
+        console.warn('Supabase canvas query error:', error);
+        // Fallback to localStorage only if Supabase fails
+        const saved = localStorage.getItem(`projectCanvas_${projectId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.map((item: any) => ({
+            id: item.id,
+            type: item.type,
+            position: item.position,
+            data: item.data,
+            createdAt: new Date(item.createdAt)
+          }));
+        }
+        return [];
+      }
+      
+      return (data || []).map((item: any) => ({
+        id: item.id,
+        type: item.type,
+        position: { x: item.position_x, y: item.position_y },
+        data: item.data,
+        createdAt: new Date(item.created_at)
+      }));
+    } catch (e) {
+      console.warn('Canvas data load error:', e);
+      // Fallback to localStorage if Supabase completely fails
+      try {
+        const saved = localStorage.getItem(`projectCanvas_${projectId}`);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return parsed.map((item: any) => ({
+            id: item.id,
+            type: item.type,
+            position: item.position,
+            data: item.data,
+            createdAt: new Date(item.createdAt)
+          }));
+        }
+      } catch (localError) {
+        console.warn('localStorage fallback also failed:', localError);
+      }
+      return [];
+    }
+  };
+
   const sendMessage = async (content: string) => {
     if (!content.trim()) return;
     if (!aiSettings.enabled) {
@@ -295,12 +366,76 @@ export function GeminiChat() {
             projectId: t.projectId
           })),
           
-        // Project details
-        projectsDetail: projects.slice(0, 5).map(p => ({
-          name: p.name,
-          description: p.description,
-          tasksCount: tasks.filter(t => t.projectId === p.id).length,
-          completedTasks: tasks.filter(t => t.projectId === p.id && t.completed).length
+        // Project details with COMPLETE data from Supabase
+        projectsDetail: await Promise.all(projects.slice(0, 5).map(async p => {
+          const projectTasks = tasks.filter(t => t.projectId === p.id);
+          const projectNotes = notes.filter(n => n.projectId === p.id);
+          const projectTodoList = todoLists.find(l => l.projectId === p.id);
+          const projectImagesFiltered = projectImages.filter(i => i.projectId === p.id);
+          const projectWallet = projectWalletEntries.filter(e => e.projectId === p.id);
+          const projectBalance = projectWallet.reduce((acc, e) => acc + (e.type === 'deposit' ? e.amount : -e.amount), 0);
+          
+          return {
+            id: p.id,
+            name: p.name,
+            description: p.description,
+            color: p.color,
+            icon: p.icon,
+            
+            // Tasks data
+            tasksCount: projectTasks.length,
+            completedTasks: projectTasks.filter(t => t.completed).length,
+            overdueTasks: projectTasks.filter(t => !t.completed && new Date(t.date) < new Date()).length,
+            tasksList: projectTasks.map(t => ({
+              title: t.title,
+              completed: t.completed,
+              date: t.date.toLocaleDateString('pt-BR'),
+              isOverdue: !t.completed && new Date(t.date) < new Date(),
+              isRoutine: t.isRoutine
+            })),
+            
+            // Notes data
+            notesCount: projectNotes.length,
+            notesList: projectNotes.map(n => ({
+              title: n.title,
+              content: n.content,
+              createdAt: n.createdAt?.toLocaleDateString('pt-BR')
+            })),
+            
+            // TodoList/Checklist data
+            hasChecklist: !!projectTodoList,
+            checklistItems: projectTodoList ? projectTodoList.items.length : 0,
+            checklistCompleted: projectTodoList ? projectTodoList.items.filter(i => i.completed).length : 0,
+            checklistData: projectTodoList ? projectTodoList.items.map(item => ({
+              text: item.text,
+              completed: item.completed,
+              createdAt: item.createdAt?.toLocaleDateString('pt-BR')
+            })) : [],
+            
+            // Images data
+            imagesCount: projectImagesFiltered.length,
+            imagesList: projectImagesFiltered.map(img => ({
+              url: img.url,
+              createdAt: img.createdAt?.toLocaleDateString('pt-BR')
+            })),
+            
+            // Financial data
+            walletEntriesCount: projectWallet.length,
+            projectBalance: projectBalance,
+            walletEntries: projectWallet.map(e => ({
+              type: e.type,
+              amount: e.amount,
+              description: e.description,
+              createdAt: e.createdAt?.toLocaleDateString('pt-BR')
+            })),
+            
+            // Progress calculation
+            overallProgress: projectTasks.length > 0 ? 
+              Math.round((projectTasks.filter(t => t.completed).length / projectTasks.length) * 100) : 0,
+            
+            // Canvas data - loaded from Supabase
+            canvasItems: await loadProjectCanvasData(p.id)
+          };
         })),
         
         // Clockify time tracking data (duration in seconds, converted to hours)
@@ -418,6 +553,39 @@ export function GeminiChat() {
           currentMonth: new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
         };
       }
+
+      // Update canvas items count after loading and add debug logging
+      context.projectsDetail = context.projectsDetail.map((p: any) => ({
+        ...p,
+        canvasItemsCount: p.canvasItems.length,
+        canvasItemsSummary: {
+          todoCards: p.canvasItems.filter((item: any) => item.type === 'todo').length,
+          noteCards: p.canvasItems.filter((item: any) => item.type === 'note').length,
+          financeCards: p.canvasItems.filter((item: any) => item.type === 'finance').length,
+          imageCards: p.canvasItems.filter((item: any) => item.type === 'image').length,
+          documentCards: p.canvasItems.filter((item: any) => item.type === 'document').length
+        },
+        canvasItemsDetail: p.canvasItems.map((item: any) => ({
+          type: item.type,
+          data: item.data,
+          position: item.position,
+          createdAt: item.createdAt?.toLocaleDateString?.('pt-BR') || 'Data não disponível'
+        }))
+      }));
+      
+      // Debug logging to see what data is being sent
+      console.log('🔍 Stephany Context - Project Data:', {
+        projectCount: context.projectsDetail.length,
+        projectNames: context.projectsDetail.map((p: any) => p.name),
+        projectDetails: context.projectsDetail.map((p: any) => ({
+          name: p.name,
+          notesCount: p.notesCount,
+          tasksCount: p.tasksCount,
+          walletEntriesCount: p.walletEntriesCount,
+          projectBalance: p.projectBalance,
+          canvasItemsCount: p.canvasItemsCount
+        }))
+      });
 
       // Try APIs in order: Gemini → Groq → Simulator, with cooldown awareness
       let response: string;

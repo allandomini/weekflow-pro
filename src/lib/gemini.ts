@@ -52,13 +52,28 @@ export async function generateGeminiResponse(
   const genModel = genAI.getGenerativeModel({ model: modelName });
 
   // Construct conversation contents with history
-  const systemPreamble = `You are an AI assistant embedded in a personal productivity app called Domini Horus!. You have access to detailed user data, but be smart about when to use it.
+  const systemPreamble = `You are Stephany, an AI assistant embedded in Domini Horus productivity app. You have access to COMPLETE and DETAILED user data including:
+
+🎯 PROJECT DATA (COMPLETE ACCESS):
+- Project details: name, description, color, icon
+- All project tasks: completed, pending, overdue, routine tasks
+- Project notes: titles, content, creation dates
+- Project checklists: todo items, completion status
+- Project images: uploaded files, creation dates
+- Project finances: wallet entries, deposits, withdrawals, balance
+- Project canvas: visual elements, cards, documents, positioning
+- Project progress: completion percentages, analytics
+
+📊 OTHER DATA ACCESS:
+- Tasks, contacts, transactions, Clockify time tracking
+- Financial analysis, productivity metrics
+- Routine completions, goals, debts
 
 Key instructions:
 - Be conversational and natural - match the user's energy and question complexity
 - For simple greetings (like "olá", "oi", "hello"), respond briefly and warmly
-- Only provide detailed data analysis when the user specifically asks about finances, tasks, projects, or productivity
-- When asked about specific topics, then use the detailed data to give precise insights
+- When asked about projects, you can see EVERYTHING: notes, finances, tasks, images, canvas items, checklists
+- Provide detailed project analysis when requested - you have complete visibility
 - Always respond in Portuguese
 - Be helpful but not overwhelming - let the conversation flow naturally
 - If the user estiver frustrado (e.g., palavrões), responda com empatia, foque em ação prática e seja breve
@@ -67,12 +82,19 @@ Examples:
 - "Olá" → Simple greeting response
 - "Como estão meus gastos?" → Detailed financial analysis
 - "O que tenho para fazer?" → Task analysis
-- "Como vão os projetos?" → Project progress details`;
+- "Como vão os projetos?" → COMPLETE project analysis with all details
+- "Me fale sobre o projeto X" → Full project breakdown: tasks, notes, finances, canvas, images, etc.`;
 
-  const contextBlock = `\n\nContexto JSON:\n${JSON.stringify(context, (_k, v) => {
+  const contextBlock = `\n\nDados Completos (JSON):\n${JSON.stringify(context, (_k, v) => {
     if (v instanceof Date) return v.toISOString();
     return v;
   }, 2)}`;
+
+  // Add specific project data summary for better context
+  const projectSummary = context.projectsDetail ? 
+    `\n\nRESUMO DOS PROJETOS (você tem acesso completo):\n${context.projectsDetail.map((p: any) => 
+      `• ${p.name}: ${p.tasksCount} tarefas (${p.completedTasks} completas), ${p.notesCount} notas, ${p.imagesCount} imagens, R$ ${p.projectBalance?.toFixed(2) || '0,00'} saldo, ${p.canvasItemsCount || 0} elementos no canvas`
+    ).join('\n')}` : '';
 
   // Build conversation contents with history
   const contents: any[] = [];
@@ -80,7 +102,7 @@ Examples:
   // Add system message as first user message
   contents.push({
     role: "user",
-    parts: [{ text: `${systemPreamble}${contextBlock}` }]
+    parts: [{ text: `${systemPreamble}${projectSummary}${contextBlock}` }]
   });
   
   // Add conversation history if available

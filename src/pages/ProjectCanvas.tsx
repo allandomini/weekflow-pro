@@ -67,6 +67,9 @@ export default function ProjectCanvas() {
     addProjectWalletEntry,
     addProjectImage 
   } = useAppContext();
+  
+  // Get supabase and user from SupabaseAppContext
+  const { supabase, user } = useAppContext() as any;
 
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -105,51 +108,156 @@ export default function ProjectCanvas() {
     return foundProject;
   }, [projects, projectId]);
   
-  // Load canvas items after component mounts to avoid hydration issues
+  // Load canvas items from Supabase
   useEffect(() => {
-    if (typeof window !== 'undefined' && projectId) {
-      try {
-        const saved = localStorage.getItem(`projectCanvas_${projectId}`);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          const items = parsed.map((item: any) => ({
-            ...item,
-            createdAt: new Date(item.createdAt),
-            data: {
-              ...item.data,
-              ...(item.data.dueDate && { dueDate: new Date(item.data.dueDate) })
-            }
-          }));
-          setCanvasItems(items);
-        }
-      } catch (e) {
-        console.error('Failed to load canvas items:', e);
-        setLoadError('Erro ao carregar itens do projeto');
+    const loadCanvasItems = async () => {
+      console.log('Loading canvas items...', { projectId, user: !!user, supabase: !!supabase });
+      
+      if (!projectId || !user || !supabase) {
+        console.warn('Missing required data for loading:', { projectId: !!projectId, user: !!user, supabase: !!supabase });
+        return;
       }
-    }
-  }, [projectId]);
+      
+      try {
+        console.log('Querying Supabase for canvas items...');
+        
+        const { data, error } = await supabase
+          .from('canvas_items')
+          .select('*')
+          .eq('project_id', projectId)
+          .eq('user_id', user.id);
+        
+        if (error) {
+          console.error('Supabase query error:', error);
+          throw error;
+        }
+        
+        console.log('Loaded canvas items from Supabase:', data);
+        
+        const items = (data || []).map((item: any) => ({
+          id: item.id,
+          type: item.type,
+          position: { x: item.position_x, y: item.position_y },
+          data: item.data,
+          createdAt: new Date(item.created_at)
+        }));
+        
+        setCanvasItems(items);
+        console.log('Canvas items set:', items);
+      } catch (e) {
+        console.error('Failed to load canvas items from Supabase:', e);
+        setLoadError(`Erro ao carregar do Supabase: ${e.message || 'Erro desconhecido'}`);
+        
+        // Fallback to localStorage if Supabase fails
+        try {
+          console.log('Falling back to localStorage...');
+          const saved = localStorage.getItem(`projectCanvas_${projectId}`);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            const items = parsed.map((item: any) => ({
+              ...item,
+              createdAt: new Date(item.createdAt),
+              data: {
+                ...item.data,
+                ...(item.data.dueDate && { dueDate: new Date(item.data.dueDate) })
+              }
+            }));
+            setCanvasItems(items);
+            console.log('Loaded from localStorage:', items);
+          }
+        } catch (localError) {
+          console.error('Failed to load from localStorage:', localError);
+        }
+      }
+    };
+    
+    loadCanvasItems();
+  }, [projectId, user, supabase]);
   
-  // Debounced save function to prevent performance issues
-  const saveCanvasItems = useCallback((items: CanvasItem[]) => {
-    if (typeof window !== 'undefined' && projectId) {
+  // Save canvas items to Supabase
+  const saveCanvasItemToSupabase = useCallback(async (item: CanvasItem) => {
+    console.log('Attempting to save canvas item:', item);
+    console.log('ProjectId:', projectId, 'User:', user, 'Supabase:', !!supabase);
+    
+    if (!projectId || !user || !supabase) {
+      console.warn('Missing required data for Supabase save:', { projectId: !!projectId, user: !!user, supabase: !!supabase });
+      return;
+    }
+    
+    try {
+      const canvasItemData = {
+        id: item.id,
+        project_id: projectId,
+        user_id: user.id,
+        type: item.type,
+        position_x: item.position.x,
+        position_y: item.position.y,
+        data: item.data
+      };
+      
+      console.log('Saving to Supabase:', canvasItemData);
+      
+      const { data, error } = await supabase
+        .from('canvas_items')
+        .upsert(canvasItemData, { onConflict: 'id' })
+        .select();
+      
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+      
+      console.log('Successfully saved to Supabase:', data);
+      
+      // Also save to localStorage as backup
+      const allItems = canvasItems.map(i => i.id === item.id ? item : i);
+      localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(allItems));
+    } catch (e) {
+      console.error('Failed to save canvas item to Supabase:', e);
+      
+      // Show error to user
+      setLoadError(`Erro ao salvar no Supabase: ${e.message || 'Erro desconhecido'}`);
+      
+      // Fallback to localStorage only
       try {
-        // Use requestIdleCallback for better performance
-        if ('requestIdleCallback' in window) {
-          requestIdleCallback(() => {
-            localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(items));
-          });
-        } else {
-          // Fallback for browsers without requestIdleCallback
-          setTimeout(() => {
-            localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(items));
-          }, 0);
-        }
-      } catch (e) {
-        console.error('Failed to save canvas items:', e);
-        setLoadError('Erro ao salvar itens do projeto');
+        const allItems = canvasItems.map(i => i.id === item.id ? item : i);
+        localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(allItems));
+        console.log('Saved to localStorage as fallback');
+      } catch (localError) {
+        console.error('Failed to save to localStorage:', localError);
+        setLoadError('Erro ao salvar item');
       }
     }
-  }, [projectId]);
+  }, [projectId, user, supabase, canvasItems]);
+  
+  // Delete canvas item from Supabase
+  const deleteCanvasItemFromSupabase = useCallback(async (itemId: string) => {
+    if (!projectId || !user || !supabase) return;
+    
+    try {
+      const { error } = await supabase
+        .from('canvas_items')
+        .delete()
+        .eq('id', itemId)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      // Also remove from localStorage
+      const updatedItems = canvasItems.filter(item => item.id !== itemId);
+      localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updatedItems));
+    } catch (e) {
+      console.error('Failed to delete canvas item from Supabase:', e);
+      // Fallback to localStorage only
+      try {
+        const updatedItems = canvasItems.filter(item => item.id !== itemId);
+        localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updatedItems));
+      } catch (localError) {
+        console.error('Failed to delete from localStorage:', localError);
+        setLoadError('Erro ao deletar item');
+      }
+    }
+  }, [projectId, user, supabase, canvasItems]);
   
   // Canvas event handlers
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
@@ -172,11 +280,16 @@ export default function ProjectCanvas() {
             ? { ...item, position: newPosition }
             : item
         );
-        saveCanvasItems(updated);
+        // Save each updated item to Supabase
+        updated.forEach(item => {
+          if (item.id === draggedItem.id) {
+            saveCanvasItemToSupabase(item);
+          }
+        });
         return updated;
       });
     }
-  }, [isPanning, isDragging, draggedItem, panStart, dragOffset, canvasTransform.scale, saveCanvasItems]);
+  }, [isPanning, isDragging, draggedItem, panStart, dragOffset, canvasTransform.scale, saveCanvasItemToSupabase]);
   
   const handleCanvasMouseUp = useCallback(() => {
     setIsPanning(false);
@@ -218,9 +331,22 @@ export default function ProjectCanvas() {
   }
 
 
+  // Generate UUID compatible with all browsers
+  const generateUUID = () => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for browsers without crypto.randomUUID
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      const v = c == 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   const handleAddCanvasItem = (type: CanvasItem['type']) => {
     const newItem: CanvasItem = {
-      id: Date.now().toString(),
+      id: generateUUID(),
       type,
       position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
       data: {},
@@ -229,7 +355,7 @@ export default function ProjectCanvas() {
 
     setCanvasItems(prev => {
       const updated = [...prev, newItem];
-      saveCanvasItems(updated);
+      saveCanvasItemToSupabase(newItem);
       return updated;
     });
     setEditingItem(newItem);
@@ -296,7 +422,7 @@ export default function ProjectCanvas() {
         };
         setCanvasItems(prev => {
           const updated = prev.map(i => i.id === item.id ? updatedNote : i);
-          saveCanvasItems(updated);
+          saveCanvasItemToSupabase(updatedNote);
           return updated;
         });
         break;
@@ -312,7 +438,7 @@ export default function ProjectCanvas() {
         };
         setCanvasItems(prev => {
           const updated = prev.map(i => i.id === item.id ? updatedFinance : i);
-          saveCanvasItems(updated);
+          saveCanvasItemToSupabase(updatedFinance);
           return updated;
         });
         break;
@@ -337,7 +463,7 @@ export default function ProjectCanvas() {
         };
         setCanvasItems(prev => {
           const updated = prev.map(i => i.id === item.id ? updatedImage : i);
-          saveCanvasItems(updated);
+          saveCanvasItemToSupabase(updatedImage);
           return updated;
         });
         break;
@@ -369,7 +495,7 @@ export default function ProjectCanvas() {
         };
         setCanvasItems(prev => {
           const updated = prev.map(i => i.id === item.id ? updatedDocument : i);
-          saveCanvasItems(updated);
+          saveCanvasItemToSupabase(updatedDocument);
           return updated;
         });
         break;
@@ -426,6 +552,13 @@ export default function ProjectCanvas() {
             }
           : item
       );
+      
+      // Save to Supabase and localStorage
+      const updatedItem = updated.find(item => item.id === itemId);
+      if (updatedItem) {
+        saveCanvasItemToSupabase(updatedItem);
+      }
+      
       if (typeof window !== 'undefined' && projectId) {
         try {
           localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
@@ -452,6 +585,13 @@ export default function ProjectCanvas() {
             }
           : item
       );
+      
+      // Save to Supabase and localStorage
+      const updatedItem = updated.find(item => item.id === itemId);
+      if (updatedItem) {
+        saveCanvasItemToSupabase(updatedItem);
+      }
+      
       if (typeof window !== 'undefined' && projectId) {
         try {
           localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
@@ -470,18 +610,8 @@ export default function ProjectCanvas() {
   };
 
   const handleDeleteItem = (itemId: string) => {
-    setCanvasItems(prev => {
-      const updated = prev.filter(i => i.id !== itemId);
-      // Save to localStorage
-      if (typeof window !== 'undefined' && projectId) {
-        try {
-          localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updated));
-        } catch (e) {
-          console.error('Failed to save canvas items', e);
-        }
-      }
-      return updated;
-    });
+    setCanvasItems(prev => prev.filter(item => item.id !== itemId));
+    deleteCanvasItemFromSupabase(itemId);
     if (editingItem?.id === itemId) {
       setEditingItem(null);
     }

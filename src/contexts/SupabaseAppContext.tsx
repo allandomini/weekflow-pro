@@ -146,11 +146,15 @@ interface AppContextType {
   // Loading states
   loading: boolean;
   refreshData: () => Promise<void>;
+  
+  // Supabase client and user access
+  supabase: typeof supabase;
+  user: any;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export function SupabaseAppProvider({ children }: { children: React.ReactNode }) {
+export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -1379,6 +1383,10 @@ export function SupabaseAppProvider({ children }: { children: React.ReactNode })
   }, [user]); // Remove loadAllData dependency to prevent infinite re-renders
 
   const value: AppContextType = {
+    // Supabase client and user
+    supabase,
+    user,
+    
     // Projects
     projects,
     addProject,
