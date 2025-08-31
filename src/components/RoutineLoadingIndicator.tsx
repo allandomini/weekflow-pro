@@ -36,7 +36,7 @@ export function RoutineLoadingIndicator({
   if (isError) {
     return (
       <XCircle 
-        className={cn(iconClasses, 'text-destructive animate-pulse')} 
+        className={cn(iconClasses, 'text-destructive')} 
       />
     );
   }

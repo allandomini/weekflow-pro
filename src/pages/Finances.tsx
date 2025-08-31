@@ -112,11 +112,11 @@ export default function Finances() {
 
   const handleConfirmDeleteAccount = () => {
     if (deleteAccountDialog.account) {
-      // @ts-ignore added in context
-      typeof deleteAccount === 'function' && deleteAccount(
-        deleteAccountDialog.account.id, 
-        deleteAccountDialog.hasTransactions
-      );
+      // Type assertion to handle the deleteAccount function safely
+      const deleteFn = deleteAccount as ((id: string, forceDelete?: boolean) => void) | undefined;
+      if (typeof deleteFn === 'function') {
+        deleteFn(deleteAccountDialog.account.id, deleteAccountDialog.hasTransactions);
+      }
       setDeleteAccountDialog({
         isOpen: false,
         account: null,
@@ -439,7 +439,7 @@ export default function Finances() {
             <Plus className="w-4 h-4 mr-2" />
             Nova Conta
           </Button>
-          <Button variant="gradient" onClick={() => setIsTransactionDialogOpen(true)} className="animate-glow">
+          <Button variant="gradient" onClick={() => setIsTransactionDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Transação
           </Button>
@@ -1109,7 +1109,6 @@ export default function Finances() {
                 <SelectContent>
                   <SelectItem value="checking">Conta Corrente</SelectItem>
                   <SelectItem value="savings">Poupança</SelectItem>
-                  <SelectItem value="investment">Investimento</SelectItem>
                 </SelectContent>
               </Select>
             </div>

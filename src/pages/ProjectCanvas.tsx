@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,6 +61,7 @@ interface CanvasItem {
 export default function ProjectCanvas() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const { 
     projects, 
     addTask, 
@@ -345,10 +347,24 @@ export default function ProjectCanvas() {
   };
 
   const handleAddCanvasItem = (type: CanvasItem['type']) => {
+    let position;
+    
+    if (isMobile) {
+      // Em mobile, posiciona os cards verticalmente em coluna
+      const existingItems = canvasItems.length;
+      position = { 
+        x: 20, // Margem pequena da esquerda
+        y: 50 + (existingItems * 320) // Espaçamento vertical entre cards
+      };
+    } else {
+      // Desktop mantém posicionamento aleatório
+      position = { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 };
+    }
+    
     const newItem: CanvasItem = {
       id: generateUUID(),
       type,
-      position: { x: Math.random() * 400 + 100, y: Math.random() * 300 + 100 },
+      position,
       data: {},
       createdAt: new Date()
     };
@@ -625,7 +641,7 @@ export default function ProjectCanvas() {
   };
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isDragging) {
+    if (e.target === e.currentTarget && !isDragging && !isMobile) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - canvasTransform.x, y: e.clientY - canvasTransform.y });
       e.preventDefault();
@@ -644,7 +660,7 @@ export default function ProjectCanvas() {
   };
 
   const handleWheel = (e: React.WheelEvent) => {
-    if (e.ctrlKey || e.metaKey) {
+    if (!isMobile && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.1 : 0.1;
       handleZoom(delta);
@@ -652,7 +668,7 @@ export default function ProjectCanvas() {
   };
 
   const handleDragHandleMouseDown = (e: React.MouseEvent, item: CanvasItem) => {
-    if (editingItem?.id === item.id) return;
+    if (editingItem?.id === item.id || isMobile) return;
     
     const rect = e.currentTarget.getBoundingClientRect();
     const offsetX = e.clientX - rect.left;
@@ -809,16 +825,18 @@ export default function ProjectCanvas() {
       case 'todo':
         return (
           <Card 
-            className="w-80 shadow-lg select-none relative" 
+            className={`${isMobile ? 'w-full' : 'w-80'} shadow-lg select-none relative`} 
           >
-            {/* Drag Handle */}
-            <div 
-              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
-              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-              title="Arrastar card"
-            >
-              <GripVertical className="w-3 h-3 text-muted-foreground" />
-            </div>
+            {/* Drag Handle - oculto no mobile */}
+            {!isMobile && (
+              <div 
+                className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+                title="Arrastar card"
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -995,16 +1013,18 @@ export default function ProjectCanvas() {
       case 'note':
         return (
           <Card 
-            className="w-80 max-h-96 shadow-lg select-none relative flex flex-col" 
+            className={`${isMobile ? 'w-full' : 'w-80'} max-h-96 shadow-lg select-none relative flex flex-col`} 
           >
-            {/* Drag Handle */}
-            <div 
-              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
-              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-              title="Arrastar card"
-            >
-              <GripVertical className="w-3 h-3 text-muted-foreground" />
-            </div>
+            {/* Drag Handle - oculto no mobile */}
+            {!isMobile && (
+              <div 
+                className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+                title="Arrastar card"
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1120,16 +1140,18 @@ export default function ProjectCanvas() {
         const total = calculateTotal(entries);
         return (
           <Card 
-            className="w-80 shadow-lg select-none relative" 
+            className={`${isMobile ? 'w-full' : 'w-80'} shadow-lg select-none relative`} 
           >
-            {/* Drag Handle */}
-            <div 
-              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
-              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-              title="Arrastar card"
-            >
-              <GripVertical className="w-3 h-3 text-muted-foreground" />
-            </div>
+            {/* Drag Handle - oculto no mobile */}
+            {!isMobile && (
+              <div 
+                className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+                title="Arrastar card"
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1277,15 +1299,17 @@ export default function ProjectCanvas() {
 
       case 'image':
         return (
-          <Card className="w-80 shadow-lg select-none relative">
-            {/* Drag Handle */}
-            <div 
-              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
-              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-              title="Arrastar card"
-            >
-              <GripVertical className="w-3 h-3 text-muted-foreground" />
-            </div>
+          <Card className={`${isMobile ? 'w-full' : 'w-80'} shadow-lg select-none relative`}>
+            {/* Drag Handle - oculto no mobile */}
+            {!isMobile && (
+              <div 
+                className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+                title="Arrastar card"
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1424,15 +1448,17 @@ export default function ProjectCanvas() {
 
       case 'document':
         return (
-          <Card className="w-80 shadow-lg select-none relative">
-            {/* Drag Handle */}
-            <div 
-              className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
-              onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-              title="Arrastar card"
-            >
-              <GripVertical className="w-3 h-3 text-muted-foreground" />
-            </div>
+          <Card className={`${isMobile ? 'w-full' : 'w-80'} shadow-lg select-none relative`}>
+            {/* Drag Handle - oculto no mobile */}
+            {!isMobile && (
+              <div 
+                className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
+                onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
+                title="Arrastar card"
+              >
+                <GripVertical className="w-3 h-3 text-muted-foreground" />
+              </div>
+            )}
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -1603,9 +1629,9 @@ export default function ProjectCanvas() {
   };
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black relative">
+    <div className={`${isMobile ? 'h-screen flex flex-col' : 'min-h-screen'} bg-white dark:bg-black relative`}>
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b dark:border-gray-800">
+      <div className={`${isMobile ? 'flex-shrink-0' : 'absolute top-0 left-0 right-0'} z-10 bg-white/80 dark:bg-black/80 backdrop-blur-sm border-b dark:border-gray-800`}>
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate('/projects')}>
@@ -1617,36 +1643,38 @@ export default function ProjectCanvas() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {/* Canvas Controls */}
-            <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => handleZoom(0.1)}
-                className="h-8 w-8 p-0"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={() => handleZoom(-0.1)}
-                className="h-8 w-8 p-0"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={resetCanvas}
-                className="h-8 w-8 p-0"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-              <span className="text-xs text-muted-foreground px-2">
-                {Math.round(canvasTransform.scale * 100)}%
-              </span>
-            </div>
+            {/* Canvas Controls - ocultos no mobile */}
+            {!isMobile && (
+              <div className="flex items-center gap-1 bg-background/80 backdrop-blur-sm rounded-lg p-1 border">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleZoom(0.1)}
+                  className="h-8 w-8 p-0"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleZoom(-0.1)}
+                  className="h-8 w-8 p-0"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={resetCanvas}
+                  className="h-8 w-8 p-0"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+                <span className="text-xs text-muted-foreground px-2">
+                  {Math.round(canvasTransform.scale * 100)}%
+                </span>
+              </div>
+            )}
             <Button 
               onClick={() => setIsSideMenuOpen(true)}
               className="rounded-full w-12 h-12 p-0"
@@ -1660,39 +1688,56 @@ export default function ProjectCanvas() {
       {/* Canvas */}
       <div 
         ref={canvasRef}
-        className="pt-20 min-h-screen relative bg-white dark:bg-black overflow-hidden"
-        onClick={handleCanvasClick}
-        onMouseDown={handleCanvasMouseDown}
-        onMouseMove={handleCanvasMouseMove}
-        onMouseUp={handleCanvasMouseUp}
-        onMouseLeave={handleCanvasMouseUp}
-        onWheel={handleWheel}
-        style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+        className={`${isMobile ? 'flex-1 overflow-y-auto px-4 py-4' : 'pt-20 min-h-screen overflow-hidden'} relative bg-white dark:bg-black`}
+        onClick={isMobile ? undefined : handleCanvasClick}
+        onMouseDown={!isMobile ? handleCanvasMouseDown : undefined}
+        onMouseMove={!isMobile ? handleCanvasMouseMove : undefined}
+        onMouseUp={!isMobile ? handleCanvasMouseUp : undefined}
+        onMouseLeave={!isMobile ? handleCanvasMouseUp : undefined}
+        onWheel={!isMobile ? handleWheel : undefined}
+        style={{ 
+          cursor: !isMobile && isPanning ? 'grabbing' : isMobile ? 'default' : 'grab',
+          touchAction: isMobile ? 'auto' : 'none'
+        }}
       >
-        <div 
-          className="relative"
-          style={{
-            transform: `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`,
-            transformOrigin: '0 0',
-            transition: isPanning || isDragging ? 'none' : 'transform 0.1s ease-out'
-          }}
-        >
-          {canvasItems.map((item) => (
-            <div
-              key={item.id}
-              className={`absolute ${
-                isDragging && draggedItem?.id === item.id ? 'cursor-grabbing' : 'cursor-default'
-              }`}
-              style={{
-                left: item.position.x,
-                top: item.position.y,
-                zIndex: isDragging && draggedItem?.id === item.id ? 1000 : 1,
-              }}
-            >
-              {renderItemContent(item)}
-            </div>
-          ))}
-        </div>
+        {isMobile ? (
+          // Layout vertical para mobile
+          <div className="space-y-4 pb-8">
+            {canvasItems
+              .sort((a, b) => a.position.y - b.position.y) // Ordena por posição Y
+              .map((item) => (
+                <div key={item.id} className="w-full">
+                  {renderItemContent(item)}
+                </div>
+              ))}
+          </div>
+        ) : (
+          // Layout livre para desktop
+          <div 
+            className="relative"
+            style={{
+              transform: `translate(${canvasTransform.x}px, ${canvasTransform.y}px) scale(${canvasTransform.scale})`,
+              transformOrigin: '0 0',
+              transition: isPanning || isDragging ? 'none' : 'transform 0.1s ease-out'
+            }}
+          >
+            {canvasItems.map((item) => (
+              <div
+                key={item.id}
+                className={`absolute ${
+                  isDragging && draggedItem?.id === item.id ? 'cursor-grabbing' : 'cursor-default'
+                }`}
+                style={{
+                  left: item.position.x,
+                  top: item.position.y,
+                  zIndex: isDragging && draggedItem?.id === item.id ? 1000 : 1,
+                }}
+              >
+                {renderItemContent(item)}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Side Menu */}

@@ -561,7 +561,7 @@ export default function Dashboard() {
                          <div className={`font-medium transition-all duration-200 flex items-center gap-2 ${task.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                            {task.title}
                            {task.isOverdue && !task.completed && (
-                             <Badge variant="destructive" className="text-xs animate-pulse">
+                             <Badge variant="destructive" className="text-xs">
                                ATRASADA
                              </Badge>
                            )}

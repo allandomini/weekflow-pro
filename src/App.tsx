@@ -1,3 +1,4 @@
+import React from 'react';
 import { AuthProvider } from './hooks/useAuth';
 import { SupabaseAppProvider } from './contexts/SupabaseAppContext';
 import { AnimationProvider } from './contexts/AnimationContext';
@@ -7,6 +8,7 @@ import { Toaster } from './components/ui/toaster';
 import { TooltipProvider } from './components/ui/tooltip';
 import { Layout } from './components/Layout';
 import { useAuth } from "./hooks/useAuth";
+import AppLoadingWrapper from './components/AppLoadingWrapper';
 import Dashboard from "./pages/Dashboard";
 import Calendar from "./pages/Calendar";
 import Projects from "./pages/Projects";
@@ -29,12 +31,11 @@ const queryClient = new QueryClient();
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   
+  // Wait for auth to finish loading before redirecting
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <div className="flex items-center justify-center min-h-screen">
+      <div className="text-lg">Verificando autenticação...</div>
+    </div>;
   }
   
   if (!user) {
@@ -77,6 +78,7 @@ const App = () => (
                       </Routes>
                       <GeminiChat />
                     </Layout>
+                    <AppLoadingWrapper />
                   </ProtectedRoute>
                 } />
               </Routes>

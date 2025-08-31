@@ -55,7 +55,7 @@ export interface Account {
   id: string;
   name: string;
     balance: number;
-  type: 'checking' | 'savings' | 'investment';
+  type: 'checking' | 'savings';
   createdAt: Date;
   updatedAt: Date;
 }

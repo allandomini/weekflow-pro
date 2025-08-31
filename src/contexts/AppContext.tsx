@@ -47,7 +47,7 @@ interface AppContextType {
   addDebt: (debt: Omit<Debt, 'id' | 'createdAt' | 'updatedAt'>) => void;
   addGoal: (goal: Omit<Goal, 'id' | 'createdAt' | 'updatedAt'>) => void;
   updateAccount: (id: string, updates: Partial<Account>) => void;
-  deleteAccount: (id: string) => void;
+  deleteAccount: (id: string, forceDelete?: boolean) => void;
   updateDebt: (id: string, updates: Partial<Debt>) => void;
   updateGoal: (id: string, updates: Partial<Goal>) => void;
   payDebt: (debtId: string, accountId: string, amount: number) => void;
@@ -866,9 +866,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     ));
   };
 
-  const deleteAccount = (id: string) => {
+  const deleteAccount = (id: string, forceDelete: boolean = false) => {
     setAccounts(prev => prev.filter(account => account.id !== id));
     // Optionally: keep transactions; could also filter transactions by account if desired
+    // Note: forceDelete parameter is kept for API compatibility but not used in local storage
   };
 
   const updateDebt = (id: string, updates: Partial<Debt>) => {

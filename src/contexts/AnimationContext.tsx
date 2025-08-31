@@ -79,14 +79,14 @@ export const animations = {
     lift: 'hover:-translate-y-1 hover:shadow-lg transition-all duration-200 ease-out',
     glow: 'hover:shadow-lg hover:shadow-primary/25 transition-all duration-200 ease-out',
     rotate: 'hover:rotate-3 transition-transform duration-200 ease-out',
-    pulse: 'hover:animate-pulse',
+    pulse: 'hover:scale-105 transition-transform duration-200',
     brightness: 'hover:brightness-110 transition-all duration-200 ease-out'
   },
   
   // Loading animations
   loading: {
     spin: 'animate-spin',
-    pulse: 'animate-pulse',
+    pulse: '',
     bounce: 'animate-bounce',
     ping: 'animate-ping'
   },

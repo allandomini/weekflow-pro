@@ -1,4 +1,4 @@
-import { Calendar, ClipboardList, Users, Wallet, Home, FolderOpen, StickyNote, Settings, Clock, Trello, Repeat, User } from "lucide-react";
+import { Calendar, ClipboardList, Users, Wallet, Home, FolderOpen, StickyNote, Settings, Clock, Trello, Repeat, User, TrendingUp } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 
