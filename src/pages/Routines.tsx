@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../contexts/SupabaseAppContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -25,6 +26,7 @@ export default function Routines() {
   const navigate = useNavigate();
   const { routines, addRoutine, updateRoutine, hardDeleteRoutine, bulkDeleteRoutineOccurrences, bulkSkipRoutinePeriod } = useAppContext();
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingRoutine, setEditingRoutine] = useState<Routine | null>(null);
@@ -126,12 +128,12 @@ export default function Routines() {
   };
 
   const handleDeleteRoutine = async (routine: Routine) => {
-    if (confirm(`Tem certeza que deseja excluir a rotina "${routine.name}"?`)) {
+    if (confirm(t('routines.delete_warning_confirm', { name: routine.name }))) {
       try {
         await hardDeleteRoutine(routine.id);
         toast({
-          title: "Rotina excluída",
-          description: "A rotina foi excluída permanentemente.",
+          title: t('routines.deleted'),
+          description: t('routines.deleted_description'),
         });
       } catch (error) {
         console.error('Error deleting routine:', error);
@@ -160,12 +162,12 @@ export default function Routines() {
 
   const getStatusBadge = (routine: Routine) => {
     if (routine.pausedUntil && routine.pausedUntil > format(new Date(), 'yyyy-MM-dd')) {
-      return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Pausada</Badge>;
+      return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">{t('routines.paused')}</Badge>;
     }
     if (routine.activeTo && routine.activeTo < format(new Date(), 'yyyy-MM-dd')) {
-      return <Badge variant="outline" className="text-muted-foreground">Expirada</Badge>;
+      return <Badge variant="outline" className="text-muted-foreground">{t('routines.expired')}</Badge>;
     }
-    return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Ativa</Badge>;
+    return <Badge variant="default" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">{t('routines.active')}</Badge>;
   };
 
   return (
@@ -179,12 +181,12 @@ export default function Routines() {
             className="hover:scale-105 active:scale-95 transition-transform"
           >
             <ArrowLeft className="w-5 h-5 mr-2" />
-            Voltar
+{t('common.back')}
           </Button>
           <div>
-            <h1 className="text-3xl font-bold text-foreground transition-colors duration-200">Gerenciar Rotinas</h1>
+            <h1 className="text-3xl font-bold text-foreground transition-colors duration-200">{t('routines.title')}</h1>
             <p className="text-muted-foreground transition-colors duration-200">
-              Configure e gerencie suas rotinas diárias
+              {t('routines.manage_description')}
             </p>
           </div>
         </div>
@@ -194,7 +196,7 @@ export default function Routines() {
           className="bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
         >
           <Plus className="w-4 h-4 mr-2" />
-          Nova Rotina
+{t('routines.create_routine')}
         </Button>
       </div>
 
@@ -219,7 +221,7 @@ export default function Routines() {
                 <div className="flex items-center gap-2">
                   {getStatusBadge(routine)}
                   <Badge className={getPriorityColor(routine.priority)}>
-                    {routine.priority === 'high' ? 'Alta' : routine.priority === 'medium' ? 'Média' : 'Baixa'}
+                    {routine.priority === 'high' ? t('tasks.high_priority') : routine.priority === 'medium' ? t('tasks.medium_priority') : t('tasks.low_priority')}
                   </Badge>
                 </div>
               </div>
@@ -230,15 +232,15 @@ export default function Routines() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="flex items-center gap-2">
                   <Target className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-muted-foreground">Meta:</span>
-                  <span className="font-medium">{routine.timesPerDay}x/dia</span>
+                  <span className="text-muted-foreground">{t('routines.goal')}:</span>
+                  <span className="font-medium">{routine.timesPerDay}x/{t('routines.per_day')}</span>
                 </div>
                 
                 {routine.durationDays && (
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Duração:</span>
-                    <span className="font-medium">{routine.durationDays} dias</span>
+                    <span className="text-muted-foreground">{t('routines.duration')}:</span>
+                    <span className="font-medium">{routine.durationDays} {t('routines.days')}</span>
                   </div>
                 )}
               </div>
@@ -248,7 +250,7 @@ export default function Routines() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Clock className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Horários:</span>
+                    <span className="text-sm text-muted-foreground">{t('routines.times')}:</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {routine.specificTimes.map((time, index) => (
@@ -265,12 +267,12 @@ export default function Routines() {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <Repeat className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Dias:</span>
+                    <span className="text-sm text-muted-foreground">{t('routines.days_label')}:</span>
                   </div>
                   <div className="flex flex-wrap gap-1">
                     {routine.weekdays.map(day => (
                       <Badge key={day} variant="outline" className="text-xs">
-                        {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][day]}
+                        {[t('dashboard.week_days.sun'), t('dashboard.week_days.mon'), t('dashboard.week_days.tue'), t('dashboard.week_days.wed'), t('dashboard.week_days.thu'), t('dashboard.week_days.fri'), t('dashboard.week_days.sat')][day]}
                       </Badge>
                     ))}
                   </div>
@@ -286,7 +288,7 @@ export default function Routines() {
                   className="flex-1 transition-all duration-200 hover:scale-105 active:scale-95"
                 >
                   <Edit className="w-4 h-4 mr-2" />
-                  Editar
+                  {t('common.edit')}
                 </Button>
                 
                 <Button
@@ -296,7 +298,7 @@ export default function Routines() {
                   className="flex-1 transition-all duration-200 hover:scale-105 active:scale-95"
                 >
                   <Settings className="w-4 h-4 mr-2" />
-                  Gerenciar
+                  {t('routines.manage')}
                 </Button>
                 
                 <Button
@@ -322,14 +324,14 @@ export default function Routines() {
                 <Repeat className="w-8 h-8 text-muted-foreground" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-foreground">Nenhuma rotina criada</h3>
+                <h3 className="text-lg font-semibold text-foreground">{t('routines.no_routines_created')}</h3>
                 <p className="text-muted-foreground">
-                  Crie sua primeira rotina para começar a organizar suas atividades diárias.
+                  {t('routines.create_first_routine_description')}
                 </p>
               </div>
               <Button onClick={handleCreateRoutine} className="mt-4">
                 <Plus className="w-4 h-4 mr-2" />
-                Criar Primeira Rotina
+{t('routines.create_first_routine')}
               </Button>
             </div>
           </CardContent>
@@ -341,12 +343,12 @@ export default function Routines() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {editingRoutine ? 'Editar Rotina' : 'Nova Rotina'}
+              {editingRoutine ? t('routines.edit_routine') : t('routines.new_routine')}
             </DialogTitle>
             <DialogDescription>
               {editingRoutine 
-                ? 'Edite as configurações da sua rotina.' 
-                : 'Configure uma nova rotina com horários específicos e dias da semana.'
+                ? t('routines.edit_routine_description') 
+                : t('routines.new_routine_description')
               }
             </DialogDescription>
           </DialogHeader>
@@ -354,17 +356,17 @@ export default function Routines() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="name" className="text-foreground">Nome da Rotina</Label>
+                <Label htmlFor="name" className="text-foreground">{t('routines.routine_name')}</Label>
                 <Input
                   id="name"
                   value={routineForm.name}
                   onChange={(e) => setRoutineForm(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Ex: Beber água"
+                  placeholder={t('routines.name_placeholder')}
                   className="modern-input"
                 />
               </div>
               <div>
-                <Label htmlFor="color" className="text-foreground">Cor</Label>
+                <Label htmlFor="color" className="text-foreground">{t('routines.color')}</Label>
                 <Input
                   id="color"
                   type="color"
@@ -376,19 +378,19 @@ export default function Routines() {
             </div>
 
             <div>
-              <Label htmlFor="description" className="text-foreground">Descrição</Label>
+              <Label htmlFor="description" className="text-foreground">{t('common.description')}</Label>
               <Textarea
                 id="description"
                 value={routineForm.description}
                 onChange={(e) => setRoutineForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição opcional da rotina"
+                placeholder={t('routines.description_placeholder')}
                 className="modern-input"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="timesPerDay" className="text-foreground">Vezes por dia</Label>
+                <Label htmlFor="timesPerDay" className="text-foreground">{t('routines.times_per_day')}</Label>
                 <Input
                   id="timesPerDay"
                   type="number"
@@ -400,7 +402,7 @@ export default function Routines() {
                 />
               </div>
               <div>
-                <Label htmlFor="priority" className="text-foreground">Prioridade</Label>
+                <Label htmlFor="priority" className="text-foreground">{t('tasks.priority')}</Label>
                 <Select
                   value={routineForm.priority}
                   onValueChange={(value) => setRoutineForm(prev => ({ ...prev, priority: value as "low" | "medium" | "high" }))}
@@ -409,21 +411,21 @@ export default function Routines() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="modern-dropdown">
-                    <SelectItem value="low">Baixa</SelectItem>
-                    <SelectItem value="medium">Média</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
+                    <SelectItem value="low">{t('tasks.low_priority')}</SelectItem>
+                    <SelectItem value="medium">{t('tasks.medium_priority')}</SelectItem>
+                    <SelectItem value="high">{t('tasks.high_priority')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="durationDays" className="text-foreground">Duração (dias)</Label>
+              <Label htmlFor="durationDays" className="text-foreground">{t('routines.duration_days')}</Label>
               <Input
                 id="durationDays"
                 type="number"
                 min={1}
-                placeholder="Deixe vazio para sempre"
+                placeholder={t('routines.leave_empty_forever')}
                 value={routineForm.durationDays || ''}
                 onChange={(e) => setRoutineForm(prev => ({ ...prev, durationDays: e.target.value ? Number(e.target.value) : null }))}
                 className="modern-input"
@@ -431,7 +433,7 @@ export default function Routines() {
             </div>
 
             <div>
-              <Label className="text-foreground block mb-2">Horários específicos</Label>
+              <Label className="text-foreground block mb-2">{t('routines.specific_times')}</Label>
               <div className="space-y-2">
                 {routineForm.specificTimes.map((time, index) => (
                   <div key={index} className="flex items-center gap-2">
@@ -467,15 +469,15 @@ export default function Routines() {
                   className="w-full"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Adicionar horário
+                  {t('routines.add_time')}
                 </Button>
               </div>
             </div>
 
             <div>
-              <Label className="text-foreground block mb-2">Dias da semana</Label>
+              <Label className="text-foreground block mb-2">{t('dashboard.weekdays.title')}</Label>
               <div className="grid grid-cols-7 gap-2">
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                {[t('dashboard.week_days.sun'), t('dashboard.week_days.mon'), t('dashboard.week_days.tue'), t('dashboard.week_days.wed'), t('dashboard.week_days.thu'), t('dashboard.week_days.fri'), t('dashboard.week_days.sat')].map((day, index) => (
                   <div key={index} className="flex items-center space-x-2">
                     <Checkbox
                       id={`weekday-${index}`}
@@ -494,15 +496,15 @@ export default function Routines() {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                {routineForm.weekdays.length === 0 ? 'Selecione para todos os dias' : 
-                 routineForm.weekdays.length === 7 ? 'Todos os dias selecionados' :
-                 `${routineForm.weekdays.length} dia(s) selecionado(s)`}
+                {routineForm.weekdays.length === 0 ? t('dashboard.weekdays.select_all_days') : 
+                 routineForm.weekdays.length === 7 ? t('dashboard.weekdays.all_days_selected') :
+                 t('dashboard.weekdays.days_selected', { count: routineForm.weekdays.length })}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="activeFrom" className="text-foreground">Data de início</Label>
+                <Label htmlFor="activeFrom" className="text-foreground">{t('routines.start_date')}</Label>
                 <Input
                   id="activeFrom"
                   type="date"
@@ -512,7 +514,7 @@ export default function Routines() {
                 />
               </div>
               <div>
-                <Label htmlFor="activeTo" className="text-foreground">Data de fim (opcional)</Label>
+                <Label htmlFor="activeTo" className="text-foreground">{t('routines.end_date_optional')}</Label>
                 <Input
                   id="activeTo"
                   type="date"
@@ -528,14 +530,14 @@ export default function Routines() {
                 onClick={handleSaveRoutine} 
                 className="flex-1 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95 shadow-soft hover:shadow-medium"
               >
-                {editingRoutine ? 'Salvar Alterações' : 'Criar Rotina'}
+                {editingRoutine ? t('routines.save_changes') : t('routines.create_routine')}
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsCreateDialogOpen(false)}
                 className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
               >
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>

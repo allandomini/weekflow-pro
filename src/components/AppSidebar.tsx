@@ -1,6 +1,7 @@
 import { Calendar, ClipboardList, Users, Wallet, Home, FolderOpen, StickyNote, Settings, Clock, Trello, Repeat, User, TrendingUp } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "@/hooks/useTranslation";
 
 import {
   Sidebar,
@@ -14,46 +15,52 @@ import {
   useSidebar,
 } from "./ui/sidebar";
 
-const menuSections = [
-  {
-    label: "Principal",
-    items: [
-      { title: "Dashboard", url: "/", icon: Home },
-      { title: "Calendário", url: "/calendar", icon: Calendar },
-    ]
-  },
-  {
-    label: "Produtividade",
-    items: [
-      { title: "Projetos", url: "/projects", icon: FolderOpen },
-      { title: "Rotinas", url: "/routines", icon: Repeat },
-    ]
-  },
-  {
-    label: "Financeiro",
-    items: [
-      { title: "Finanças", url: "/finances", icon: Wallet },
-    ]
-  },
-  {
-    label: "Ferramentas",
-    items: [
-      { title: "Network", url: "/network", icon: Users },
-      { title: "Clockify", url: "/clockify", icon: Clock },
-      { title: "Plaky", url: "/plaky", icon: Trello },
-    ]
-  },
-  {
-    label: "Sistema",
-    items: [
-      { title: "Configurações", url: "/settings", icon: Settings },
-    ]
-  }
-];
+const useMenuSections = () => {
+  const { t } = useTranslation();
+  
+  return [
+    {
+      label: t('sidebar.sections.main'),
+      items: [
+        { title: t('navigation.dashboard'), url: "/", icon: Home },
+        { title: t('navigation.calendar'), url: "/calendar", icon: Calendar },
+      ]
+    },
+    {
+      label: t('sidebar.sections.productivity'),
+      items: [
+        { title: t('navigation.projects'), url: "/projects", icon: FolderOpen },
+        { title: t('navigation.routines'), url: "/routines", icon: Repeat },
+      ]
+    },
+    {
+      label: t('sidebar.sections.financial'),
+      items: [
+        { title: t('navigation.finances'), url: "/finances", icon: Wallet },
+      ]
+    },
+    {
+      label: t('sidebar.sections.tools'),
+      items: [
+        { title: t('navigation.network'), url: "/network", icon: Users },
+        { title: t('navigation.clockify'), url: "/clockify", icon: Clock },
+        { title: t('navigation.plaky'), url: "/plaky", icon: Trello },
+      ]
+    },
+    {
+      label: t('sidebar.sections.system'),
+      items: [
+        { title: t('navigation.settings'), url: "/settings", icon: Settings },
+      ]
+    }
+  ];
+};
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const menuSections = useMenuSections();
 
   const isCollapsed = state === "collapsed";
 
@@ -80,7 +87,7 @@ export function AppSidebar() {
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-sidebar-foreground dark:text-white truncate">
-                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Usuário'}
+                  {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t('sidebar.user.default_name')}
                 </p>
                 <p className="text-xs text-sidebar-foreground/60 dark:text-white/60 truncate">
                   {user?.email}

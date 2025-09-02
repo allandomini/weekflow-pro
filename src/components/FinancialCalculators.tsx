@@ -6,9 +6,39 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Calculator, TrendingUp, DollarSign, CreditCard } from "lucide-react";
-import { LoanCalculation, CompoundInterestCalculation, AmortizationEntry } from "@/types";
+import { useTranslation } from '@/hooks/useTranslation';
+
+interface LoanCalculation {
+  principal: number;
+  interestRate: number;
+  termMonths: number;
+  monthlyPayment: number;
+  totalInterest: number;
+  totalAmount: number;
+  amortizationSchedule: AmortizationEntry[];
+}
+
+interface CompoundInterestCalculation {
+  principal: number;
+  monthlyContribution: number;
+  annualRate: number;
+  years: number;
+  compoundingFrequency: number;
+  futureValue: number;
+  totalContributions: number;
+  totalInterest: number;
+}
+
+interface AmortizationEntry {
+  month: number;
+  payment: number;
+  principal: number;
+  interest: number;
+  balance: number;
+}
 
 const FinancialCalculators = () => {
+  const { t } = useTranslation();
   // Calculadora Básica
   const [basicCalc, setBasicCalc] = useState({
     display: '0',
@@ -221,15 +251,15 @@ const FinancialCalculators = () => {
     <div className="space-y-6">
       <div className="flex items-center gap-2">
         <Calculator className="h-6 w-6" />
-        <h2 className="text-2xl font-bold">Calculadoras Financeiras</h2>
+        <h2 className="text-2xl font-bold">{t('financial_calculators.title')}</h2>
       </div>
 
       <Tabs defaultValue="basic" className="w-full">
         <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="basic">Básica</TabsTrigger>
-          <TabsTrigger value="compound">Juros Compostos</TabsTrigger>
-          <TabsTrigger value="loan">Empréstimo</TabsTrigger>
-          <TabsTrigger value="installment">Parcelas</TabsTrigger>
+          <TabsTrigger value="basic">{t('financial_calculators.tabs.basic')}</TabsTrigger>
+          <TabsTrigger value="compound">{t('financial_calculators.tabs.compound')}</TabsTrigger>
+          <TabsTrigger value="loan">{t('financial_calculators.tabs.loan')}</TabsTrigger>
+          <TabsTrigger value="installment">{t('financial_calculators.tabs.installment')}</TabsTrigger>
         </TabsList>
 
         {/* Calculadora Básica */}
@@ -238,10 +268,10 @@ const FinancialCalculators = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calculator className="h-5 w-5" />
-                Calculadora Básica
+                {t('financial_calculators.basic.title')}
               </CardTitle>
               <CardDescription>
-                Calculadora para operações matemáticas básicas
+                {t('financial_calculators.basic.description')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -287,16 +317,16 @@ const FinancialCalculators = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5" />
-                Calculadora de Juros Compostos
+                {t('financial_calculators.compound.title')}
               </CardTitle>
               <CardDescription>
-                Calcule o crescimento do seu investimento com juros compostos
+                {t('financial_calculators.compound.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="principal">Valor Inicial (R$)</Label>
+                  <Label htmlFor="principal">{t('financial_calculators.compound.initial_value')}</Label>
                   <Input
                     id="principal"
                     type="number"
@@ -305,7 +335,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="monthly">Aporte Mensal (R$)</Label>
+                  <Label htmlFor="monthly">{t('financial_calculators.compound.monthly_contribution')}</Label>
                   <Input
                     id="monthly"
                     type="number"
@@ -314,7 +344,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="rate">Taxa Anual (%)</Label>
+                  <Label htmlFor="rate">{t('financial_calculators.compound.annual_rate')}</Label>
                   <Input
                     id="rate"
                     type="number"
@@ -324,7 +354,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="years">Período (anos)</Label>
+                  <Label htmlFor="years">{t('financial_calculators.compound.period_years')}</Label>
                   <Input
                     id="years"
                     type="number"
@@ -335,15 +365,15 @@ const FinancialCalculators = () => {
               </div>
 
               <Button onClick={calculateCompoundInterest} className="w-full">
-                Calcular Juros Compostos
+                {t('financial_calculators.compound.calculate_button')}
               </Button>
 
               {results.compound && (
                 <div className="mt-6 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                  <h3 className="font-semibold mb-3 text-green-800 dark:text-green-200">Resultado:</h3>
+                  <h3 className="font-semibold mb-3 text-green-800 dark:text-green-200">{t('financial_calculators.compound.result_title')}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Valor Final</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.compound.final_value')}</p>
                       <p className="text-xl font-bold text-green-600 dark:text-green-400">
                         R$ {results.compound.futureValue.toLocaleString('pt-BR')}
                       </p>
@@ -355,13 +385,13 @@ const FinancialCalculators = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Total Investido</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.compound.total_invested')}</p>
                       <p className="text-lg text-gray-900 dark:text-gray-100">
                         R$ {results.compound.totalContributions.toLocaleString('pt-BR')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Rendimento</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.compound.yield')}</p>
                       <p className="text-lg text-gray-900 dark:text-gray-100">
                         {((results.compound.totalInterest / results.compound.totalContributions) * 100).toFixed(1)}%
                       </p>
@@ -379,16 +409,16 @@ const FinancialCalculators = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Simulador de Empréstimo
+                {t('financial_calculators.loan.title')}
               </CardTitle>
               <CardDescription>
-                Calcule as parcelas e juros do seu empréstimo
+                {t('financial_calculators.loan.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="loanAmount">Valor do Empréstimo (R$)</Label>
+                  <Label htmlFor="loanAmount">{t('financial_calculators.loan.loan_amount')}</Label>
                   <Input
                     id="loanAmount"
                     type="number"
@@ -397,7 +427,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="loanRate">Taxa Anual (%)</Label>
+                  <Label htmlFor="loanRate">{t('financial_calculators.loan.annual_rate')}</Label>
                   <Input
                     id="loanRate"
                     type="number"
@@ -407,7 +437,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="loanTerm">Prazo (anos)</Label>
+                  <Label htmlFor="loanTerm">{t('financial_calculators.loan.term_years')}</Label>
                   <Input
                     id="loanTerm"
                     type="number"
@@ -418,36 +448,36 @@ const FinancialCalculators = () => {
               </div>
 
               <Button onClick={calculateLoan} className="w-full">
-                Simular Empréstimo
+                {t('financial_calculators.loan.simulate_button')}
               </Button>
 
               {results.loan && (
                 <div className="mt-6 space-y-4">
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <h3 className="font-semibold mb-3 text-blue-800 dark:text-blue-200">Resumo do Empréstimo:</h3>
+                    <h3 className="font-semibold mb-3 text-blue-800 dark:text-blue-200">{t('financial_calculators.loan.summary_title')}</h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Parcela Mensal</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.loan.monthly_payment')}</p>
                         <p className="text-xl font-bold text-blue-600 dark:text-blue-400">
                           R$ {results.loan.monthlyPayment.toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Total de Juros</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.loan.total_interest')}</p>
                         <p className="text-xl font-bold text-red-600 dark:text-red-400">
                           R$ {results.loan.totalInterest.toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.loan.total_amount')}</p>
                         <p className="text-lg text-gray-900 dark:text-gray-100">
                           R$ {results.loan.totalAmount.toLocaleString('pt-BR')}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Prazo</p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.loan.term')}</p>
                         <p className="text-lg text-gray-900 dark:text-gray-100">
-                          {results.loan.termMonths} meses
+                          {results.loan.termMonths} {t('financial_calculators.loan.months')}
                         </p>
                       </div>
                     </div>
@@ -455,15 +485,15 @@ const FinancialCalculators = () => {
 
                   <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-700 rounded-lg">
                     <h4 className="font-semibold mb-2 p-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                      Tabela de Amortização (primeiras 12 parcelas):
+                      {t('financial_calculators.loan.amortization_table')}
                     </h4>
                     <div className="space-y-1 p-2">
                       {results.loan.amortizationSchedule?.slice(0, 12).map((entry) => (
                         <div key={entry.month} className="grid grid-cols-4 gap-2 text-sm p-3 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
-                          <span className="font-medium text-gray-900 dark:text-gray-100">Mês {entry.month}</span>
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{t('financial_calculators.loan.month')} {entry.month}</span>
                           <span className="text-blue-600 dark:text-blue-400">R$ {entry.payment.toLocaleString('pt-BR')}</span>
-                          <span className="text-green-600 dark:text-green-400">Principal: R$ {entry.principal.toLocaleString('pt-BR')}</span>
-                          <span className="text-gray-600 dark:text-gray-400">Saldo: R$ {entry.balance.toLocaleString('pt-BR')}</span>
+                          <span className="text-green-600 dark:text-green-400">{t('financial_calculators.loan.principal')}: R$ {entry.principal.toLocaleString('pt-BR')}</span>
+                          <span className="text-gray-600 dark:text-gray-400">{t('financial_calculators.loan.balance')}: R$ {entry.balance.toLocaleString('pt-BR')}</span>
                         </div>
                       ))}
                     </div>
@@ -480,16 +510,16 @@ const FinancialCalculators = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                Simulador de Parcelas
+                {t('financial_calculators.installment.title')}
               </CardTitle>
               <CardDescription>
-                Calcule o valor das parcelas com juros
+                {t('financial_calculators.installment.description')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="totalAmount">Valor Total (R$)</Label>
+                  <Label htmlFor="totalAmount">{t('financial_calculators.installment.total_amount')}</Label>
                   <Input
                     id="totalAmount"
                     type="number"
@@ -498,7 +528,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="installments">Número de Parcelas</Label>
+                  <Label htmlFor="installments">{t('financial_calculators.installment.installments_number')}</Label>
                   <Input
                     id="installments"
                     type="number"
@@ -507,7 +537,7 @@ const FinancialCalculators = () => {
                   />
                 </div>
                 <div className="col-span-2">
-                  <Label htmlFor="installmentRate">Taxa Mensal (%)</Label>
+                  <Label htmlFor="installmentRate">{t('financial_calculators.installment.monthly_rate')}</Label>
                   <Input
                     id="installmentRate"
                     type="number"
@@ -519,33 +549,33 @@ const FinancialCalculators = () => {
               </div>
 
               <Button onClick={calculateInstallments} className="w-full">
-                Calcular Parcelas
+                {t('financial_calculators.installment.calculate_button')}
               </Button>
 
               {results.installment && (
                 <div className="mt-6 p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                  <h3 className="font-semibold mb-3 text-purple-800 dark:text-purple-200">Resultado:</h3>
+                  <h3 className="font-semibold mb-3 text-purple-800 dark:text-purple-200">{t('financial_calculators.installment.result_title')}</h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Valor da Parcela</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.installment.installment_value')}</p>
                       <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
                         R$ {results.installment.installmentValue.toLocaleString('pt-BR')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Total com Juros</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.installment.total_with_interest')}</p>
                       <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
                         R$ {results.installment.totalWithInterest.toLocaleString('pt-BR')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Total de Juros</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.installment.total_interest')}</p>
                       <p className="text-lg text-red-600 dark:text-red-400">
                         R$ {results.installment.totalInterest.toLocaleString('pt-BR')}
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">Acréscimo</p>
+                      <p className="text-sm text-gray-600 dark:text-gray-400">{t('financial_calculators.installment.increase')}</p>
                       <p className="text-lg text-gray-900 dark:text-gray-100">
                         {((results.installment.totalInterest / results.installment.totalAmount) * 100).toFixed(1)}%
                       </p>

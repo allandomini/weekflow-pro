@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ import { ptBR } from "date-fns/locale";
 export default function ProjectDetail() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const {
     projects, tasks, notes, todoLists, projectImages, projectWalletEntries,
     addNote, addTodoList, updateTodoList, addTask,
@@ -43,10 +45,10 @@ export default function ProjectDetail() {
     return (
       <div className="space-y-4">
         <Button variant="outline" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
+          <ChevronLeft className="w-4 h-4 mr-2" /> {t('common.back')}
         </Button>
         <Card>
-          <CardContent className="py-8 text-center text-muted-foreground">Projeto não encontrado.</CardContent>
+          <CardContent className="py-8 text-center text-muted-foreground">{t('projects.project_not_found')}</CardContent>
         </Card>
       </div>
     );
@@ -54,7 +56,7 @@ export default function ProjectDetail() {
 
   const ensureTodoList = () => {
     if (projectTodoList) return projectTodoList;
-    const list = { title: `Checklist - ${project.name}`, items: [], projectId: project.id };
+    const list = { title: `${t('projects.checklist')} - ${project.name}`, items: [], projectId: project.id };
     addTodoList(list);
     return undefined; // UI atualizará quando o estado mudar
   };
@@ -143,41 +145,41 @@ export default function ProjectDetail() {
           )}
         </div>
         <Button variant="outline" onClick={() => navigate(-1)}>
-          <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
+          <ChevronLeft className="w-4 h-4 mr-2" /> {t('common.back')}
         </Button>
       </div>
 
       <Tabs defaultValue="notes">
         <TabsList className="grid grid-cols-5 w-full md:w-auto">
-          <TabsTrigger value="notes"><StickyNote className="w-4 h-4 mr-2" /> Notas</TabsTrigger>
-          <TabsTrigger value="checklist"><ListChecks className="w-4 h-4 mr-2" /> Checklist</TabsTrigger>
-          <TabsTrigger value="routine"><Calendar className="w-4 h-4 mr-2" /> Rotina</TabsTrigger>
-          <TabsTrigger value="images"><ImageIcon className="w-4 h-4 mr-2" /> Imagens</TabsTrigger>
-          <TabsTrigger value="wallet"><Wallet className="w-4 h-4 mr-2" /> Financeiro</TabsTrigger>
+          <TabsTrigger value="notes"><StickyNote className="w-4 h-4 mr-2" /> {t('common.notes')}</TabsTrigger>
+          <TabsTrigger value="checklist"><ListChecks className="w-4 h-4 mr-2" /> {t('projects.checklist')}</TabsTrigger>
+          <TabsTrigger value="routine"><Calendar className="w-4 h-4 mr-2" /> {t('routines.title')}</TabsTrigger>
+          <TabsTrigger value="images"><ImageIcon className="w-4 h-4 mr-2" /> {t('projects.images')}</TabsTrigger>
+          <TabsTrigger value="wallet"><Wallet className="w-4 h-4 mr-2" /> {t('finances.title')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="notes">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Notas</CardTitle>
+              <CardTitle>{t('common.notes')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="note-title">Título</Label>
+                  <Label htmlFor="note-title">{t('common.title')}</Label>
                   <Input id="note-title" value={noteForm.title} onChange={(e) => setNoteForm(p => ({ ...p, title: e.target.value }))} />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="note-content">Conteúdo</Label>
+                  <Label htmlFor="note-content">{t('common.content')}</Label>
                   <Textarea id="note-content" value={noteForm.content} onChange={(e) => setNoteForm(p => ({ ...p, content: e.target.value }))} />
                 </div>
                 <div className="md:col-span-2 flex justify-end">
-                  <Button onClick={handleCreateNote}>Adicionar Nota</Button>
+                  <Button onClick={handleCreateNote}>{t('notes.add_note')}</Button>
                 </div>
               </div>
               <div className="space-y-2">
                 {projectNotes.length === 0 ? (
-                  <p className="text-muted-foreground">Sem notas ainda.</p>
+                  <p className="text-muted-foreground">{t('notes.no_notes_yet')}</p>
                 ) : projectNotes.map(n => (
                   <div key={n.id} className="p-3 rounded border">
                     <div className="font-medium">{n.title}</div>
@@ -192,21 +194,21 @@ export default function ProjectDetail() {
         <TabsContent value="checklist">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Checklist</CardTitle>
+              <CardTitle>{t('projects.checklist')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {!projectTodoList && (
-                <Button onClick={ensureTodoList}>Criar Lista</Button>
+                <Button onClick={ensureTodoList}>{t('projects.create_list')}</Button>
               )}
               {projectTodoList && (
                 <div className="space-y-3">
                   <div className="flex gap-2">
-                    <Input placeholder="Novo item" value={todoInput} onChange={(e) => setTodoInput(e.target.value)} />
-                    <Button onClick={handleAddTodoItem}>Adicionar</Button>
+                    <Input placeholder={t('project_detail.new_item')} value={todoInput} onChange={(e) => setTodoInput(e.target.value)} />
+                    <Button onClick={handleAddTodoItem}>{t('common.add')}</Button>
                   </div>
                   <div className="space-y-2">
                     {projectTodoList.items.length === 0 ? (
-                      <p className="text-muted-foreground">Sem itens.</p>
+                      <p className="text-muted-foreground">{t('projects.no_items')}</p>
                     ) : projectTodoList.items.map(item => (
                       <button key={item.id} onClick={() => handleToggleTodoItem(item.id)} className="w-full text-left p-2 rounded border flex items-center gap-2">
                         <span className={`w-3 h-3 rounded border ${item.completed ? 'bg-success border-success' : 'border-border'}`} />
@@ -223,46 +225,46 @@ export default function ProjectDetail() {
         <TabsContent value="routine">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Rotina semanal</CardTitle>
+              <CardTitle>{t('routines.weekly_routine')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-3 gap-4 items-end">
                 <div className="md:col-span-2">
-                  <Label>Título</Label>
+                  <Label>{t('common.title')}</Label>
                   <Input value={routineForm.title} onChange={(e) => setRoutineForm(p => ({ ...p, title: e.target.value }))} />
                 </div>
                 <div>
-                  <Label>Semanas</Label>
+                  <Label>{t('routines.weeks')}</Label>
                   <Input type="number" min={1} max={52} value={routineForm.weeks} onChange={(e) => setRoutineForm(p => ({ ...p, weeks: Math.max(1, Math.min(52, Number(e.target.value) || 1)) }))} />
                 </div>
                 <div>
-                  <Label>Dia da semana</Label>
+                  <Label>{t('routines.weekday')}</Label>
                   <select className="w-full h-10 rounded border px-3 bg-card" value={routineForm.weekday} onChange={(e) => setRoutineForm(p => ({ ...p, weekday: Number(e.target.value) }))}>
-                    <option value={1}>Segunda</option>
-                    <option value={2}>Terça</option>
-                    <option value={3}>Quarta</option>
-                    <option value={4}>Quinta</option>
-                    <option value={5}>Sexta</option>
-                    <option value={6}>Sábado</option>
-                    <option value={7}>Domingo</option>
+                    <option value={1}>{t('calendar.monday')}</option>
+                    <option value={2}>{t('calendar.tuesday')}</option>
+                    <option value={3}>{t('calendar.wednesday')}</option>
+                    <option value={4}>{t('calendar.thursday')}</option>
+                    <option value={5}>{t('calendar.friday')}</option>
+                    <option value={6}>{t('calendar.saturday')}</option>
+                    <option value={7}>{t('calendar.sunday')}</option>
                   </select>
                 </div>
                 <div className="md:col-span-3 flex justify-end">
-                  <Button onClick={handleCreateRoutine}>Criar tarefas</Button>
+                  <Button onClick={handleCreateRoutine}>{t('routines.create_tasks')}</Button>
                 </div>
               </div>
               <div className="space-y-2">
                 {projectTasks.length === 0 ? (
-                  <p className="text-muted-foreground">Sem tarefas deste projeto.</p>
-                ) : projectTasks.map(t => (
-                  <div key={t.id} className="p-3 rounded border flex items-center gap-2">
-                    <Checkbox checked={t.completed} disabled />
+                  <p className="text-muted-foreground">{t('tasks.no_project_tasks')}</p>
+                ) : projectTasks.map(task => (
+                  <div key={task.id} className="p-3 rounded border flex items-center gap-2">
+                    <Checkbox checked={task.completed} disabled />
                     <div className="flex-1">
-                      <div className="font-medium">{t.title}</div>
+                      <div className="font-medium">{task.title}</div>
                       <div className="text-xs text-muted-foreground flex gap-2 mt-1">
-                        <Badge variant="outline">{t.isRoutine ? 'Rotina' : 'Avulsa'}</Badge>
+                        <Badge variant="outline">{task.isRoutine ? t('routines.routine') : t('tasks.single_task')}</Badge>
                         <span>
-                          {format(t.date, "d 'de' MMMM yyyy", { locale: ptBR })}
+                          {format(task.date, "d 'de' MMMM yyyy", { locale: ptBR })}
                         </span>
                       </div>
                     </div>
@@ -276,22 +278,22 @@ export default function ProjectDetail() {
         <TabsContent value="images">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Imagens</CardTitle>
+              <CardTitle>{t('projects.images')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
                 <Input type="file" accept="image/*" onChange={handleImageUpload} />
-                <Button disabled={uploading}>{uploading ? 'Enviando...' : 'Upload'}</Button>
+                <Button disabled={uploading}>{uploading ? t('common.uploading') : t('common.upload')}</Button>
               </div>
               {images.length === 0 ? (
-                <p className="text-muted-foreground">Sem imagens.</p>
+                <p className="text-muted-foreground">{t('projects.no_images')}</p>
               ) : (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {images.map(img => (
                     <div key={img.id} className="rounded border overflow-hidden">
-                      <img src={img.url} alt="Imagem do projeto" className="w-full h-32 object-cover" />
+                      <img src={img.url} alt={t('projects.project_image')} className="w-full h-32 object-cover" />
                       <div className="p-2 flex justify-end">
-                        <Button size="sm" variant="outline" onClick={() => deleteProjectImage(img.id)}>Remover</Button>
+                        <Button size="sm" variant="outline" onClick={() => deleteProjectImage(img.id)}>{t('common.remove')}</Button>
                       </div>
                     </div>
                   ))}
@@ -304,40 +306,40 @@ export default function ProjectDetail() {
         <TabsContent value="wallet">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Financeiro do Projeto</CardTitle>
+              <CardTitle>{t('projects.project_finance')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-4 gap-3 items-end">
                 <div>
-                  <Label>Tipo</Label>
+                  <Label>{t('finance.type')}</Label>
                   <select className="w-full h-10 rounded border px-3 bg-card" value={walletForm.type} onChange={(e) => setWalletForm(p => ({ ...p, type: e.target.value as 'deposit' | 'withdrawal' }))}>
-                    <option value="deposit">Depósito</option>
-                    <option value="withdrawal">Retirada</option>
+                    <option value="deposit">{t('finance.deposit')}</option>
+                    <option value="withdrawal">{t('finance.withdrawal')}</option>
                   </select>
                 </div>
                 <div>
-                  <Label>Valor</Label>
+                  <Label>{t('finance.amount')}</Label>
                   <Input type="number" step="0.01" min="0" value={walletForm.amount} onChange={(e) => setWalletForm(p => ({ ...p, amount: e.target.value }))} />
                 </div>
                 <div className="md:col-span-2">
-                  <Label>Descrição</Label>
+                  <Label>{t('common.description')}</Label>
                   <Input value={walletForm.description} onChange={(e) => setWalletForm(p => ({ ...p, description: e.target.value }))} />
                 </div>
                 <div className="md:col-span-4 flex justify-end">
-                  <Button onClick={handleAddWallet}>Adicionar</Button>
+                  <Button onClick={handleAddWallet}>{t('common.add')}</Button>
                 </div>
               </div>
               <div className="flex items-center justify-between p-3 rounded border bg-card/50">
-                <div className="text-muted-foreground">Saldo</div>
+                <div className="text-muted-foreground">{t('finance.balance')}</div>
                 <div className="text-lg font-semibold">{balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
               </div>
               <div className="space-y-2">
                 {walletEntries.length === 0 ? (
-                  <p className="text-muted-foreground">Sem lançamentos.</p>
+                  <p className="text-muted-foreground">{t('finance.no_entries')}</p>
                 ) : walletEntries.map(e => (
                   <div key={e.id} className="p-3 rounded border flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{e.description || (e.type === 'deposit' ? 'Depósito' : 'Retirada')}</div>
+                      <div className="font-medium">{e.description || (e.type === 'deposit' ? t('finance.deposit') : t('finance.withdrawal'))}</div>
                       <div className="text-xs text-muted-foreground">{format(e.createdAt, "d/MM/yyyy HH:mm")}</div>
                     </div>
                     <div className={`font-semibold ${e.type === 'deposit' ? 'text-success' : 'text-destructive'}`}>

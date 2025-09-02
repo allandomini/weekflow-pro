@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   Calculator, 
   TrendingUp, 
@@ -53,6 +54,7 @@ interface DebtPaymentRecommendation {
 }
 
 export default function FinancialCalculator() {
+  const { t } = useTranslation();
   const { accounts, debts, receivables } = useAppContext();
   const [isOpen, setIsOpen] = useState(false);
   const [calculation, setCalculation] = useState<SpendingCalculation | null>(null);
@@ -113,23 +115,23 @@ export default function FinancialCalculator() {
     const suggestions: string[] = [];
     
     if (availableAfterExpense < 0) {
-      suggestions.push('⚠️ Gasto planejado excede recursos disponíveis');
+      suggestions.push(t('financial_calculator.suggestions.exceeds_resources'));
     }
     
     if (debtRatio > 0.5) {
-      suggestions.push('💡 Considere priorizar pagamento de dívidas');
+      suggestions.push(t('financial_calculator.suggestions.prioritize_debts'));
     }
     
     if (expenseRatio > 0.4) {
-      suggestions.push('🎯 Gasto representa grande parte do orçamento - avalie necessidade');
+      suggestions.push(t('financial_calculator.suggestions.evaluate_necessity'));
     }
     
     if (projectedIncome > plannedExpenseAmount * 2) {
-      suggestions.push('✅ Receitas futuras cobrem bem o gasto planejado');
+      suggestions.push(t('financial_calculator.suggestions.future_income_covers'));
     }
     
     if (availableAfterExpense > totalBalance * 0.3) {
-      suggestions.push('💚 Situação financeira saudável após o gasto');
+      suggestions.push(t('financial_calculator.suggestions.healthy_situation'));
     }
     
     const recommendedSpending = Math.max(0, totalAvailable * 0.3); // 30% of available money
@@ -166,65 +168,65 @@ export default function FinancialCalculator() {
       <DialogTrigger asChild>
         <Button variant="outline" className="gap-2">
           <Calculator className="w-4 h-4" />
-          Calculadora Financeira
+          {t('financial_calculator.title')}
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="w-5 h-5" />
-            Calculadora Financeira Inteligente
+            {t('financial_calculator.intelligent_title')}
           </DialogTitle>
         </DialogHeader>
         
         <Tabs defaultValue="spending" className="w-full">
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="spending">Planejamento</TabsTrigger>
-            <TabsTrigger value="partial">Recebíveis Parciais</TabsTrigger>
-            <TabsTrigger value="debt">Simulador Dívidas</TabsTrigger>
-            <TabsTrigger value="recommendations">Recomendações</TabsTrigger>
-            <TabsTrigger value="overview">Visão Geral</TabsTrigger>
+            <TabsTrigger value="spending">{t('financial_calculator.tabs.planning')}</TabsTrigger>
+            <TabsTrigger value="partial">{t('financial_calculator.tabs.partial_receivables')}</TabsTrigger>
+            <TabsTrigger value="debt">{t('financial_calculator.tabs.debt_simulator')}</TabsTrigger>
+            <TabsTrigger value="recommendations">{t('financial_calculator.tabs.recommendations')}</TabsTrigger>
+            <TabsTrigger value="overview">{t('financial_calculator.tabs.overview')}</TabsTrigger>
           </TabsList>
           
           <TabsContent value="spending" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Parâmetros do Cálculo</CardTitle>
+                  <CardTitle className="text-lg">{t('financial_calculator.fields.calculation_parameters')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="plannedExpense">Gasto Planejado (R$)</Label>
+                    <Label htmlFor="plannedExpense">{t('financial_calculator.fields.planned_expense')}</Label>
                     <Input
                       id="plannedExpense"
                       type="number"
                       step="0.01"
                       value={plannedExpense}
                       onChange={(e) => setPlannedExpense(e.target.value)}
-                      placeholder="Ex: 500.00 para mercado"
+                      placeholder={t('financial_calculator.placeholders.planned_expense')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="debtToPay">Dívida a Pagar (R$)</Label>
+                    <Label htmlFor="debtToPay">{t('financial_calculator.fields.debt_to_pay')}</Label>
                     <Input
                       id="debtToPay"
                       type="number"
                       step="0.01"
                       value={debtToPay}
                       onChange={(e) => setDebtToPay(e.target.value)}
-                      placeholder="Ex: 1000.00"
+                      placeholder={t('financial_calculator.placeholders.debt_to_pay')}
                     />
                   </div>
                   
                   <div>
-                    <Label htmlFor="timeframe">Período de Análise (dias)</Label>
+                    <Label htmlFor="timeframe">{t('financial_calculator.fields.timeframe')}</Label>
                     <Input
                       id="timeframe"
                       type="number"
                       value={timeframe}
                       onChange={(e) => setTimeframe(e.target.value)}
-                      placeholder="7"
+                      placeholder={t('financial_calculator.placeholders.timeframe')}
                     />
                   </div>
                   
@@ -237,13 +239,13 @@ export default function FinancialCalculator() {
                       className="rounded"
                     />
                     <Label htmlFor="includeReceivables">
-                      Incluir valores a receber no período
+                      {t('financial_calculator.fields.include_receivables')}
                     </Label>
                   </div>
                   
                   <Button onClick={calculateSpending} className="w-full">
                     <Calculator className="w-4 h-4 mr-2" />
-                    Calcular Viabilidade
+                    {t('financial_calculator.fields.calculate_viability')}
                   </Button>
                 </CardContent>
               </Card>
@@ -253,27 +255,27 @@ export default function FinancialCalculator() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <TrendingUp className="w-5 h-5" />
-                      Resultado da Análise
+                      {t('financial_calculator.fields.analysis_result')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-1 gap-3">
                       <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                        <span className="text-sm font-medium">Disponível hoje:</span>
+                        <span className="text-sm font-medium">{t('financial_calculator.fields.available_today')}</span>
                         <span className="font-bold text-blue-600">
                           {calculation.availableToday.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       </div>
                       
                       <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
-                        <span className="text-sm font-medium">Após pagar dívidas:</span>
+                        <span className="text-sm font-medium">{t('financial_calculator.fields.after_debts')}</span>
                         <span className="font-bold text-purple-600">
                           {calculation.availableAfterDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
                       </div>
                       
                       <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                        <span className="text-sm font-medium">Gasto recomendado:</span>
+                        <span className="text-sm font-medium">{t('financial_calculator.fields.recommended_spending')}</span>
                         <span className="font-bold text-green-600">
                           {calculation.recommendedSpending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </span>
@@ -284,15 +286,14 @@ export default function FinancialCalculator() {
                       <div className="flex items-center gap-2 mb-2">
                         {getRiskIcon(calculation.riskLevel)}
                         <span className="font-medium">
-                          Nível de Risco: {calculation.riskLevel === 'low' ? 'Baixo' : 
-                                         calculation.riskLevel === 'medium' ? 'Médio' : 'Alto'}
+                          {t('financial_calculator.fields.risk_level')} {t(`financial_calculator.risk_levels.${calculation.riskLevel}`)}
                         </span>
                       </div>
                     </div>
                     
                     {calculation.suggestions.length > 0 && (
                       <div className="space-y-2">
-                        <Label className="text-sm font-medium">Recomendações:</Label>
+                        <Label className="text-sm font-medium">{t('financial_calculator.fields.recommendations_label')}</Label>
                         {calculation.suggestions.map((suggestion, index) => (
                           <div key={index} className="text-sm p-2 bg-gray-50 rounded">
                             {suggestion}
@@ -312,15 +313,15 @@ export default function FinancialCalculator() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <PieChart className="w-5 h-5" />
-                    Alocar Recebíveis Parciais
+                    {t('settings.partial_receivables.allocate_title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="receivableSelect">Selecionar Recebível</Label>
+                    <Label htmlFor="receivableSelect">{t('settings.partial_receivables.select_receivable')}</Label>
                     <Select value={selectedReceivable} onValueChange={setSelectedReceivable}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Escolha um recebível" />
+                        <SelectValue placeholder={t('settings.partial_receivables.choose_receivable')} />
                       </SelectTrigger>
                       <SelectContent>
                         {pendingReceivables.map((r) => (
@@ -333,7 +334,7 @@ export default function FinancialCalculator() {
                   </div>
                   
                   <div>
-                    <Label htmlFor="allocationPercentage">Percentual para Dívidas (%)</Label>
+                    <Label htmlFor="allocationPercentage">{t('settings.partial_receivables.percentage_for_debts')}</Label>
                     <Input
                       id="allocationPercentage"
                       type="number"
@@ -370,11 +371,11 @@ export default function FinancialCalculator() {
                     disabled={!selectedReceivable}
                   >
                     <PieChart className="w-4 h-4 mr-2" />
-                    Adicionar Alocação
+                    {t('settings.partial_receivables.add_allocation')}
                   </Button>
                   
                   <div className="border-t pt-4">
-                    <Label className="text-sm font-medium">Salário/Renda Fixa</Label>
+                    <Label className="text-sm font-medium">{t('settings.partial_receivables.salary_fixed_income')}</Label>
                     <div className="space-y-2 mt-2">
                       <Input
                         type="number"
@@ -393,7 +394,7 @@ export default function FinancialCalculator() {
                           placeholder="30"
                           className="w-20"
                         />
-                        <span className="text-sm text-gray-600">% para dívidas</span>
+                        <span className="text-sm text-gray-600">{t('settings.partial_receivables.percentage_for_debts_short')}</span>
                       </div>
                     </div>
                   </div>
@@ -402,7 +403,7 @@ export default function FinancialCalculator() {
               
               <Card>
                 <CardHeader>
-                  <CardTitle>Alocações Configuradas</CardTitle>
+                  <CardTitle>{t('settings.partial_receivables.configured_allocations')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -424,17 +425,17 @@ export default function FinancialCalculator() {
                         </div>
                         <div className="space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span>Total:</span>
+                            <span>{t('settings.partial_receivables.total')}</span>
                             <span>{allocation.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Alocado ({allocation.allocatedPercentage}%):</span>
+                            <span>{t('settings.partial_receivables.allocated')} ({allocation.allocatedPercentage}%):</span>
                             <span className="font-medium text-blue-600">
                               {allocation.allocatedAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Restante:</span>
+                            <span>{t('settings.partial_receivables.remaining')}</span>
                             <span className="text-green-600">
                               {(allocation.totalAmount - allocation.allocatedAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
@@ -445,14 +446,14 @@ export default function FinancialCalculator() {
                     
                     {salaryAmount && (
                       <div className="p-3 border rounded-lg bg-blue-50">
-                        <h4 className="font-medium text-sm mb-2">Salário/Renda Fixa</h4>
+                        <h4 className="font-medium text-sm mb-2">{t('settings.partial_receivables.salary_fixed_income')}</h4>
                         <div className="space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span>Valor:</span>
+                            <span>{t('settings.partial_receivables.value')}</span>
                             <span>{parseFloat(salaryAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Para dívidas ({salaryAllocationPercentage}%):</span>
+                            <span>{t('settings.partial_receivables.for_debts')} ({salaryAllocationPercentage}%):</span>
                             <span className="font-medium text-blue-600">
                               {((parseFloat(salaryAmount) || 0) * (parseFloat(salaryAllocationPercentage) || 0) / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </span>
@@ -463,14 +464,14 @@ export default function FinancialCalculator() {
                     
                     {partialAllocations.length === 0 && !salaryAmount && (
                       <p className="text-center text-gray-500 py-4 text-sm">
-                        Configure alocações parciais para simular cenários
+                        {t('settings.partial_receivables.configure_partial_allocations')}
                       </p>
                     )}
                   </div>
                   
                   {(partialAllocations.length > 0 || salaryAmount) && (
                     <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                      <div className="text-sm font-medium mb-1">Total Disponível para Dívidas:</div>
+                      <div className="text-sm font-medium mb-1">{t('settings.partial_receivables.total_available_for_debts')}</div>
                       <div className="text-lg font-bold text-green-600">
                         {(
                           partialAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0) +
@@ -487,7 +488,7 @@ export default function FinancialCalculator() {
           <TabsContent value="debt" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle>Simulador de Pagamento de Dívidas</CardTitle>
+                <CardTitle>{t('settings.debt_simulator.title')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -500,7 +501,7 @@ export default function FinancialCalculator() {
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-medium">{debt.name}</h4>
                           <Badge variant={isOverdue ? "destructive" : "secondary"}>
-                            {isOverdue ? `${Math.abs(daysUntilDue)} dias atrasado` : `${daysUntilDue} dias`}
+                            {isOverdue ? `${Math.abs(daysUntilDue)} ${t('settings.debt_simulator.days_overdue')}` : `${daysUntilDue} ${t('settings.debt_simulator.days_remaining')}`}
                           </Badge>
                         </div>
                         <div className="space-y-2">
@@ -508,17 +509,17 @@ export default function FinancialCalculator() {
                             {debt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </div>
                           <div className="text-sm text-gray-600">
-                            Vence: {format(debt.dueDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                            {t('settings.debt_simulator.due_date')} {format(debt.dueDate, "d 'de' MMM yyyy", { locale: ptBR })}
                           </div>
                           {totalBalance >= debt.remainingAmount ? (
                             <div className="text-sm text-green-600 flex items-center gap-1">
                               <CheckCircle className="w-4 h-4" />
-                              Pode ser quitada hoje
+                              {t('settings.debt_simulator.can_be_paid_today')}
                             </div>
                           ) : (
                             <div className="text-sm text-yellow-600 flex items-center gap-1">
                               <AlertTriangle className="w-4 h-4" />
-                              Saldo insuficiente (faltam {(debt.remainingAmount - totalBalance).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
+                              {t('settings.debt_simulator.insufficient_balance')} {(debt.remainingAmount - totalBalance).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })})
                             </div>
                           )}
                         </div>
@@ -535,7 +536,7 @@ export default function FinancialCalculator() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Lightbulb className="w-5 h-5" />
-                  Recomendações Inteligentes de Pagamento
+                  {t('settings.recommendations.intelligent_payment_title')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -549,20 +550,20 @@ export default function FinancialCalculator() {
                       const isOverdue = daysUntilDue < 0;
                       
                       let priority: 'high' | 'medium' | 'low' = 'medium';
-                      let reason = 'Pagamento padrão recomendado';
+                      let reason = t('settings.debt_reasons.default_payment');
                       
                       if (isOverdue) {
                         priority = 'high';
-                        reason = `Dívida em atraso há ${Math.abs(daysUntilDue)} dias`;
+                        reason = t('settings.debt_reasons.overdue_days', { days: Math.abs(daysUntilDue) });
                       } else if (daysUntilDue <= 7) {
                         priority = 'high';
-                        reason = `Vence em ${daysUntilDue} dias`;
+                        reason = t('settings.debt_reasons.due_in_days', { days: daysUntilDue });
                       } else if (daysUntilDue <= 30) {
                         priority = 'medium';
-                        reason = `Vence em ${daysUntilDue} dias`;
+                        reason = t('settings.debt_reasons.due_in_days', { days: daysUntilDue });
                       } else {
                         priority = 'low';
-                        reason = `Vence em ${daysUntilDue} dias`;
+                        reason = t('settings.debt_reasons.due_in_days', { days: daysUntilDue });
                       }
                       
                       // Calculate recommended payment based on available funds and priority
@@ -593,7 +594,7 @@ export default function FinancialCalculator() {
                   className="mb-4"
                 >
                   <Calculator className="w-4 h-4 mr-2" />
-                  Gerar Recomendações
+                  {t('settings.recommendations.generate_recommendations')}
                 </Button>
                 
                 {debtRecommendations.length > 0 && (
@@ -609,26 +610,25 @@ export default function FinancialCalculator() {
                             variant={rec.priority === 'high' ? 'destructive' : 
                                    rec.priority === 'medium' ? 'default' : 'secondary'}
                           >
-                            {rec.priority === 'high' ? 'Alta' : 
-                             rec.priority === 'medium' ? 'Média' : 'Baixa'} Prioridade
+                            {t(`settings.recommendations.${rec.priority}_priority`)} {t('settings.recommendations.priority')}
                           </Badge>
                         </div>
                         
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
-                            <div className="text-gray-600">Valor Atual</div>
+                            <div className="text-gray-600">{t('settings.recommendations.current_value')}</div>
                             <div className="font-medium text-red-600">
                               {rec.currentAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Pagamento Recomendado</div>
+                            <div className="text-gray-600">{t('settings.recommendations.recommended_payment')}</div>
                             <div className="font-medium text-blue-600">
                               {rec.recommendedPayment.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </div>
                           </div>
                           <div>
-                            <div className="text-gray-600">Restaria</div>
+                            <div className="text-gray-600">{t('settings.recommendations.would_remain')}</div>
                             <div className="font-medium text-green-600">
                               {(rec.currentAmount - rec.recommendedPayment).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </div>
@@ -640,7 +640,7 @@ export default function FinancialCalculator() {
                             <div className="flex items-center gap-2">
                               <ArrowRight className="w-4 h-4" />
                               <span>
-                                Redução: {((rec.recommendedPayment / rec.currentAmount) * 100).toFixed(1)}% da dívida
+                                {t('settings.recommendations.reduction')} {((rec.recommendedPayment / rec.currentAmount) * 100).toFixed(1)}% {t('settings.recommendations.of_debt')}
                               </span>
                             </div>
                           </div>
@@ -649,16 +649,16 @@ export default function FinancialCalculator() {
                     ))}
                     
                     <div className="mt-4 p-4 bg-green-50 rounded-lg">
-                      <h4 className="font-medium mb-2">Resumo das Recomendações</h4>
+                      <h4 className="font-medium mb-2">{t('settings.recommendations.recommendations_summary')}</h4>
                       <div className="text-sm space-y-1">
                         <div className="flex justify-between">
-                          <span>Total recomendado para pagamento:</span>
+                          <span>{t('settings.recommendations.total_recommended')}</span>
                           <span className="font-medium">
                             {debtRecommendations.reduce((sum, r) => sum + r.recommendedPayment, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span>Recursos disponíveis:</span>
+                          <span>{t('settings.recommendations.available_resources')}</span>
                           <span className="font-medium">
                             {(
                               partialAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0) +
@@ -667,7 +667,7 @@ export default function FinancialCalculator() {
                           </span>
                         </div>
                         <div className="flex justify-between text-green-600">
-                          <span>Sobra estimada:</span>
+                          <span>{t('settings.recommendations.estimated_surplus')}</span>
                           <span className="font-medium">
                             {Math.max(0, 
                               (partialAllocations.reduce((sum, a) => sum + a.allocatedAmount, 0) +
@@ -690,14 +690,14 @@ export default function FinancialCalculator() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <Wallet className="w-4 h-4" />
-                    Situação Atual
+                    {t('settings.overview.current_situation')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-green-600">
                     {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </div>
-                  <p className="text-xs text-gray-600">Saldo total em contas</p>
+                  <p className="text-xs text-gray-600">{t('settings.overview.total_balance_accounts')}</p>
                 </CardContent>
               </Card>
               
@@ -705,14 +705,14 @@ export default function FinancialCalculator() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4" />
-                    Dívidas Ativas
+                    {t('settings.overview.active_debts')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-red-600">
                     {totalActiveDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </div>
-                  <p className="text-xs text-gray-600">{activeDebts.length} dívida(s) pendente(s)</p>
+                  <p className="text-xs text-gray-600">{activeDebts.length} {t('settings.overview.pending_debts')}</p>
                 </CardContent>
               </Card>
               
@@ -720,38 +720,38 @@ export default function FinancialCalculator() {
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm flex items-center gap-2">
                     <DollarSign className="w-4 h-4" />
-                    A Receber
+                    {t('settings.overview.receivables')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold text-blue-600">
                     {totalPendingReceivables.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </div>
-                  <p className="text-xs text-gray-600">{pendingReceivables.length} valor(es) pendente(s)</p>
+                  <p className="text-xs text-gray-600">{pendingReceivables.length} {t('settings.overview.pending_receivables')}</p>
                 </CardContent>
               </Card>
             </div>
             
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Resumo Financeiro</CardTitle>
+                <CardTitle className="text-lg">{t('settings.overview.financial_summary')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center p-3 bg-green-50 rounded">
-                    <span>Patrimônio Líquido:</span>
+                    <span>{t('settings.overview.net_worth')}</span>
                     <span className="font-bold text-green-600">
                       {(totalBalance - totalActiveDebts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-blue-50 rounded">
-                    <span>Patrimônio Projetado (c/ recebíveis):</span>
+                    <span>{t('settings.overview.projected_worth')}</span>
                     <span className="font-bold text-blue-600">
                       {(totalBalance + totalPendingReceivables - totalActiveDebts).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
                   </div>
                   <div className="flex justify-between items-center p-3 bg-yellow-50 rounded">
-                    <span>Taxa de Endividamento:</span>
+                    <span>{t('settings.overview.debt_ratio')}</span>
                     <span className="font-bold text-yellow-600">
                       {totalBalance > 0 ? ((totalActiveDebts / totalBalance) * 100).toFixed(1) : '0'}%
                     </span>

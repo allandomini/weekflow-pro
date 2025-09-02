@@ -5,6 +5,7 @@ import { useRoutinesOptimized } from '../hooks/useRoutinesOptimized';
 import { useOffline } from '../hooks/useOffline';
 import { useAnimations } from '../contexts/AnimationContext';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -40,6 +41,7 @@ export default function Dashboard() {
   
   const { toast } = useToast();
   const { animationsEnabled } = useAnimations();
+  const { t } = useTranslation();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -168,18 +170,18 @@ export default function Dashboard() {
 
   const handleConfirmDeleteSingle = () => {
     if (!deleteModal.task) return;
-    const t = deleteModal.task;
-    if (t.id.startsWith('routine:')) {
-      const [, routineId] = t.id.split(':');
+    const task = deleteModal.task;
+    if (task.id.startsWith('routine:')) {
+      const [, routineId] = task.id.split(':');
       // DELETAR a rotina completamente
       hardDeleteRoutine(routineId);
       
       toast({
-        title: "Rotina excluída",
-        description: "A rotina foi excluída permanentemente.",
+        title: t('routines.deleted'),
+        description: t('routines.deleted_description'),
       });
     } else {
-      deleteTask(t.id);
+      deleteTask(task.id);
     }
     setDeleteModal({ open: false, task: null, mode: 'single' });
   };
@@ -301,8 +303,8 @@ export default function Dashboard() {
           saveOffline('routineCompletions', offlineCompletions);
           
           toast({
-            title: "Rotina completada offline",
-            description: "Será sincronizada quando voltar online.",
+            title: t('offline.routine_completed'),
+            description: t('offline.sync_when_online'),
           });
         }
         
@@ -333,8 +335,8 @@ export default function Dashboard() {
       saveOffline('tasks', offlineTasks);
       
       toast({
-        title: "Tarefa atualizada offline",
-        description: "Será sincronizada quando voltar online.",
+        title: t('offline.task_updated'),
+        description: t('offline.sync_when_online'),
       });
     }
   };
@@ -378,11 +380,11 @@ export default function Dashboard() {
   return (
     <div className={`space-y-6 ${animationsEnabled ? 'animate-fade-in' : ''}`}>
       <div className={`flex items-center justify-between ${animationsEnabled ? 'animate-slide-down' : ''}`}>
-        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <h1 className="text-3xl font-bold text-foreground">{t('dashboard.title')}</h1>
         <div className="flex items-center gap-2">
           <Button onClick={() => setIsTaskDialogOpen(true)} className="shadow-elegant">
             <Plus className="h-4 w-4 mr-2" />
-            Nova Tarefa
+            {t('tasks.create_task')}
           </Button>
         </div>
       </div>
@@ -391,33 +393,33 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <Card className={`modern-card ${animationsEnabled ? 'animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]' : ''}`} style={animationsEnabled ? { animationDelay: '100ms' } : {}}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-foreground">Tarefas Hoje</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">{t('tasks.title')} {t('time.today')}</CardTitle>
             <CheckSquare className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-primary transition-colors duration-200">{completedToday.length}/{todayTasks.length}</div>
             <p className="text-xs text-muted-foreground transition-colors duration-200">
-              {todayTasks.length > 0 ? `${Math.round((completedToday.length / todayTasks.length) * 100)}% completo` : 'Nenhuma tarefa'}
+              {todayTasks.length > 0 ? `${Math.round((completedToday.length / todayTasks.length) * 100)}% ${t('dashboard.complete')}` : t('dashboard.no_tasks')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '200ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-foreground">Projetos Ativos</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">{t('dashboard.active_projects')}</CardTitle>
             <CalendarDays className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent transition-colors duration-200">{projects.length}</div>
             <p className="text-xs text-muted-foreground transition-colors duration-200">
-              Projetos em andamento
+              {t('dashboard.projects_in_progress')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '300ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-foreground">Saldo Total</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">{t('dashboard.total_balance')}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
@@ -425,39 +427,39 @@ export default function Dashboard() {
               {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground transition-colors duration-200">
-              {accounts.length} conta{accounts.length !== 1 ? 's' : ''}
+              {accounts.length} {accounts.length === 1 ? t('dashboard.account') : t('dashboard.accounts')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="modern-card animate-fade-in-up hover:shadow-medium transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]" style={{ animationDelay: '400ms' }}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-foreground">Contatos</CardTitle>
+            <CardTitle className="text-sm font-medium text-foreground">{t('dashboard.contacts')}</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground transition-colors duration-200" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning transition-colors duration-200">{contacts.length}</div>
             <p className="text-xs text-muted-foreground transition-colors duration-200">
-              Total de contatos
+              {t('dashboard.total_contacts')}
             </p>
           </CardContent>
         </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Calendário Semanal */}
+        {/* Weekly Calendar */}
         <Card className="modern-card animate-fade-in-left hover:shadow-medium transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-foreground">
               <CalendarDays className="w-5 h-5 text-primary transition-colors duration-200" />
-              Calendário Semanal
+{t('dashboard.weekly_calendar')}
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => setCurrentWeekDate(prev => subWeeks(prev, 1))}
-                aria-label="Semana anterior"
+                aria-label={t('dashboard.previous_week')}
                 className="transition-all duration-200 hover:scale-105 active:scale-95"
               >
                 ←
@@ -466,7 +468,7 @@ export default function Dashboard() {
                 variant="outline" 
                 size="sm"
                 onClick={() => setCurrentWeekDate(prev => addWeeks(prev, 1))}
-                aria-label="Próxima semana"
+                aria-label={t('dashboard.next_week')}
                 className="transition-all duration-200 hover:scale-105 active:scale-95"
               >
                 →
@@ -492,13 +494,13 @@ export default function Dashboard() {
                   onClick={() => setSelectedDate(day)}
                 >
                   <div className="text-xs font-medium text-muted-foreground">
-                    {format(day, 'EEE', { locale: ptBR })}
+                    {format(day, 'EEE')}
                   </div>
                   <div className="text-lg font-semibold">
                     {format(day, 'd')}
                   </div>
                   <div className="text-xs">
-                    {getTasksForDay(day).length} tarefa{getTasksForDay(day).length !== 1 ? 's' : ''}
+                    {getTasksForDay(day).length} {getTasksForDay(day).length === 1 ? t('tasks.task') : t('tasks.tasks')}
                   </div>
                 </div>
               ))}
@@ -506,14 +508,14 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* Tarefas de Hoje */}
+        {/* Today's Tasks */}
         <Card className="modern-card animate-fade-in-right hover:shadow-medium transition-all duration-300">
           <CardHeader className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-foreground">
               <CheckSquare className="w-5 h-5 text-success transition-colors duration-200" />
-              {selectedDate ? `Tarefas de ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })}` : 'Tarefas de Hoje'}
+              {selectedDate ? `${t('tasks.title')} ${t('common.of')} ${format(selectedDate, "d 'de' MMMM", { locale: ptBR })}` : t('dashboard.tasks_today')}
             </CardTitle>
-            <Button variant="ghost" size="icon" aria-label="Abrir histórico" onClick={() => navigate('/historico')} className="hover:scale-105 active:scale-95 transition-transform">
+            <Button variant="ghost" size="icon" aria-label={t('dashboard.open_history')} onClick={() => navigate('/historico')} className="hover:scale-105 active:scale-95 transition-transform">
               <Clock className="w-5 h-5 text-muted-foreground" />
             </Button>
           </CardHeader>
@@ -522,14 +524,14 @@ export default function Dashboard() {
               <div className="flex items-center justify-center py-8">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Carregando rotinas...</span>
+                  <span>{t('common.loading')}...</span>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
                 {(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today)).length === 0 ? (
                   <p className="text-muted-foreground text-center py-4 transition-colors duration-200">
-                    Nenhuma tarefa para este dia
+{t('dashboard.no_tasks_for_day')}
                   </p>
                 ) : (
                 [...(selectedDate ? getTasksForDay(selectedDate) : getTasksForDay(today))].sort((a, b) => {
@@ -562,7 +564,7 @@ export default function Dashboard() {
                            {task.title}
                            {task.isOverdue && !task.completed && (
                              <Badge variant="destructive" className="text-xs">
-                               ATRASADA
+                               {t('tasks.overdue')}
                              </Badge>
                            )}
                          </div>
@@ -623,43 +625,43 @@ export default function Dashboard() {
       <Dialog open={isTaskDialogOpen} onOpenChange={setIsTaskDialogOpen}>
         <DialogContent className="animate-scale-in">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Nova Tarefa</DialogTitle>
+            <DialogTitle className="text-foreground">{t('tasks.new_task')}</DialogTitle>
             <DialogDescription>
-              Crie uma nova tarefa ou rotina para organizar suas atividades diárias.
+              {t('tasks.create_task_description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title" className="text-foreground">Título</Label>
+              <Label htmlFor="title" className="text-foreground">{t('tasks.title')}</Label>
               <Input
                 id="title"
                 value={taskForm.title}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Digite o título da tarefa"
+                placeholder={t('tasks.title_placeholder')}
                 className="modern-input"
               />
             </div>
             <div>
-              <Label htmlFor="description" className="text-foreground">Descrição</Label>
+              <Label htmlFor="description" className="text-foreground">{t('tasks.description')}</Label>
               <Textarea
                 id="description"
                 value={taskForm.description}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição opcional"
+                placeholder={t('tasks.description_placeholder')}
                 className="modern-input"
               />
             </div>
             <div>
-              <Label htmlFor="project" className="text-foreground">Projeto</Label>
+              <Label htmlFor="project" className="text-foreground">{t('projects.project')}</Label>
               <Select
                 value={taskForm.projectId}
                 onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value === "none" ? "" : value }))}
               >
                 <SelectTrigger className="modern-input">
-                  <SelectValue placeholder="Selecione um projeto" />
+                  <SelectValue placeholder={t('projects.select_project')} />
                 </SelectTrigger>
                 <SelectContent className="modern-dropdown">
-                  <SelectItem value="none">Nenhum projeto</SelectItem>
+                  <SelectItem value="none">{t('projects.no_project')}</SelectItem>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
@@ -670,7 +672,7 @@ export default function Dashboard() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startTime" className="text-foreground">Hora de Início</Label>
+                <Label htmlFor="startTime" className="text-foreground">{t('tasks.start_time')}</Label>
                 <Input
                   id="startTime"
                   type="time"
@@ -680,7 +682,7 @@ export default function Dashboard() {
                 />
               </div>
               <div>
-                <Label htmlFor="endTime" className="text-foreground">Hora de Fim</Label>
+                <Label htmlFor="endTime" className="text-foreground">{t('tasks.end_time')}</Label>
                 <Input
                   id="endTime"
                   type="time"
@@ -697,13 +699,13 @@ export default function Dashboard() {
                 onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, isRoutine: !!checked }))}
                 className="transition-all duration-200 hover:scale-110"
               />
-              <Label htmlFor="isRoutine" className="text-foreground">Tarefa de rotina</Label>
+              <Label htmlFor="isRoutine" className="text-foreground">{t('tasks.routine_task')}</Label>
             </div>
             {taskForm.isRoutine && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-foreground block mb-1">Vezes por dia</Label>
+                    <Label className="text-foreground block mb-1">{t('routines.times_per_day')}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -714,11 +716,11 @@ export default function Dashboard() {
                     />
                   </div>
                   <div>
-                    <Label className="text-foreground block mb-1">Duração (dias)</Label>
+                    <Label className="text-foreground block mb-1">{t('routines.duration_days')}</Label>
                     <Input
                       type="number"
                       min={1}
-                      placeholder="Deixe vazio para sempre"
+                      placeholder={t('routines.leave_empty_forever')}
                       value={taskForm.routineDurationDays || ''}
                       onChange={(e) => setTaskForm(prev => ({ ...prev, routineDurationDays: e.target.value ? Number(e.target.value) : null }))}
                       className="modern-input"
@@ -727,7 +729,7 @@ export default function Dashboard() {
                 </div>
                 
                 <div>
-                  <Label className="text-foreground block mb-2">Horários específicos</Label>
+                  <Label className="text-foreground block mb-2">{t('routines.specific_times')}</Label>
                   <div className="space-y-2">
                     {taskForm.routineSpecificTimes.map((time, index) => (
                       <div key={index} className="flex items-center gap-2">
@@ -763,15 +765,15 @@ export default function Dashboard() {
                       className="w-full"
                     >
                       <Plus className="w-4 h-4 mr-2" />
-                      Adicionar horário
+                      {t('routines.add_time')}
                     </Button>
                   </div>
                 </div>
 
                 <div>
-                  <Label className="text-foreground block mb-2">Dias da semana</Label>
+                  <Label className="text-foreground block mb-2">{t('dashboard.weekdays.title')}</Label>
                   <div className="grid grid-cols-7 gap-2">
-                    {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                    {[t('dashboard.weekdays.sunday_short'), t('dashboard.weekdays.monday_short'), t('dashboard.weekdays.tuesday_short'), t('dashboard.weekdays.wednesday_short'), t('dashboard.weekdays.thursday_short'), t('dashboard.weekdays.friday_short'), t('dashboard.weekdays.saturday_short')].map((day, index) => (
                       <div key={index} className="flex items-center space-x-2">
                         <Checkbox
                           id={`weekday-${index}`}
@@ -790,14 +792,14 @@ export default function Dashboard() {
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    {taskForm.routineWeekdays.length === 0 ? 'Selecione para todos os dias' : 
-                     taskForm.routineWeekdays.length === 7 ? 'Todos os dias selecionados' :
-                     `${taskForm.routineWeekdays.length} dia(s) selecionado(s)`}
+                    {taskForm.routineWeekdays.length === 0 ? t('dashboard.weekdays.select_all_days') : 
+                     taskForm.routineWeekdays.length === 7 ? t('dashboard.weekdays.all_days_selected') :
+                     t('dashboard.weekdays.days_selected', { count: taskForm.routineWeekdays.length })}
                   </p>
                 </div>
 
                 <div>
-                  <Label className="text-foreground block mb-1">Prioridade</Label>
+                  <Label className="text-foreground block mb-1">{t('common.priority')}</Label>
                   <Select
                     value={taskForm.routinePriority}
                     onValueChange={(value) => setTaskForm(prev => ({ ...prev, routinePriority: value as "low" | "medium" | "high" }))}
@@ -806,16 +808,16 @@ export default function Dashboard() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="modern-dropdown">
-                      <SelectItem value="low">Baixa</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="low">{t('common.priority_low')}</SelectItem>
+                      <SelectItem value="medium">{t('common.priority_medium')}</SelectItem>
+                      <SelectItem value="high">{t('common.priority_high')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label className="text-foreground block mb-1">Frequência</Label>
+                    <Label className="text-foreground block mb-1">{t('routines.frequency')}</Label>
                     <Select
                       value={taskForm.repeatUnit}
                       onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
@@ -824,15 +826,15 @@ export default function Dashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="modern-dropdown">
-                        <SelectItem value="day">Dia</SelectItem>
-                        <SelectItem value="week">Semana</SelectItem>
-                        <SelectItem value="month">Mês</SelectItem>
-                        <SelectItem value="year">Ano</SelectItem>
+                        <SelectItem value="day">{t('time.day')}</SelectItem>
+                        <SelectItem value="week">{t('time.week')}</SelectItem>
+                        <SelectItem value="month">{t('time.month')}</SelectItem>
+                        <SelectItem value="year">{t('time.year')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div>
-                    <Label className="text-foreground block mb-1">Quantidade</Label>
+                    <Label className="text-foreground block mb-1">{t('common.quantity')}</Label>
                     <Input
                       type="number"
                       min={1}
@@ -849,7 +851,7 @@ export default function Dashboard() {
                       onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
                       className="transition-all duration-200 hover:scale-110"
                     />
-                    <Label htmlFor="repeatAlways" className="text-foreground">Sempre</Label>
+                    <Label htmlFor="repeatAlways" className="text-foreground">{t('common.always')}</Label>
                   </div>
                 </div>
               </div>
@@ -863,10 +865,10 @@ export default function Dashboard() {
                 {routineLoading ? (
                   <div className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Criando...</span>
+                    <span>{t('common.creating')}...</span>
                   </div>
                 ) : (
-                  'Criar Tarefa'
+                  t('tasks.create_task')
                 )}
               </Button>
               <Button 
@@ -875,7 +877,7 @@ export default function Dashboard() {
                 disabled={routineLoading}
                 className="transition-all duration-200 hover:scale-105 active:scale-95 hover:bg-accent"
               >
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -885,11 +887,11 @@ export default function Dashboard() {
       <Dialog open={deleteModal.open} onOpenChange={(open) => setDeleteModal(prev => ({ ...prev, open }))}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Excluir tarefa</DialogTitle>
+            <DialogTitle>{t('tasks.delete_task')}</DialogTitle>
             <DialogDescription>
               {deleteModal.task?.isRoutine
-                ? 'Esta tarefa faz parte de uma rotina. Você pode excluir apenas esta ocorrência ou excluir todas as ocorrências em um intervalo de datas.'
-                : 'Tem certeza que deseja excluir esta tarefa?'}
+                ? t('tasks.delete_routine_description')
+                : t('tasks.delete_task_confirmation')}
             </DialogDescription>
           </DialogHeader>
                         {deleteModal.task?.isRoutine && (
@@ -897,7 +899,7 @@ export default function Dashboard() {
               <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                 <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mx-auto mb-2" />
                 <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                  <strong>Atenção:</strong> Excluir uma rotina irá removê-la permanentemente de todas as datas.
+                  <strong>{t('common.attention')}:</strong> {t('routines.delete_warning')}
                 </p>
               </div>
             </div>
@@ -905,13 +907,13 @@ export default function Dashboard() {
           <div className="flex gap-2 pt-2">
             {deleteModal.task?.isRoutine ? (
               <Button className="flex-1" onClick={handleConfirmDeleteSingle}>
-                Excluir rotina permanentemente
+                {t('routines.delete_permanently')}
               </Button>
             ) : (
-              <Button className="flex-1" onClick={handleConfirmDeleteSingle}>Confirmar</Button>
+              <Button className="flex-1" onClick={handleConfirmDeleteSingle}>{t('common.confirm')}</Button>
             )}
             <Button variant="outline" className="flex-1" onClick={() => setDeleteModal({ open: false, task: null, mode: 'single' })}>
-              Cancelar
+              {t('common.cancel')}
             </Button>
           </div>
         </DialogContent>

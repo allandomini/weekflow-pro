@@ -2,6 +2,7 @@ import React from 'react';
 import { AuthProvider } from './hooks/useAuth';
 import { SupabaseAppProvider } from './contexts/SupabaseAppContext';
 import { AnimationProvider } from './contexts/AnimationContext';
+import TranslationProvider from './components/TranslationProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from './components/ui/toaster';
@@ -48,14 +49,15 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <AnimationProvider>
-        <SupabaseAppProvider>
-          <TooltipProvider>
-            <Toaster />
-            <BrowserRouter future={{
-              v7_startTransition: true,
-              v7_relativeSplatPath: true
-            }}>
+      <TranslationProvider>
+        <AnimationProvider>
+          <SupabaseAppProvider>
+            <TooltipProvider>
+              <Toaster />
+              <BrowserRouter future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true
+              }}>
               <Routes>
                 <Route path="/auth" element={<Auth />} />
                 <Route path="/*" element={
@@ -86,8 +88,9 @@ const App = () => (
           </TooltipProvider>
         </SupabaseAppProvider>
       </AnimationProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+    </TranslationProvider>
+  </AuthProvider>
+</QueryClientProvider>
 );
 
 export default App;

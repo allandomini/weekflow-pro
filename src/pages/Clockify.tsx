@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { ClockifyTimeEntry } from '@/types';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -28,6 +29,8 @@ export default function Clockify() {
     pauseClockifyTimer,
     resumeClockifyTimer
   } = useAppContext();
+  
+  const { t } = useTranslation();
 
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [timerStart, setTimerStart] = useState<Date | null>(null);
@@ -45,7 +48,7 @@ export default function Clockify() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
   // Tags padrão para categorizar pessoas
-  const defaultTags = ['cliente', 'apoio', 'devedor', 'fornecedor', 'parceiro', 'funcionário'];
+  const defaultTags = [t('clockify.tags_categories.client'), t('clockify.tags_categories.support'), t('clockify.tags_categories.debtor'), t('clockify.tags_categories.supplier'), t('clockify.tags_categories.partner'), t('clockify.tags_categories.employee')];
 
   // Atualizar timer a cada segundo
   useEffect(() => {
@@ -75,7 +78,7 @@ export default function Clockify() {
     if (activeTimer) return;
     
     const newEntry: Omit<ClockifyTimeEntry, 'id' | 'createdAt' | 'updatedAt'> = {
-      description: entry.description || 'Tarefa em andamento',
+      description: entry.description || t('clockify.task_in_progress'),
       projectId: entry.projectId || '',
       personIds: entry.personIds || [],
       startTime: new Date(),
@@ -179,8 +182,8 @@ export default function Clockify() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Clockify</h1>
-          <p className="text-muted-foreground">Controle de tempo integrado com projetos e pessoas</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('clockify.title')}</h1>
+          <p className="text-muted-foreground">{t('clockify.time_tracking')}</p>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
@@ -192,9 +195,9 @@ export default function Clockify() {
 
       <Tabs defaultValue="timer" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="timer">Timer</TabsTrigger>
-          <TabsTrigger value="entries">Entradas</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="timer">{t('clockify.start_timer')}</TabsTrigger>
+          <TabsTrigger value="entries">{t('clockify.entries')}</TabsTrigger>
+          <TabsTrigger value="analytics">{t('clockify.analytics')}</TabsTrigger>
         </TabsList>
 
         {/* Timer Tab */}
@@ -203,7 +206,7 @@ export default function Clockify() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
-                Timer Ativo
+{t('clockify.start_timer')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -220,11 +223,11 @@ export default function Clockify() {
                   <div className="flex gap-2 justify-center">
                     <Button onClick={() => pauseTimer()} size="lg" variant="outline">
                       <Pause className="w-4 h-4 mr-2" />
-                      Pausar
+{t('clockify.pause_timer')}
                     </Button>
                     <Button onClick={() => stopTimer()} size="lg" className="bg-red-600 hover:bg-red-700">
                       <Square className="w-4 h-4 mr-2" />
-                      Parar
+{t('clockify.stop_timer')}
                     </Button>
                   </div>
                 </div>
@@ -232,19 +235,19 @@ export default function Clockify() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="description">Descrição</Label>
+                      <Label htmlFor="description">{t('clockify.description')}</Label>
                       <Input
                         id="description"
                         value={newEntry.description}
                         onChange={(e) => setNewEntry({ ...newEntry, description: e.target.value })}
-                        placeholder="O que você está fazendo?"
+                        placeholder={t('clockify.what_are_you_doing')}
                       />
                     </div>
                     <div>
-                      <Label htmlFor="project">Projeto</Label>
+                      <Label htmlFor="project">{t('clockify.project')}</Label>
                       <Select value={newEntry.projectId} onValueChange={(value) => setNewEntry({ ...newEntry, projectId: value })}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecione um projeto" />
+                          <SelectValue placeholder={t('clockify.select_project')} />
                         </SelectTrigger>
                         <SelectContent>
                           {projects.map((project) => (
@@ -264,14 +267,14 @@ export default function Clockify() {
                   </div>
 
                   <div>
-                    <Label htmlFor="people">Pessoas Envolvidas</Label>
+                    <Label htmlFor="people">{t('clockify.people_involved')}</Label>
                     <Select onValueChange={(value) => {
                       if (!newEntry.personIds.includes(value)) {
                         setNewEntry({ ...newEntry, personIds: [...newEntry.personIds, value] });
                       }
                     }}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Adicionar pessoa" />
+                        <SelectValue placeholder={t('clockify.add_person')} />
                       </SelectTrigger>
                       <SelectContent>
                         {contacts.map((contact) => (
@@ -318,13 +321,13 @@ export default function Clockify() {
                   </div>
 
                   <div>
-                    <Label htmlFor="tags">Tags</Label>
+                    <Label htmlFor="tags">{t('clockify.tags')}</Label>
                     <div className="flex gap-2 mb-2">
                       <Input
                         id="tags"
                         value={newTag}
                         onChange={(e) => setNewTag(e.target.value)}
-                        placeholder="Nova tag"
+                        placeholder={t('clockify.new_tag')}
                         onKeyPress={(e) => e.key === 'Enter' && addTag()}
                       />
                       <Button onClick={addTag} size="sm">
@@ -356,11 +359,11 @@ export default function Clockify() {
                         checked={newEntry.billable}
                         onCheckedChange={(checked) => setNewEntry({ ...newEntry, billable: checked })}
                       />
-                      <Label htmlFor="billable">Faturável</Label>
+                      <Label htmlFor="billable">{t('clockify.billable')}</Label>
                     </div>
                     {newEntry.billable && (
                       <div className="flex-1">
-                        <Label htmlFor="hourlyRate">Taxa por hora (R$)</Label>
+                        <Label htmlFor="hourlyRate">{t('clockify.hourly_rate')}</Label>
                         <Input
                           id="hourlyRate"
                           type="number"
@@ -379,7 +382,7 @@ export default function Clockify() {
                     disabled={!newEntry.description || !newEntry.projectId}
                   >
                     <Play className="w-4 h-4 mr-2" />
-                    Iniciar Timer
+{t('clockify.start_timer')}
                   </Button>
                 </div>
               )}
@@ -390,21 +393,21 @@ export default function Clockify() {
         {/* Entries Tab */}
         <TabsContent value="entries" className="space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Entradas de Tempo</h3>
+            <h3 className="text-lg font-semibold">{t('clockify.time_entries')}</h3>
             <div className="flex gap-2">
               <Badge variant="outline">
-                {getActiveEntries().length} Ativas
+{getActiveEntries().length} {t('clockify.active')}
               </Badge>
               <Badge variant="outline">
-                {getCompletedEntries().length} Concluídas
+{getCompletedEntries().length} {t('clockify.completed')}
               </Badge>
             </div>
           </div>
           <div className="space-y-6">
             <Tabs defaultValue="inprogress" className="space-y-4">
               <TabsList>
-                <TabsTrigger value="inprogress">Em andamento</TabsTrigger>
-                <TabsTrigger value="completed">Concluídas</TabsTrigger>
+                <TabsTrigger value="inprogress">{t('clockify.in_progress')}</TabsTrigger>
+                <TabsTrigger value="completed">{t('clockify.completed')}</TabsTrigger>
               </TabsList>
 
               <TabsContent value="inprogress" className="mt-0">
@@ -425,7 +428,7 @@ export default function Clockify() {
                                   </Badge>
                                 )}
                                 <Badge variant={entry.status === 'active' ? 'default' : 'outline'}>
-                                  {entry.status === 'active' ? 'Ativo' : 'Pausado'}
+                                  {entry.status === 'active' ? t('clockify.active') : t('clockify.paused')}
                                 </Badge>
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
@@ -512,7 +515,7 @@ export default function Clockify() {
                                       />
                                     </div>
                                     <div>
-                                      <Label htmlFor="edit-project">Projeto</Label>
+                                      <Label htmlFor="edit-project">{t('clockify.project')}</Label>
                                       <Select 
                                         value={entry.projectId} 
                                         onValueChange={(value) => updateClockifyTimeEntry(entry.id, { projectId: value })}
@@ -535,11 +538,11 @@ export default function Clockify() {
                                         checked={entry.billable}
                                         onCheckedChange={(checked) => updateClockifyTimeEntry(entry.id, { billable: checked })}
                                       />
-                                      <Label htmlFor="edit-billable">Faturável</Label>
+                                      <Label htmlFor="edit-billable">{t('clockify.billable')}</Label>
                                     </div>
                                     {entry.billable && (
                                       <div>
-                                        <Label htmlFor="edit-hourlyRate">Taxa por hora (R$)</Label>
+                                        <Label htmlFor="edit-hourlyRate">{t('clockify.hourly_rate')}</Label>
                                         <Input
                                           id="edit-hourlyRate"
                                           type="number"
@@ -560,7 +563,7 @@ export default function Clockify() {
                       </Card>
                     ))}
                   {clockifyTimeEntries.filter(e => e.status === 'active' || e.status === 'paused').length === 0 && (
-                    <div className="text-sm text-muted-foreground">Nenhuma entrada ativa ou pausada.</div>
+                    <div className="text-sm text-muted-foreground">{t('clockify.no_active_entries')}</div>
                   )}
                 </div>
               </TabsContent>
@@ -582,7 +585,7 @@ export default function Clockify() {
                                     R$ {entry.hourlyRate}/h
                                   </Badge>
                                 )}
-                                <Badge variant="outline">Concluído</Badge>
+                                <Badge variant="outline">{t('clockify.completed')}</Badge>
                               </div>
                               <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
                                 {entry.projectId && (
@@ -647,7 +650,7 @@ export default function Clockify() {
                                       />
                                     </div>
                                     <div>
-                                      <Label htmlFor="edit-project">Projeto</Label>
+                                      <Label htmlFor="edit-project">{t('clockify.project')}</Label>
                                       <Select 
                                         value={entry.projectId} 
                                         onValueChange={(value) => updateClockifyTimeEntry(entry.id, { projectId: value })}
@@ -670,11 +673,11 @@ export default function Clockify() {
                                         checked={entry.billable}
                                         onCheckedChange={(checked) => updateClockifyTimeEntry(entry.id, { billable: checked })}
                                       />
-                                      <Label htmlFor="edit-billable">Faturável</Label>
+                                      <Label htmlFor="edit-billable">{t('clockify.billable')}</Label>
                                     </div>
                                     {entry.billable && (
                                       <div>
-                                        <Label htmlFor="edit-hourlyRate">Taxa por hora (R$)</Label>
+                                        <Label htmlFor="edit-hourlyRate">{t('clockify.hourly_rate')}</Label>
                                         <Input
                                           id="edit-hourlyRate"
                                           type="number"
@@ -695,7 +698,7 @@ export default function Clockify() {
                       </Card>
                     ))}
                   {clockifyTimeEntries.filter(e => e.status === 'completed').length === 0 && (
-                    <div className="text-sm text-muted-foreground">Nenhuma entrada concluída.</div>
+                    <div className="text-sm text-muted-foreground">{t('clockify.no_completed_entries')}</div>
                   )}
                 </div>
               </TabsContent>
@@ -708,7 +711,7 @@ export default function Clockify() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Total de Horas</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('clockify.total_hours')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -719,7 +722,7 @@ export default function Clockify() {
             
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Horas Faturáveis</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('clockify.billable_hours')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
@@ -733,7 +736,7 @@ export default function Clockify() {
             
             <Card>
               <CardHeader>
-                <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+                <CardTitle className="text-sm font-medium">{t('clockify.total_value')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
@@ -745,7 +748,7 @@ export default function Clockify() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Projetos por Tempo</CardTitle>
+              <CardTitle>{t('clockify.projects_by_time')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">

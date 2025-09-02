@@ -128,7 +128,7 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
         return newSet;
       });
     }
-  }, [completeRoutineOnce, activeRoutines, routineCompletions, isCompleting, refreshData]);
+  }, [completeRoutineOnce, activeRoutines, routineCompletions, isCompleting]);
 
   // Optimized get routine progress with local state
   const getRoutineProgress = useCallback((routineId: string, date?: string) => {
@@ -183,13 +183,13 @@ export function useRoutinesOptimized(): UseRoutinesOptimizedReturn {
       // Update context with fresh data if available
       if (routinesResult.data && completionsResult.data) {
         // This would require exposing setRoutines and setRoutineCompletions from context
-        // For now, fallback to full refresh only when necessary
-        await refreshData();
+        // For now, we'll skip the full refresh to prevent excessive loading
+        console.log('Routine data refreshed without full app reload');
       }
     } catch (error) {
       console.error('Error refreshing routines:', error);
     }
-  }, [user, refreshData]);
+  }, [user]);
 
   return {
     routines: activeRoutines,

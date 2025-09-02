@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -39,7 +40,7 @@ import {
   History
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR, enUS, es } from 'date-fns/locale';
 import { Account, Transaction, Debt, Goal, Receivable } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -69,6 +70,18 @@ export default function Finances() {
     deleteDebt,
     deleteReceivable
   } = useAppContext();
+  
+  const { t, getCurrentLanguage } = useTranslation();
+  
+  // Get appropriate locale for date formatting
+  const getDateLocale = () => {
+    const lang = getCurrentLanguage();
+    switch (lang) {
+      case 'en': return enUS;
+      case 'es': return es;
+      default: return ptBR;
+    }
+  };
 
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
@@ -261,7 +274,7 @@ export default function Finances() {
       setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
       setIsTransactionDialogOpen(false);
     } catch (error) {
-      console.error('Erro ao atualizar transação:', error);
+      console.error('Error updating transaction:', error);
     }
   };
 
@@ -287,11 +300,11 @@ export default function Finances() {
   };
 
   const handleDeleteTransaction = async (id: string) => {
-    if (confirm("Tem certeza que deseja excluir esta transação?")) {
+    if (confirm(t('finances.confirm_delete_transaction'))) {
       try {
         await deleteTransaction(id);
       } catch (error) {
-        console.error('Erro ao excluir transação:', error);
+        console.error('Error deleting transaction:', error);
       }
     }
   };
@@ -363,7 +376,7 @@ export default function Finances() {
     const account = accounts.find(a => a.id === paymentForm.accountId);
     
     if (!account || account.balance < amount) {
-      alert('Saldo insuficiente na conta selecionada');
+      alert(t('finances.insufficient_balance'));
       return;
     }
 
@@ -380,7 +393,7 @@ export default function Finances() {
     const account = accounts.find(a => a.id === allocationForm.accountId);
     
     if (!account || account.balance < amount) {
-      alert('Saldo insuficiente na conta selecionada');
+      alert(t('finances.insufficient_balance'));
       return;
     }
 
@@ -428,20 +441,20 @@ export default function Finances() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Finanças</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t('finances.title')}</h1>
             <p className="text-muted-foreground">
-              Gerencie suas contas, dívidas e metas
+              {t('finances.manage_description')}
             </p>
           </div>
         <div className="flex gap-2">
           <FinancialCalculator />
           <Button variant="outline" onClick={() => setIsAccountDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Nova Conta
+{t('finances.create_account')}
           </Button>
           <Button variant="gradient" onClick={() => setIsTransactionDialogOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            Transação
+{t('finances.create_transaction')}
           </Button>
         </div>
       </div>
@@ -450,7 +463,7 @@ export default function Finances() {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Saldo Total</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('finances.balance')}</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -458,14 +471,14 @@ export default function Finances() {
               {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {accounts.length} conta{accounts.length !== 1 ? 's' : ''}
+              {accounts.length} {accounts.length === 1 ? t('finances.labels.account') : t('finances.labels.accounts')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Dívidas Ativas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('finances.active_debts')}</CardTitle>
             <CreditCard className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -473,9 +486,9 @@ export default function Finances() {
               {totalActiveDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {activeDebts.length} ativa{activeDebts.length !== 1 ? 's' : ''}
+              {activeDebts.length} {activeDebts.length === 1 ? t('finances.labels.active') : t('finances.labels.actives')}
               {overdueDebts.length > 0 && (
-                <span className="text-red-600 ml-1">• {overdueDebts.length} atrasada{overdueDebts.length !== 1 ? 's' : ''}</span>
+                <span className="text-red-600 ml-1">• {overdueDebts.length} {overdueDebts.length === 1 ? t('finances.labels.overdue') : t('finances.labels.overdues')}</span>
               )}
             </p>
           </CardContent>
@@ -483,7 +496,7 @@ export default function Finances() {
 
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Patrimônio Líquido</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('finances.net_worth')}</CardTitle>
             <Shield className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -491,14 +504,14 @@ export default function Finances() {
               {netWorth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {netWorth >= 0 ? 'Situação positiva' : 'Necessita atenção'}
+              {netWorth >= 0 ? t('finances.positive_situation') : t('finances.needs_attention')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Metas</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('finances.goals')}</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -506,14 +519,14 @@ export default function Finances() {
               {totalGoals.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {goals.length} meta{goals.length !== 1 ? 's' : ''}
+              {goals.length} {goals.length === 1 ? t('finances.labels.goal') : t('finances.labels.goals')}
             </p>
           </CardContent>
         </Card>
 
         <Card className="shadow-elegant hover:shadow-glow transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">A Receber</CardTitle>
+            <CardTitle className="text-sm font-medium">{t('finances.receivables')}</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -521,7 +534,7 @@ export default function Finances() {
               {totalReceivablesPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </div>
             <p className="text-xs text-muted-foreground">
-              {receivables.filter(r => r.status === 'pending').length} pendente(s)
+              {receivables.filter(r => r.status === 'pending').length} {t('finances.labels.pendings')}
             </p>
           </CardContent>
         </Card>
@@ -529,12 +542,12 @@ export default function Finances() {
 
       <Tabs defaultValue="accounts" className="space-y-6">
         <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="accounts">Contas</TabsTrigger>
-          <TabsTrigger value="transactions">Transações</TabsTrigger>
-          <TabsTrigger value="debts">Dívidas</TabsTrigger>
-          <TabsTrigger value="goals">Metas</TabsTrigger>
-          <TabsTrigger value="receivables">A Receber</TabsTrigger>
-          <TabsTrigger value="analytics">Análises</TabsTrigger>
+          <TabsTrigger value="accounts">{t('financial.tabs.accounts')}</TabsTrigger>
+          <TabsTrigger value="transactions">{t('financial.tabs.transactions')}</TabsTrigger>
+          <TabsTrigger value="debts">{t('financial.tabs.debts')}</TabsTrigger>
+          <TabsTrigger value="goals">{t('financial.tabs.goals')}</TabsTrigger>
+          <TabsTrigger value="receivables">{t('financial.tabs.receivables')}</TabsTrigger>
+          <TabsTrigger value="analytics">{t('financial.tabs.analytics')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts">
@@ -548,8 +561,8 @@ export default function Finances() {
                       {account.name}
                     </CardTitle>
                     <Badge variant="secondary">
-                      {account.type === 'checking' ? 'Corrente' : 
-                       account.type === 'savings' ? 'Poupança' : 'Investimento'}
+                      {account.type === 'checking' ? t('finances.account_types.checking') : 
+                       account.type === 'savings' ? t('finances.account_types.savings') : t('finances.account_types.investment')}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -563,15 +576,15 @@ export default function Finances() {
                         setEditingAccount(account);
                         setAccountForm({ name: account.name, balance: String(account.balance), type: account.type });
                         setIsAccountDialogOpen(true);
-                      }}>Editar</Button>
+                      }}>{t('common.edit')}</Button>
                       <Button variant="ghost" size="sm" onClick={() => handleDeleteAccountClick(account)}>
-                        Excluir
+                        {t('common.delete')}
                       </Button>
                     </div>
                     
                     <div>
                       <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                        Últimas Transações
+                        {t('finances.latest_transactions')}
                       </h4>
                       <div className="space-y-2">
                         {getAccountTransactions(account.id).map((transaction) => (
@@ -585,7 +598,7 @@ export default function Finances() {
                       <div>
                         <div className="text-sm font-medium">{transaction.description}</div>
                         <div className="text-xs text-muted-foreground">
-                          {format(transaction.date, "d 'de' MMM", { locale: ptBR })}
+                          {format(transaction.date, "d MMM", { locale: getDateLocale() })}
                         </div>
                       </div>
                     </div>
@@ -604,10 +617,10 @@ export default function Finances() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => openEditTransaction(transaction)}>
-                            <Pencil className="mr-2 h-4 w-4" /> Editar
+                            <Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteTransaction(transaction.id)}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                            <Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -616,7 +629,7 @@ export default function Finances() {
                 ))}
                         {getAccountTransactions(account.id).length === 0 && (
                           <p className="text-sm text-muted-foreground py-2">
-                            Nenhuma transação encontrada
+                            {t('finances.no_transactions_found')}
                           </p>
                         )}
                       </div>
@@ -631,7 +644,7 @@ export default function Finances() {
         <TabsContent value="transactions">
           <Card className="shadow-elegant">
             <CardHeader>
-              <CardTitle>Histórico de Transações</CardTitle>
+              <CardTitle>{t('finances.transaction_history')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -651,7 +664,7 @@ export default function Finances() {
                           <div>
                             <div className="font-medium">{transaction.description}</div>
                             <div className="text-sm text-muted-foreground">
-                              {account?.name} • {format(transaction.date, "d 'de' MMM 'às' HH:mm", { locale: ptBR })}
+                              {account?.name} • {format(transaction.date, "d MMM 'at' HH:mm", { locale: getDateLocale() })}
                             </div>
                           </div>
                         </div>
@@ -670,10 +683,10 @@ export default function Finances() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => openEditTransaction(transaction)}>
-                                <Pencil className="mr-2 h-4 w-4" /> Editar
+                                <Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}
                               </DropdownMenuItem>
                               <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => handleDeleteTransaction(transaction.id)}>
-                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                                <Trash2 className="mr-2 h-4 w-4" /> {t('common.delete')}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -683,7 +696,7 @@ export default function Finances() {
                   })}
                 {transactions.length === 0 && (
                   <p className="text-center text-muted-foreground py-8">
-                    Nenhuma transação encontrada
+                    {t('finances.no_transactions_found')}
                   </p>
                 )}
               </div>
@@ -696,31 +709,31 @@ export default function Finances() {
             <div className="flex justify-between items-center">
               <div className="flex gap-2">
                 <Badge variant={overdueDebts.length > 0 ? "destructive" : "secondary"}>
-                  {activeDebts.length} Ativa{activeDebts.length !== 1 ? 's' : ''}
+                  {activeDebts.length} {activeDebts.length === 1 ? t('finances.labels.active') : t('finances.labels.actives')}
                 </Badge>
                 {overdueDebts.length > 0 && (
                   <Badge variant="destructive">
-                    {overdueDebts.length} Atrasada{overdueDebts.length !== 1 ? 's' : ''}
+                    {overdueDebts.length} {overdueDebts.length === 1 ? t('finances.labels.overdue') : t('finances.labels.overdues')}
                   </Badge>
                 )}
                 {paidDebts.length > 0 && (
                   <Badge variant="secondary" className="bg-green-100 text-green-800">
-                    {paidDebts.length} Paga{paidDebts.length !== 1 ? 's' : ''}
+                    {paidDebts.length} {paidDebts.length === 1 ? t('finances.labels.paid') : t('finances.labels.paids')}
                   </Badge>
                 )}
               </div>
               <Button onClick={() => setIsDebtDialogOpen(true)} className="gap-2">
                 <Receipt className="w-4 h-4" />
-                Nova Dívida
+                {t('finances.debt_dialog.title')}
               </Button>
             </div>
             
             {/* Active and Overdue Debts */}
             {(activeDebts.length > 0 || overdueDebts.length > 0) && (
               <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-red-600" />
-                  Dívidas Pendentes
+                  {t('finances.labels.pending_debts')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {activeDebts.concat(overdueDebts).map((debt) => {
@@ -743,7 +756,7 @@ export default function Finances() {
                           <span className={isOverdue ? 'text-red-800' : ''}>{debt.name}</span>
                           {isOverdue && (
                             <Badge variant="destructive" className="text-xs">
-                              {Math.abs(daysUntilDue)} dias atrasado
+                              {Math.abs(daysUntilDue)} {t('finances.labels.days_overdue')}
                             </Badge>
                           )}
                         </div>
@@ -765,7 +778,7 @@ export default function Finances() {
                               setIsEditDebtDialogOpen(true);
                             }}>
                               <Edit className="mr-2 h-4 w-4" />
-                              Editar
+                              {t('common.edit')}
                             </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => {
@@ -775,7 +788,7 @@ export default function Finances() {
                               className="text-destructive"
                             >
                               <Trash className="mr-2 h-4 w-4" />
-                              Excluir
+                              {t('common.delete')}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -785,14 +798,14 @@ export default function Finances() {
                       <div className="space-y-4">
                         <div>
                           <div className="flex justify-between text-sm mb-2">
-                            <span>Valor Restante</span>
-                            <span className="font-medium">{progress.toFixed(0)}% pago</span>
+                            <span>{t('finances.labels.remaining_value')}</span>
+                            <span className="font-medium">{progress.toFixed(0)}% {t('finances.labels.paid_percentage')}</span>
                           </div>
                           <div className="text-xl font-bold text-destructive mb-2">
                             {debt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            de {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {t('finances.labels.of')} {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 mt-2">
                             <div 
@@ -803,7 +816,7 @@ export default function Finances() {
                         </div>
                         <div>
                           <div className="flex justify-between text-sm mb-2">
-                            <span>Valor Projetado Restante</span>
+                            <span>{t('finances.labels.projected_remaining')}</span>
                           </div>
                           <div className="text-xl font-bold text-destructive mb-2">
                             {projectedRemaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -811,7 +824,7 @@ export default function Finances() {
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="w-4 h-4" />
-                          Vence em {format(debt.dueDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                          {t('finances.labels.due_date')} {format(debt.dueDate, "d MMM yyyy", { locale: getDateLocale() })}
                         </div>
                         <Button 
                           variant="outline" 
@@ -821,7 +834,7 @@ export default function Finances() {
                             setIsPayDebtDialogOpen(true);
                           }}
                         >
-                          Fazer Pagamento
+                          {t('finances.labels.make_payment')}
                         </Button>
                         <Button 
                           variant="outline" 
@@ -832,7 +845,7 @@ export default function Finances() {
                             setIsAllocateAdvanceDialogOpen(true);
                           }}
                         >
-                          Alocar Adiantamento
+                          {t('finances.labels.allocate_advance')}
                         </Button>
                       </div>
                     </CardContent>
@@ -848,7 +861,7 @@ export default function Finances() {
               <div className="border-t pt-6">
                 <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                   <Archive className="w-5 h-5 text-green-600" />
-                  Dívidas Quitadas
+                  {t('finances.labels.paid_debts')}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {paidDebts.map((debt) => {
@@ -861,7 +874,7 @@ export default function Finances() {
                               <CheckCircle2 className="w-5 h-5 text-green-600" />
                               <span className="text-green-800">{debt.name}</span>
                               <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
-                                QUITADA
+                                {t('finances.labels.paid_status')}
                               </Badge>
                             </div>
                           </CardTitle>
@@ -872,11 +885,11 @@ export default function Finances() {
                               {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </div>
                             <div className="text-sm text-green-600">
-                              Valor total quitado
+                              {t('finances.labels.total_paid')}
                             </div>
                             <div className="flex items-center gap-2 text-sm text-green-600">
                               <Calendar className="w-4 h-4" />
-                              Paga em {format(paidDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                              {t('finances.labels.paid_on')} {format(paidDate, "d MMM yyyy", { locale: getDateLocale() })}
                             </div>
                             <div className="w-full bg-green-200 rounded-full h-2">
                               <div className="bg-green-600 h-2 rounded-full w-full" />
@@ -897,7 +910,7 @@ export default function Finances() {
             <div className="flex justify-end">
               <Button onClick={() => setIsGoalDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Nova Meta
+                {t('finances.labels.new_goal')}
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -915,14 +928,14 @@ export default function Finances() {
                       <div className="space-y-4">
                         <div>
                           <div className="flex justify-between text-sm mb-2">
-                            <span>Progresso</span>
+                            <span>{t('finances.labels.progress')}</span>
                             <span className="font-medium">{progress.toFixed(0)}%</span>
                           </div>
                           <div className="text-xl font-bold text-warning mb-2">
                             {goal.currentAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            de {goal.targetAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {t('finances.labels.of')} {goal.targetAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 mt-2">
                             <div 
@@ -934,7 +947,7 @@ export default function Finances() {
                         {goal.targetDate && (
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />
-                            Meta para {format(goal.targetDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                            {t('finances.labels.goal_target')} {format(goal.targetDate, "d MMM yyyy", { locale: getDateLocale() })}
                           </div>
                         )}
                         <Button 
@@ -945,7 +958,7 @@ export default function Finances() {
                             setIsAllocateGoalDialogOpen(true);
                           }}
                         >
-                          Alocar Dinheiro
+                          {t('finances.labels.allocate_money')}
                         </Button>
                       </div>
                     </CardContent>
@@ -961,7 +974,7 @@ export default function Finances() {
             <div className="flex justify-end">
               <Button onClick={() => setIsReceivableDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
-                Novo A Receber
+                {t('finances.labels.new_receivable')}
               </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -984,14 +997,14 @@ export default function Finances() {
                           {r.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          Vencimento: {format(r.dueDate, "d 'de' MMM yyyy", { locale: ptBR })}
+                          {t('finances.labels.due_date_short')}: {format(r.dueDate, "d MMM yyyy", { locale: getDateLocale() })}
                         </div>
                         {r.description && (
                           <div className="text-sm text-muted-foreground mt-1">{r.description}</div>
                         )}
                         {r.status === 'received' && r.receivedAt && (
                           <div className="text-xs text-muted-foreground mt-1">
-                            Recebido em {format(r.receivedAt, "d 'de' MMM yyyy", { locale: ptBR })}
+                            {t('finances.labels.received_on')} {format(r.receivedAt, "d MMM yyyy", { locale: getDateLocale() })}
                           </div>
                         )}
                       </div>
@@ -1004,14 +1017,14 @@ export default function Finances() {
                               setIsReceiveDialogOpen(true);
                             }}
                           >
-                            Marcar como Recebido
+                            {t('finances.labels.mark_received')}
                           </Button>
                         )}
                         <Button 
                           variant="ghost" 
                           onClick={() => deleteReceivable(r.id)}
                         >
-                          Excluir
+                          {t('common.delete')}
                         </Button>
                       </div>
                     </div>
@@ -1019,7 +1032,7 @@ export default function Finances() {
                 </Card>
               ))}
               {receivables.length === 0 && (
-                <p className="text-center text-muted-foreground py-8">Nenhum registro</p>
+                <p className="text-center text-muted-foreground py-8">{t('finances.labels.no_records')}</p>
               )}
             </div>
           </div>
@@ -1030,7 +1043,7 @@ export default function Finances() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="shadow-elegant">
               <CardHeader>
-                <CardTitle>Fluxo Líquido (30 dias)</CardTitle>
+                <CardTitle>{t('finances.labels.net_flow_30_days')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">
@@ -1039,12 +1052,12 @@ export default function Finances() {
                       .reduce((sum,t)=>sum + (t.type==='deposit'? t.amount : -t.amount),0)
                   ).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
                 </p>
-                <p className="text-sm text-muted-foreground">Entradas - Saídas</p>
+                <p className="text-sm text-muted-foreground">{t('finances.labels.income_minus_expenses')}</p>
               </CardContent>
             </Card>
             <Card className="shadow-elegant">
               <CardHeader>
-                <CardTitle>Maior Despesa Recente</CardTitle>
+                <CardTitle>{t('finances.labels.largest_recent_expense')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">
@@ -1053,16 +1066,16 @@ export default function Finances() {
                     return w ? w.amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—'
                   })()}
                 </p>
-                <p className="text-sm text-muted-foreground">Ponto de atenção para reduzir custos</p>
+                <p className="text-sm text-muted-foreground">{t('finances.labels.cost_reduction_focus')}</p>
               </CardContent>
             </Card>
             <Card className="shadow-elegant">
               <CardHeader>
-                <CardTitle>Recebíveis Pendentes</CardTitle>
+                <CardTitle>{t('finances.labels.pending_receivables')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">{totalReceivablesPending.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</p>
-                <p className="text-sm text-muted-foreground">Planeje o caixa com base no que entra</p>
+                <p className="text-sm text-muted-foreground">{t('finances.labels.cash_flow_planning')}</p>
               </CardContent>
             </Card>
           </div>
@@ -1074,23 +1087,23 @@ export default function Finances() {
       <Dialog open={isAccountDialogOpen} onOpenChange={(open)=>{ if(!open) setEditingAccount(null); setIsAccountDialogOpen(open); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingAccount ? 'Editar Conta' : 'Nova Conta'}</DialogTitle>
+            <DialogTitle>{editingAccount ? t('finances.account_dialog.edit_title') : t('finances.account_dialog.create_title')}</DialogTitle>
             <DialogDescription>
-              {editingAccount ? 'Edite as informações da conta selecionada.' : 'Crie uma nova conta bancária para gerenciar seus recursos.'}
+              {editingAccount ? t('finances.account_dialog.edit_description') : t('finances.account_dialog.create_description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="accountName">Nome da Conta</Label>
+              <Label htmlFor="accountName">{t('finances.account_dialog.name_label')}</Label>
               <Input
                 id="accountName"
                 value={accountForm.name}
                 onChange={(e) => setAccountForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Conta Corrente Banco X"
+                placeholder={t('finances.account_dialog.name_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="accountBalance">Saldo Inicial</Label>
+              <Label htmlFor="accountBalance">{t('finances.account_dialog.balance_label')}</Label>
               <Input
                 id="accountBalance"
                 type="number"
@@ -1101,23 +1114,23 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="accountType">Tipo de Conta</Label>
+              <Label htmlFor="accountType">{t('finances.account_dialog.type_label')}</Label>
               <Select value={accountForm.type} onValueChange={(value: Account['type']) => setAccountForm(prev => ({ ...prev, type: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="checking">Conta Corrente</SelectItem>
-                  <SelectItem value="savings">Poupança</SelectItem>
+                  <SelectItem value="checking">{t('finances.account_types.checking')}</SelectItem>
+                  <SelectItem value="savings">{t('finances.account_types.savings')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={editingAccount ? handleSaveAccount : handleCreateAccount} className="flex-1">
-                {editingAccount ? 'Salvar' : 'Criar Conta'}
+                {editingAccount ? t('finances.account_dialog.save_button') : t('finances.account_dialog.create_button')}
               </Button>
               <Button variant="outline" onClick={() => setIsAccountDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1128,19 +1141,19 @@ export default function Finances() {
       <Dialog open={isTransactionDialogOpen} onOpenChange={setIsTransactionDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingTransaction ? 'Editar Transação' : 'Nova Transação'}</DialogTitle>
+            <DialogTitle>{editingTransaction ? t('finances.dialogs.edit_transaction') : t('finances.dialogs.new_transaction')}</DialogTitle>
             <DialogDescription>
               {editingTransaction
-                ? 'Atualize os dados da transação selecionada.'
-                : 'Registre uma nova transação financeira (depósito ou retirada) em uma de suas contas.'}
+                ? t('finances.dialogs.edit_transaction_desc')
+                : t('finances.dialogs.new_transaction_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="transactionAccount">Conta</Label>
+              <Label htmlFor="transactionAccount">{t('finances.dialogs.account_label')}</Label>
               <Select value={transactionForm.accountId} onValueChange={(value) => setTransactionForm(prev => ({ ...prev, accountId: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma conta" />
+                  <SelectValue placeholder={t('finances.dialogs.select_account')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -1152,39 +1165,39 @@ export default function Finances() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="transactionType">Tipo</Label>
+              <Label htmlFor="transactionType">{t('finances.dialogs.type_label')}</Label>
               <Select value={transactionForm.type} onValueChange={(value: "deposit" | "withdrawal") => setTransactionForm(prev => ({ ...prev, type: value }))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="deposit">Depósito</SelectItem>
-                  <SelectItem value="withdrawal">Retirada</SelectItem>
+                  <SelectItem value="deposit">{t('finances.dialogs.deposit')}</SelectItem>
+                  <SelectItem value="withdrawal">{t('finances.dialogs.withdrawal')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="transactionCategory">Categoria</Label>
+              <Label htmlFor="transactionCategory">{t('finances.dialogs.category_label')}</Label>
               <Select value={transactionForm.category} onValueChange={(value) => setTransactionForm(prev => ({ ...prev, category: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma categoria" />
+                  <SelectValue placeholder={t('finances.dialogs.select_category')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="general">Geral</SelectItem>
-                  <SelectItem value="salario">Salário</SelectItem>
-                  <SelectItem value="venda">Venda</SelectItem>
-                  <SelectItem value="alimentacao">Alimentação</SelectItem>
-                  <SelectItem value="moradia">Moradia</SelectItem>
-                  <SelectItem value="transporte">Transporte</SelectItem>
-                  <SelectItem value="saude">Saúde</SelectItem>
-                  <SelectItem value="lazer">Lazer</SelectItem>
-                  <SelectItem value="impostos">Impostos</SelectItem>
-                  <SelectItem value="outros">Outros</SelectItem>
+                  <SelectItem value="general">{t('finances.categories.general')}</SelectItem>
+                  <SelectItem value="salario">{t('finances.categories.salario')}</SelectItem>
+                  <SelectItem value="venda">{t('finances.categories.venda')}</SelectItem>
+                  <SelectItem value="alimentacao">{t('finances.categories.alimentacao')}</SelectItem>
+                  <SelectItem value="moradia">{t('finances.categories.moradia')}</SelectItem>
+                  <SelectItem value="transporte">{t('finances.categories.transporte')}</SelectItem>
+                  <SelectItem value="saude">{t('finances.categories.saude')}</SelectItem>
+                  <SelectItem value="lazer">{t('finances.categories.lazer')}</SelectItem>
+                  <SelectItem value="impostos">{t('finances.categories.impostos')}</SelectItem>
+                  <SelectItem value="outros">{t('finances.categories.outros')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="transactionAmount">Valor</Label>
+              <Label htmlFor="transactionAmount">{t('finances.dialogs.amount_label')}</Label>
               <Input
                 id="transactionAmount"
                 type="number"
@@ -1195,34 +1208,34 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="transactionDescription">Descrição *</Label>
+              <Label htmlFor="transactionDescription">{t('finances.dialogs.description_label')}</Label>
               <Input
                 id="transactionDescription"
                 value={transactionForm.description}
                 onChange={(e) => setTransactionForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição da transação (obrigatório)"
+                placeholder={t('finances.dialogs.description_placeholder')}
                 className={!transactionForm.description ? "border-red-500" : ""}
               />
               {!transactionForm.description && (
-                <p className="text-sm text-red-500 mt-1">Campo obrigatório</p>
+                <p className="text-sm text-red-500 mt-1">{t('finances.dialogs.required_field')}</p>
               )}
             </div>
             <div>
-              <Label>Categorias rápidas</Label>
+              <Label>{t('finances.dialogs.quick_categories')}</Label>
               <div className="flex flex-wrap gap-2 text-xs">
                 {['salario','venda','alimentacao','moradia','transporte','saude','lazer','impostos','outros'].map(cat => (
-                  <button key={cat} type="button" className={`px-2 py-1 rounded border ${transactionForm.category===cat? 'bg-accent' : ''}`} onClick={() => setTransactionForm(prev => ({...prev, category: cat}))}>{cat}</button>
+                  <button key={cat} type="button" className={`px-2 py-1 rounded border ${transactionForm.category===cat? 'bg-accent' : ''}`} onClick={() => setTransactionForm(prev => ({...prev, category: cat}))}>{t(`finances.categories.${cat}`)}</button>
                 ))}
               </div>
             </div>
             <div className="flex gap-3 pt-4">
               {editingTransaction ? (
                 <Button onClick={handleSaveTransaction} className="flex-1">
-                  Salvar Alterações
+                  {t('finances.dialogs.save_changes')}
                 </Button>
               ) : (
                 <Button onClick={handleCreateTransaction} className="flex-1">
-                  Criar Transação
+                  {t('finances.dialogs.create_transaction')}
                 </Button>
               )}
               <Button
@@ -1233,7 +1246,7 @@ export default function Finances() {
                   setTransactionForm({ accountId: "", type: "deposit", amount: "", description: "", category: "general" });
                 }}
               >
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1246,24 +1259,24 @@ export default function Finances() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Receipt className="w-5 h-5" />
-              Nova Dívida
+              {t('finances.debt_dialog.title')}
             </DialogTitle>
             <DialogDescription>
-              Registre uma nova dívida ou compromisso financeiro. O sistema automaticamente detectará se está em atraso.
+              {t('finances.debt_dialog.description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="debtName">Nome da Dívida</Label>
+              <Label htmlFor="debtName">{t('finances.debt_dialog.name_label')}</Label>
               <Input
                 id="debtName"
                 value={debtForm.name}
                 onChange={(e) => setDebtForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Cartão de Crédito"
+                placeholder={t('finances.debt_dialog.name_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="debtAmount">Valor Total</Label>
+              <Label htmlFor="debtAmount">{t('finances.debt_dialog.amount_label')}</Label>
               <Input
                 id="debtAmount"
                 type="number"
@@ -1274,7 +1287,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="debtDueDate">Data de Vencimento</Label>
+              <Label htmlFor="debtDueDate">{t('finances.debt_dialog.due_date_label')}</Label>
               <Input
                 id="debtDueDate"
                 type="date"
@@ -1283,15 +1296,15 @@ export default function Finances() {
               />
             </div>
             <div className="bg-blue-50 p-3 rounded-lg text-sm text-blue-800 mb-4">
-              💡 <strong>Dica:</strong> Dívidas com vencimento anterior a hoje serão marcadas como "em atraso" automaticamente.
+              {t('finances.tips.debt_overdue_tip')}
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handleCreateDebt} className="flex-1 gap-2">
                 <Receipt className="w-4 h-4" />
-                Criar Dívida
+                {t('finances.debt_dialog.create_button')}
               </Button>
               <Button variant="outline" onClick={() => setIsDebtDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1302,23 +1315,23 @@ export default function Finances() {
       <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Nova Meta</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.new_goal_title')}</DialogTitle>
             <DialogDescription>
-              Defina uma meta financeira com valor alvo e data opcional para acompanhar seu progresso.
+              {t('finances.dialogs.new_goal_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="goalName">Nome da Meta</Label>
+              <Label htmlFor="goalName">{t('finances.dialogs.goal_name')}</Label>
               <Input
                 id="goalName"
                 value={goalForm.name}
                 onChange={(e) => setGoalForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Viagem de Férias"
+                placeholder={t('finances.dialogs.goal_name_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="goalAmount">Valor Alvo</Label>
+              <Label htmlFor="goalAmount">{t('finances.dialogs.target_amount')}</Label>
               <Input
                 id="goalAmount"
                 type="number"
@@ -1329,7 +1342,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="goalDate">Data Alvo (Opcional)</Label>
+              <Label htmlFor="goalDate">{t('finances.dialogs.target_date')}</Label>
               <Input
                 id="goalDate"
                 type="date"
@@ -1339,10 +1352,10 @@ export default function Finances() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handleCreateGoal} className="flex-1">
-                Criar Meta
+                {t('finances.dialogs.create_goal')}
               </Button>
               <Button variant="outline" onClick={() => setIsGoalDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1353,23 +1366,23 @@ export default function Finances() {
       <Dialog open={isReceivableDialogOpen} onOpenChange={setIsReceivableDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Novo A Receber</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.new_receivable_title')}</DialogTitle>
             <DialogDescription>
-              Registre um valor que você deve receber, incluindo parcelas e projeto associado se aplicável.
+              {t('finances.dialogs.new_receivable_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="receivableName">Nome</Label>
+              <Label htmlFor="receivableName">{t('finances.dialogs.receivable_name')}</Label>
               <Input
                 id="receivableName"
                 value={receivableForm.name}
                 onChange={(e) => setReceivableForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Ex: Fatura Cliente X"
+                placeholder={t('finances.dialogs.receivable_name_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="receivableAmount">Valor</Label>
+              <Label htmlFor="receivableAmount">{t('finances.dialogs.receivable_amount')}</Label>
               <Input
                 id="receivableAmount"
                 type="number"
@@ -1380,7 +1393,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="receivableInstallments">Parcelas</Label>
+              <Label htmlFor="receivableInstallments">{t('finances.dialogs.installments')}</Label>
               <Input
                 id="receivableInstallments"
                 type="number"
@@ -1391,7 +1404,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="receivableDueDate">Data de Vencimento</Label>
+              <Label htmlFor="receivableDueDate">{t('finances.dialogs.receivable_due_date')}</Label>
               <Input
                 id="receivableDueDate"
                 type="date"
@@ -1400,13 +1413,13 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="receivableProject">Projeto (opcional)</Label>
+              <Label htmlFor="receivableProject">{t('finances.dialogs.receivable_project')}</Label>
               <Select value={receivableForm.projectId} onValueChange={(value) => setReceivableForm(prev => ({ ...prev, projectId: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um projeto" />
+                  <SelectValue placeholder={t('finances.dialogs.select_project')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
+                  <SelectItem value="none">{t('finances.dialogs.none')}</SelectItem>
                   {projects.map((p) => (
                     <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
                   ))}
@@ -1414,20 +1427,20 @@ export default function Finances() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="receivableDescription">Descrição (opcional)</Label>
+              <Label htmlFor="receivableDescription">{t('finances.dialogs.receivable_description')}</Label>
               <Input
                 id="receivableDescription"
                 value={receivableForm.description}
                 onChange={(e) => setReceivableForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Detalhes"
+                placeholder={t('finances.dialogs.receivable_description_placeholder')}
               />
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handleCreateReceivable} className="flex-1">
-                Criar
+                {t('finances.dialogs.create')}
               </Button>
               <Button variant="outline" onClick={() => setIsReceivableDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1438,17 +1451,17 @@ export default function Finances() {
       <Dialog open={isReceiveDialogOpen} onOpenChange={setIsReceiveDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Marcar como Recebido: {selectedReceivable?.name}</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.mark_received_title')}: {selectedReceivable?.name}</DialogTitle>
             <DialogDescription>
-              Confirme o recebimento deste valor e selecione a conta para depósito.
+              {t('finances.dialogs.confirm_received_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="receiveAccount">Conta para Depósito</Label>
+              <Label htmlFor="receiveAccount">{t('finances.dialogs.deposit_account')}</Label>
               <Select value={receiveForm.accountId} onValueChange={(value) => setReceiveForm(prev => ({ ...prev, accountId: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma conta" />
+                  <SelectValue placeholder={t('finances.dialogs.select_account')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -1461,15 +1474,15 @@ export default function Finances() {
             </div>
             {selectedReceivable && (
               <p className="text-sm text-muted-foreground">
-                Valor: {selectedReceivable.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {t('finances.dialogs.receivable_amount')}: {selectedReceivable.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </p>
             )}
             <div className="flex gap-3 pt-4">
               <Button onClick={handleReceiveReceivable} className="flex-1">
-                Confirmar Recebimento
+                {t('finances.dialogs.confirm_receipt')}
               </Button>
               <Button variant="outline" onClick={() => setIsReceiveDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1480,17 +1493,17 @@ export default function Finances() {
       <Dialog open={isPayDebtDialogOpen} onOpenChange={setIsPayDebtDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Pagar Dívida: {selectedDebt?.name}</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.pay_debt_title')}: {selectedDebt?.name}</DialogTitle>
             <DialogDescription>
-              Registre o pagamento de uma dívida selecionando a conta de débito e o valor.
+              {t('finances.dialogs.pay_debt_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="paymentAccount">Conta para Débito</Label>
+              <Label htmlFor="paymentAccount">{t('finances.dialogs.debit_account')}</Label>
               <Select value={paymentForm.accountId} onValueChange={(value) => setPaymentForm(prev => ({ ...prev, accountId: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma conta" />
+                  <SelectValue placeholder={t('finances.dialogs.select_account')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -1502,7 +1515,7 @@ export default function Finances() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="paymentAmount">Valor do Pagamento</Label>
+              <Label htmlFor="paymentAmount">{t('finances.dialogs.payment_amount')}</Label>
               <Input
                 id="paymentAmount"
                 type="number"
@@ -1514,16 +1527,16 @@ export default function Finances() {
               />
               {selectedDebt && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Valor restante: {selectedDebt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {t('finances.dialogs.remaining_amount')}: {selectedDebt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </p>
               )}
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handlePayDebt} className="flex-1">
-                Confirmar Pagamento
+                {t('finances.dialogs.confirm_payment')}
               </Button>
               <Button variant="outline" onClick={() => setIsPayDebtDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1534,17 +1547,17 @@ export default function Finances() {
       <Dialog open={isAllocateGoalDialogOpen} onOpenChange={setIsAllocateGoalDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Alocar para Meta: {selectedGoal?.name}</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.allocate_goal_title')}: {selectedGoal?.name}</DialogTitle>
             <DialogDescription>
-              Aloque dinheiro de uma conta para contribuir com sua meta financeira.
+              {t('finances.dialogs.allocate_goal_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="allocationAccount">Conta para Débito</Label>
+              <Label htmlFor="allocationAccount">{t('finances.dialogs.debit_account')}</Label>
               <Select value={allocationForm.accountId} onValueChange={(value) => setAllocationForm(prev => ({ ...prev, accountId: value }))}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma conta" />
+                  <SelectValue placeholder={t('finances.dialogs.select_account')} />
                 </SelectTrigger>
                 <SelectContent>
                   {accounts.map((account) => (
@@ -1556,7 +1569,7 @@ export default function Finances() {
               </Select>
             </div>
             <div>
-              <Label htmlFor="allocationAmount">Valor a Alocar</Label>
+              <Label htmlFor="allocationAmount">{t('finances.dialogs.allocation_amount')}</Label>
               <Input
                 id="allocationAmount"
                 type="number"
@@ -1567,16 +1580,16 @@ export default function Finances() {
               />
               {selectedGoal && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  Faltam: {(selectedGoal.targetAmount - selectedGoal.currentAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {t('finances.dialogs.missing_amount')}: {(selectedGoal.targetAmount - selectedGoal.currentAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </p>
               )}
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handleAllocateToGoal} className="flex-1">
-                Confirmar Alocação
+                {t('finances.dialogs.confirm_allocation')}
               </Button>
               <Button variant="outline" onClick={() => setIsAllocateGoalDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1587,14 +1600,14 @@ export default function Finances() {
       <Dialog open={isAllocateAdvanceDialogOpen} onOpenChange={setIsAllocateAdvanceDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Alocar Adiantamento para: {selectedDebt?.name}</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.allocate_advance_title')}: {selectedDebt?.name}</DialogTitle>
             <DialogDescription>
-              Selecione os valores a receber para alocar como adiantamento no pagamento desta dívida.
+              {t('finances.dialogs.allocate_advance_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Selecione os valores a receber para alocar como adiantamento.
+              {t('finances.dialogs.select_receivables')}
             </p>
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {receivables.filter(r => r.status === 'pending').map((r) => (
@@ -1611,7 +1624,7 @@ export default function Finances() {
                     }}
                   />
                   <Label htmlFor={`receivable-${r.id}`} className="text-sm">
-                    {r.name} - {r.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} (Vence: {format(r.dueDate, "d 'de' MMM yyyy", { locale: ptBR })})
+                    {r.name} - {r.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({t('finances.labels.due_date_short')}: {format(r.dueDate, "d MMM yyyy", { locale: getDateLocale() })})
                   </Label>
                 </div>
               ))}
@@ -1619,13 +1632,13 @@ export default function Finances() {
             {selectedDebt && (
               <>
                 <div>
-                  <Label>Valor Alocado:</Label>
+                  <Label>{t('finances.dialogs.allocated_amount')}:</Label>
                   <p className="font-medium">
                     {selectedReceivableIds.reduce((sum, id) => sum + (receivables.find(r => r.id === id)?.amount || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
                 <div>
-                  <Label>Dívida Após Alocação:</Label>
+                  <Label>{t('finances.dialogs.debt_after_allocation')}:</Label>
                   <p className="font-medium text-destructive">
                     {(selectedDebt.remainingAmount - selectedReceivableIds.reduce((sum, id) => sum + (receivables.find(r => r.id === id)?.amount || 0), 0)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
@@ -1634,10 +1647,10 @@ export default function Finances() {
             )}
             <div className="flex gap-3 pt-4">
               <Button onClick={handleAllocateAdvance} className="flex-1">
-                Confirmar Alocação
+                {t('finances.dialogs.confirm_allocation')}
               </Button>
               <Button variant="outline" onClick={() => setIsAllocateAdvanceDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1648,23 +1661,23 @@ export default function Finances() {
       <Dialog open={isEditDebtDialogOpen} onOpenChange={setIsEditDebtDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Editar Dívida</DialogTitle>
+            <DialogTitle>{t('finances.dialogs.edit_debt_title')}</DialogTitle>
             <DialogDescription>
-              Edite os detalhes da dívida selecionada.
+              {t('finances.dialogs.edit_debt_desc')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="edit-debt-name">Nome da Dívida</Label>
+              <Label htmlFor="edit-debt-name">{t('finances.dialogs.debt_name')}</Label>
               <Input
                 id="edit-debt-name"
                 value={editDebtForm.name}
                 onChange={(e) => setEditDebtForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Nome da dívida"
+                placeholder={t('finances.dialogs.debt_name_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="edit-debt-total">Valor Total</Label>
+              <Label htmlFor="edit-debt-total">{t('finances.dialogs.total_amount')}</Label>
               <Input
                 id="edit-debt-total"
                 type="number"
@@ -1675,7 +1688,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-debt-remaining">Valor Restante</Label>
+              <Label htmlFor="edit-debt-remaining">{t('finances.dialogs.remaining_amount_label')}</Label>
               <Input
                 id="edit-debt-remaining"
                 type="number"
@@ -1686,7 +1699,7 @@ export default function Finances() {
               />
             </div>
             <div>
-              <Label htmlFor="edit-debt-due-date">Data de Vencimento</Label>
+              <Label htmlFor="edit-debt-due-date">{t('finances.dialogs.due_date_label')}</Label>
               <Input
                 id="edit-debt-due-date"
                 type="date"
@@ -1710,7 +1723,7 @@ export default function Finances() {
                 }}
                 className="flex-1"
               >
-                Salvar Alterações
+                {t('finances.dialogs.save_changes')}
               </Button>
               <Button 
                 variant="outline" 
@@ -1720,7 +1733,7 @@ export default function Finances() {
                 }}
                 className="flex-1"
               >
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -1731,10 +1744,10 @@ export default function Finances() {
       <AlertDialog open={isDeleteDebtDialogOpen} onOpenChange={setIsDeleteDebtDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Dívida</AlertDialogTitle>
+            <AlertDialogTitle>{t('finances.dialogs.delete_debt_title')}</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a dívida "{selectedDebt?.name}"? 
-              Esta ação não pode ser desfeita.
+              {t('finances.confirm_delete_debt', { name: selectedDebt?.name })} 
+              {t('finances.dialogs.delete_debt_desc')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1742,7 +1755,7 @@ export default function Finances() {
               setIsDeleteDebtDialogOpen(false);
               setSelectedDebt(null);
             }}>
-              Cancelar
+              {t('common.cancel')}
             </AlertDialogCancel>
             <AlertDialogAction 
               onClick={async () => {
@@ -1754,7 +1767,7 @@ export default function Finances() {
               }}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {t('common.delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1776,32 +1789,32 @@ export default function Finances() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Conta</AlertDialogTitle>
+            <AlertDialogTitle>{t('finances.dialogs.delete_account_title')}</AlertDialogTitle>
             <AlertDialogDescription>
               {deleteAccountDialog.hasTransactions ? (
                 <>
-                  Esta conta possui <strong>{deleteAccountDialog.transactionCount}</strong> transação(ões).
+                  {t('finances.dialogs.delete_account_with_transactions', { count: deleteAccountDialog.transactionCount })}
                   <br /><br />
-                  Deseja excluir a conta "<strong>{deleteAccountDialog.account?.name}</strong>" e <strong>TODAS</strong> as suas transações?
+                  {t('finances.dialogs.delete_account_confirm')} "<strong>{deleteAccountDialog.account?.name}</strong>"?
                   <br /><br />
-                  ⚠️ Esta ação não pode ser desfeita!
+                  {t('finances.dialogs.delete_account_warning')}
                 </>
               ) : (
                 <>
-                  Tem certeza que deseja excluir a conta "<strong>{deleteAccountDialog.account?.name}</strong>"?
+                  {t('finances.confirm_delete_account', { name: deleteAccountDialog.account?.name })}
                   <br /><br />
-                  Esta ação não pode ser desfeita.
+                  {t('finances.dialogs.delete_account_simple')}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmDeleteAccount}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleteAccountDialog.hasTransactions ? 'Excluir Conta e Transações' : 'Excluir Conta'}
+              {deleteAccountDialog.hasTransactions ? t('finances.dialogs.delete_account_and_transactions') : t('finances.dialogs.delete_account_only')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

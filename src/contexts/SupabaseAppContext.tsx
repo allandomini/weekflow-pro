@@ -160,6 +160,8 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [actorName, setActorName] = useState('System');
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(false);
 
   // Helper function to handle errors consistently
   const handleError = useCallback((error: any, action: string) => {
@@ -352,8 +354,9 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   // Load all data function - OPTIMIZED VERSION WITH PROGRESS TRACKING
   const loadAllData = useCallback(async (onProgress?: (step: string) => void) => {
-    if (!user) return;
+    if (!user || isLoadingData) return;
     
+    setIsLoadingData(true);
     setLoading(true);
     onProgress?.('auth');
     
@@ -363,6 +366,7 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
       if (sessionError || !session) {
         console.error('Invalid session, redirecting to login');
         setLoading(false);
+        setIsLoadingData(false);
         return;
       }
       
@@ -682,6 +686,9 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
       console.error('Error loading data:', error);
       handleError(error, 'carregar dados');
       setLoading(false);
+      setIsLoadingData(false);
+    } finally {
+      setIsLoadingData(false);
     }
   }, [user, transformDbTask, transformDbAccount, handleError]);
 
@@ -1355,15 +1362,21 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     console.warn(`${method} not yet implemented in optimized context`);
   }, []);
 
-  // Load all data when user changes
+  // Load data when user is available - FIXED VERSION
   useEffect(() => {
-    let isMounted = true;
+    const userId = user?.id;
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    // Check if we have actual data loaded (not just session flag)
+    const hasActualData = projects.length > 0 || tasks.length > 0 || accounts.length > 0;
     
-    if (user) {
-      // Force reset AI settings to use flash model on app load
-      const currentSettings = JSON.parse(localStorage.getItem('aiSettings') || '{}');
+    if (!hasActualData && !isLoadingData) {
+      console.log('🔄 Loading data for user:', userId);
       
-      // Always force flash model for now
+      // Set AI settings
       const updatedSettings = { 
         enabled: true,
         deepAnalysis: true,
@@ -1373,20 +1386,16 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
       localStorage.setItem('aiSettings', JSON.stringify(updatedSettings));
       setAISettings(updatedSettings);
       
-      loadAllData().catch(error => {
-        if (isMounted) {
-          console.error('Failed to load data:', error);
-          setLoading(false);
-        }
+      // Load data
+      loadAllData().finally(() => {
+        setLoading(false);
+        console.log('✅ Data load complete');
       });
-    } else {
+    } else if (hasActualData) {
+      console.log('✅ Data already present, skipping load');
       setLoading(false);
     }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]); // Remove loadAllData dependency to prevent infinite re-renders
+  }, [user?.id, projects.length, tasks.length, accounts.length, isLoadingData]);
 
 
   const value: AppContextType = {
@@ -2942,7 +2951,7 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     clearActivities: async () => {},
     
     loading,
-    refreshData: async () => {},
+    refreshData: loadAllData,
     
     // Missing methods
     updateAccount: async () => {},

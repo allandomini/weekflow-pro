@@ -97,7 +97,7 @@ export default function Analyses() {
           if (group) map.set(group.name, (map.get(group.name) || 0) + 1);
         });
       } else {
-        map.set("Sem grupo", (map.get("Sem grupo") || 0) + 1);
+        map.set(t('analyses.no_group'), (map.get(t('analyses.no_group')) || 0) + 1);
       }
     });
     return Array.from(map.entries()).map(([name, count]) => ({ name, count }));

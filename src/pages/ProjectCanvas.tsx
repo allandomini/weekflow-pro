@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ export default function ProjectCanvas() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
   const { 
     projects, 
     addTask, 
@@ -104,7 +106,7 @@ export default function ProjectCanvas() {
     if (projects.length > 0) {
       setIsLoading(false);
       if (!foundProject) {
-        setLoadError('Projeto não encontrado');
+        setLoadError(t('projects.project_not_found'));
       }
     }
     return foundProject;
@@ -148,7 +150,7 @@ export default function ProjectCanvas() {
         console.log('Canvas items set:', items);
       } catch (e) {
         console.error('Failed to load canvas items from Supabase:', e);
-        setLoadError(`Erro ao carregar do Supabase: ${e.message || 'Erro desconhecido'}`);
+        setLoadError(`${t('project_canvas.supabase_load_error')}: ${e.message || t('common.unknown_error')}`);
         
         // Fallback to localStorage if Supabase fails
         try {
@@ -218,7 +220,7 @@ export default function ProjectCanvas() {
       console.error('Failed to save canvas item to Supabase:', e);
       
       // Show error to user
-      setLoadError(`Erro ao salvar no Supabase: ${e.message || 'Erro desconhecido'}`);
+      setLoadError(`${t('project_canvas.supabase_save_error')}: ${e.message || t('common.unknown_error')}`);
       
       // Fallback to localStorage only
       try {
@@ -227,7 +229,7 @@ export default function ProjectCanvas() {
         console.log('Saved to localStorage as fallback');
       } catch (localError) {
         console.error('Failed to save to localStorage:', localError);
-        setLoadError('Erro ao salvar item');
+        setLoadError(t('project_canvas.save_item_error'));
       }
     }
   }, [projectId, user, supabase, canvasItems]);
@@ -256,7 +258,7 @@ export default function ProjectCanvas() {
         localStorage.setItem(`projectCanvas_${projectId}`, JSON.stringify(updatedItems));
       } catch (localError) {
         console.error('Failed to delete from localStorage:', localError);
-        setLoadError('Erro ao deletar item');
+        setLoadError(t('project_canvas.delete_item_error'));
       }
     }
   }, [projectId, user, supabase, canvasItems]);
@@ -307,7 +309,7 @@ export default function ProjectCanvas() {
         <Card>
           <CardContent className="py-8 text-center">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Carregando projeto...</p>
+            <p className="text-muted-foreground">{t('project_canvas.loading_project')}</p>
           </CardContent>
         </Card>
       </div>
@@ -320,10 +322,10 @@ export default function ProjectCanvas() {
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="py-8 text-center text-muted-foreground">
-            {loadError || 'Projeto não encontrado.'}
+            {loadError || t('projects.project_not_found')}
             <div className="mt-4">
               <Button variant="outline" onClick={() => navigate('/projects')}>
-                <ChevronLeft className="w-4 h-4 mr-2" /> Voltar para Projetos
+                <ChevronLeft className="w-4 h-4 mr-2" /> {t('projects.back_to_projects')}
               </Button>
             </div>
           </CardContent>
@@ -389,7 +391,7 @@ export default function ProjectCanvas() {
           if (!task.completed) {
             addTask({
               title: task.text,
-              description: `Do projeto: ${project.name}`,
+              description: `${t('project_canvas.from_project')}: ${project.name}`,
               projectId: project.id,
               date: task.dueDate || new Date(),
               completed: false,
@@ -524,10 +526,10 @@ export default function ProjectCanvas() {
   // Helper function to get recurrence label
   const getRecurrenceLabel = (frequency?: string) => {
     switch (frequency) {
-      case 'daily': return 'Diário';
-      case 'weekly': return 'Semanal';
-      case 'monthly': return 'Mensal';
-      case 'yearly': return 'Anual';
+      case 'daily': return t('routines.daily');
+      case 'weekly': return t('routines.weekly');
+      case 'monthly': return t('routines.monthly');
+      case 'yearly': return t('routines.yearly');
       default: return '';
     }
   };
@@ -552,7 +554,7 @@ export default function ProjectCanvas() {
       id: Date.now().toString(),
       type: financeForm.type,
       amount,
-      description: financeForm.description || (financeForm.type === 'credit' ? 'Crédito' : 'Débito'),
+      description: financeForm.description || (financeForm.type === 'credit' ? t('finance.credit') : t('finance.debit')),
       date: new Date()
     };
     
@@ -811,11 +813,11 @@ export default function ProjectCanvas() {
   };
 
   const itemTypes = [
-    { type: 'todo' as const, icon: ListChecks, label: 'To-Do', color: '#3B82F6' },
-    { type: 'note' as const, icon: FileText, label: 'Nota', color: '#10B981' },
-    { type: 'finance' as const, icon: DollarSign, label: 'Finanças', color: '#F59E0B' },
-    { type: 'image' as const, icon: FileText, label: 'Imagem', color: '#EF4444' },
-    { type: 'document' as const, icon: FileText, label: 'Documento', color: '#6366F1' },
+    { type: 'todo' as const, icon: ListChecks, label: t('project_canvas.todo'), color: '#3B82F6' },
+    { type: 'note' as const, icon: FileText, label: t('project_canvas.note'), color: '#10B981' },
+    { type: 'finance' as const, icon: DollarSign, label: t('project_canvas.finance'), color: '#F59E0B' },
+    { type: 'image' as const, icon: FileText, label: t('project_canvas.image'), color: '#EF4444' },
+    { type: 'document' as const, icon: FileText, label: t('project_canvas.document'), color: '#6366F1' },
   ];
 
   const renderItemContent = (item: CanvasItem) => {
@@ -832,7 +834,7 @@ export default function ProjectCanvas() {
               <div 
                 className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-                title="Arrastar card"
+                title={t('project_canvas.drag_card')}
               >
                 <GripVertical className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -845,11 +847,11 @@ export default function ProjectCanvas() {
                     <Input 
                       value={todoForm.task}
                       onChange={(e) => setTodoForm(prev => ({ ...prev, task: e.target.value }))}
-                      placeholder="Título do card"
+                      placeholder={t('project_canvas.card_title')}
                       className="h-7 text-sm font-semibold"
                     />
                   ) : (
-                    <CardTitle className="text-sm">{item.data.task || "To-Do"}</CardTitle>
+                    <CardTitle className="text-sm">{item.data.task || t('project_canvas.todo')}</CardTitle>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -894,7 +896,7 @@ export default function ProjectCanvas() {
                           value={task.text}
                           onChange={(e) => updateTask(item.id, task.id, { text: e.target.value })}
                           className="h-7 text-xs"
-                          placeholder="Nome da tarefa"
+                          placeholder={t('project_canvas.task_name')}
                         />
                         <div className="flex items-center gap-2">
                           <Input 
@@ -908,7 +910,7 @@ export default function ProjectCanvas() {
                             onCheckedChange={(checked) => updateTask(item.id, task.id, { showInDashboard: !!checked })}
                             className="h-3 w-3"
                           />
-                          <Label className="text-xs">Dashboard</Label>
+                          <Label className="text-xs">{t('common.dashboard')}</Label>
                           <div className="flex gap-1 ml-auto">
                             <Button 
                               size="sm" 
@@ -959,7 +961,7 @@ export default function ProjectCanvas() {
                 <Input 
                   value={newTaskText}
                   onChange={(e) => setNewTaskText(e.target.value)}
-                  placeholder="Nova tarefa..."
+                  placeholder={t('project_canvas.new_task')}
                   className="h-7 text-xs"
                   onKeyPress={(e) => {
                     if (e.key === 'Enter') {
@@ -984,8 +986,8 @@ export default function ProjectCanvas() {
               <div className="flex gap-2 pt-2">
                 {isEditing ? (
                   <>
-                    <Button size="sm" onClick={() => handleSaveItem(item)}>Salvar no Sistema</Button>
-                    <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Fechar</Button>
+                    <Button size="sm" onClick={() => handleSaveItem(item)}>{t('project_canvas.save_to_system')}</Button>
+                    <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>{t('common.close')}</Button>
                   </>
                 ) : (
                   <Button 
@@ -998,13 +1000,13 @@ export default function ProjectCanvas() {
                     }}
                   >
                     <Send className="w-3 h-3 mr-1" />
-                    Enviar para Dashboard
+                    {t('project_canvas.send_to_dashboard')}
                   </Button>
                 )}
               </div>
               
               {item.data.saved && (
-                <Badge variant="secondary" className="mt-2">Salvo no Sistema</Badge>
+                <Badge variant="secondary" className="mt-2">{t('project_canvas.saved_to_system')}</Badge>
               )}
             </CardContent>
           </Card>
@@ -1020,7 +1022,7 @@ export default function ProjectCanvas() {
               <div 
                 className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-                title="Arrastar card"
+                title={t('project_canvas.drag_card')}
               >
                 <GripVertical className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -1029,7 +1031,7 @@ export default function ProjectCanvas() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <StickyNote className="w-4 h-4 text-green-500" />
-                  <CardTitle className="text-sm">Nota</CardTitle>
+                  <CardTitle className="text-sm">{t('project_canvas.note')}</CardTitle>
                 </div>
                 <div className="flex gap-1">
                   <Button 
@@ -1061,20 +1063,20 @@ export default function ProjectCanvas() {
               {isEditing ? (
                 <>
                   <div className="flex-shrink-0">
-                    <Label>Título</Label>
+                    <Label>{t('common.title')}</Label>
                     <Input 
                       value={noteForm.title}
                       onChange={(e) => setNoteForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Título da nota"
+                      placeholder={t('project_canvas.note_title')}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                   <div className="flex-1 flex flex-col min-h-0">
-                    <Label>Conteúdo (Markdown)</Label>
+                    <Label>{t('project_canvas.content_markdown')}</Label>
                     <Textarea 
                       value={noteForm.content}
                       onChange={(e) => setNoteForm(prev => ({ ...prev, content: e.target.value }))}
-                      placeholder="Escreva em markdown...\n\n**Negrito** *Itálico*\n# Título\n- Lista\n[Link](url)"
+                      placeholder={t('project_canvas.markdown_placeholder')}
                       rows={4}
                       onClick={(e) => e.stopPropagation()}
                       className="font-mono text-sm flex-1 resize-none"
@@ -1082,7 +1084,7 @@ export default function ProjectCanvas() {
                   </div>
                   {noteForm.content && (
                     <div className="flex-shrink-0">
-                      <Label>Preview</Label>
+                      <Label>{t('project_canvas.preview')}</Label>
                       <div className="border rounded p-3 bg-muted/20 max-h-24 overflow-y-auto">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <ReactMarkdown>
@@ -1100,7 +1102,7 @@ export default function ProjectCanvas() {
                         handleSaveItem(item);
                       }}
                     >
-                      Salvar
+{t('common.save')}
                     </Button>
                     <Button 
                       size="sm" 
@@ -1110,13 +1112,13 @@ export default function ProjectCanvas() {
                         setEditingItem(null);
                       }}
                     >
-                      Cancelar
+{t('common.cancel')}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div className="flex-1 flex flex-col min-h-0">
-                  <h4 className="font-medium flex-shrink-0">{item.data.title || "Nova Nota"}</h4>
+                  <h4 className="font-medium flex-shrink-0">{item.data.title || t('project_canvas.new_note')}</h4>
                   {item.data.content && (
                     <div className="mt-2 flex-1 overflow-y-auto">
                       <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
@@ -1127,7 +1129,7 @@ export default function ProjectCanvas() {
                     </div>
                   )}
                   {item.data.saved && (
-                    <Badge variant="secondary" className="mt-2 flex-shrink-0">Salva</Badge>
+                    <Badge variant="secondary" className="mt-2 flex-shrink-0">{t('project_canvas.saved')}</Badge>
                   )}
                 </div>
               )}
@@ -1147,7 +1149,7 @@ export default function ProjectCanvas() {
               <div 
                 className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-                title="Arrastar card"
+                title={t('project_canvas.drag_card')}
               >
                 <GripVertical className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -1164,11 +1166,11 @@ export default function ProjectCanvas() {
                           i.id === item.id ? { ...i, data: { ...i.data, title: e.target.value } } : i
                         ));
                       }}
-                      placeholder="Nome do card"
+                      placeholder={t('project_canvas.card_name')}
                       className="h-7 text-sm font-semibold"
                     />
                   ) : (
-                    <CardTitle className="text-sm">{item.data.title || "Finanças"}</CardTitle>
+                    <CardTitle className="text-sm">{item.data.title || t('project_canvas.finance')}</CardTitle>
                   )}
                 </div>
                 <div className="flex gap-1">
@@ -1200,7 +1202,7 @@ export default function ProjectCanvas() {
             <CardContent className="space-y-3">
               {/* Total Display */}
               <div className="text-center p-4 bg-muted/30 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Total</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('finance.total')}</p>
                 <p className={`text-2xl font-bold ${
                   total >= 0 ? 'text-green-600' : 'text-red-600'
                 }`}>
@@ -1246,7 +1248,7 @@ export default function ProjectCanvas() {
                     step="0.01"
                     value={financeForm.amount}
                     onChange={(e) => setFinanceForm(prev => ({ ...prev, amount: e.target.value }))}
-                    placeholder="Valor"
+                    placeholder={t('finance.amount')}
                     className="flex-1 h-8 text-sm"
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -1256,15 +1258,15 @@ export default function ProjectCanvas() {
                     onChange={(e) => setFinanceForm(prev => ({ ...prev, type: e.target.value as 'credit' | 'debit' }))}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <option value="credit">Crédito</option>
-                    <option value="debit">Débito</option>
+                    <option value="credit">{t('finance.credit')}</option>
+                    <option value="debit">{t('finance.debit')}</option>
                   </select>
                 </div>
                 <div className="flex gap-2">
                   <Input 
                     value={financeForm.description}
                     onChange={(e) => setFinanceForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Descrição (opcional)"
+                    placeholder={t('finance.description_optional')}
                     className="flex-1 h-8 text-sm"
                     onClick={(e) => e.stopPropagation()}
                   />
@@ -1284,13 +1286,13 @@ export default function ProjectCanvas() {
               {/* Save Button (apenas quando editando) */}
               {isEditing && (
                 <div className="flex gap-2 pt-2">
-                  <Button size="sm" onClick={() => handleSaveItem(item)}>Salvar</Button>
-                  <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>Fechar</Button>
+                  <Button size="sm" onClick={() => handleSaveItem(item)}>{t('common.save')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingItem(null)}>{t('common.close')}</Button>
                 </div>
               )}
               
               {item.data.saved && (
-                <Badge variant="secondary" className="mt-2">Salvo</Badge>
+                <Badge variant="secondary" className="mt-2">{t('project_canvas.saved')}</Badge>
               )}
             </CardContent>
           </Card>
@@ -1305,7 +1307,7 @@ export default function ProjectCanvas() {
               <div 
                 className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-                title="Arrastar card"
+                title={t('project_canvas.drag_card')}
               >
                 <GripVertical className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -1314,7 +1316,7 @@ export default function ProjectCanvas() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-green-600" />
-                  <CardTitle className="text-sm">Imagem</CardTitle>
+                  <CardTitle className="text-sm">{t('project_canvas.image')}</CardTitle>
                 </div>
                 <div className="flex gap-1">
                   <Button 
@@ -1352,16 +1354,16 @@ export default function ProjectCanvas() {
               {isEditing ? (
                 <>
                   <div>
-                    <Label>Título</Label>
+                    <Label>{t('project_canvas.image_title')}</Label>
                     <Input 
                       value={imageForm.title}
                       onChange={(e) => setImageForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Título da imagem"
+                      placeholder={t('project_canvas.image_title')}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                   <div>
-                    <Label>Imagem</Label>
+                    <Label>{t('project_canvas.image')}</Label>
                     <div className="space-y-2">
                       <Input 
                         type="file"
@@ -1373,21 +1375,21 @@ export default function ProjectCanvas() {
                         onClick={(e) => e.stopPropagation()}
                         className="cursor-pointer"
                       />
-                      <div className="text-xs text-muted-foreground text-center">ou</div>
+                      <div className="text-xs text-muted-foreground text-center">{t('common.or')}</div>
                       <Input 
                         value={imageForm.imageUrl}
                         onChange={(e) => setImageForm(prev => ({ ...prev, imageUrl: e.target.value, imageFile: null }))}
-                        placeholder="https://exemplo.com/imagem.jpg"
+                        placeholder={t('project_canvas.image_url_placeholder')}
                         onClick={(e) => e.stopPropagation()}
                       />
                     </div>
                   </div>
                   <div>
-                    <Label>Descrição</Label>
+                    <Label>{t('common.description')}</Label>
                     <Textarea 
                       value={imageForm.description}
                       onChange={(e) => setImageForm(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descrição da imagem..."
+                      placeholder={t('project_canvas.image_description')}
                       rows={3}
                       onClick={(e) => e.stopPropagation()}
                     />
@@ -1400,7 +1402,7 @@ export default function ProjectCanvas() {
                         handleSaveItem(item);
                       }}
                     >
-                      Salvar
+{t('common.save')}
                     </Button>
                     <Button 
                       size="sm" 
@@ -1410,13 +1412,13 @@ export default function ProjectCanvas() {
                         setEditingItem(null);
                       }}
                     >
-                      Cancelar
+{t('common.cancel')}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div>
-                  <h4 className="font-medium">{item.data.title || "Nova Imagem"}</h4>
+                  <h4 className="font-medium">{item.data.title || t('project_canvas.new_image')}</h4>
                   {item.data.imageUrl && (
                     <div className="mt-2">
                       <img 
@@ -1430,7 +1432,7 @@ export default function ProjectCanvas() {
                         onError={(e) => {
                           e.currentTarget.style.display = 'none';
                         }}
-                        title="Clique para ver em tamanho completo"
+                        title={t('project_canvas.click_full_size')}
                       />
                     </div>
                   )}
@@ -1438,7 +1440,7 @@ export default function ProjectCanvas() {
                     <p className="text-sm text-muted-foreground mt-2">{item.data.description}</p>
                   )}
                   {item.data.saved && (
-                    <Badge variant="secondary" className="mt-2">Salva</Badge>
+                    <Badge variant="secondary" className="mt-2">{t('project_canvas.saved')}</Badge>
                   )}
                 </div>
               )}
@@ -1454,7 +1456,7 @@ export default function ProjectCanvas() {
               <div 
                 className="absolute top-2 right-2 p-1 hover:bg-muted/50 rounded cursor-grab active:cursor-grabbing z-10"
                 onMouseDown={(e) => handleDragHandleMouseDown(e, item)}
-                title="Arrastar card"
+                title={t('project_canvas.drag_card')}
               >
                 <GripVertical className="w-3 h-3 text-muted-foreground" />
               </div>
@@ -1463,7 +1465,7 @@ export default function ProjectCanvas() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-purple-600" />
-                  <CardTitle className="text-sm">Documento</CardTitle>
+                  <CardTitle className="text-sm">{t('project_canvas.document')}</CardTitle>
                 </div>
                 <div className="flex gap-1">
                   <Button 
@@ -1503,16 +1505,16 @@ export default function ProjectCanvas() {
               {isEditing ? (
                 <>
                   <div>
-                    <Label>Título</Label>
+                    <Label>{t('project_canvas.document_title')}</Label>
                     <Input 
                       value={documentForm.title}
                       onChange={(e) => setDocumentForm(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Título do documento"
+                      placeholder={t('project_canvas.document_title')}
                       onClick={(e) => e.stopPropagation()}
                     />
                   </div>
                   <div>
-                    <Label>Documento</Label>
+                    <Label>{t('project_canvas.document')}</Label>
                     <div className="space-y-2">
                       <Input 
                         type="file"
@@ -1527,14 +1529,14 @@ export default function ProjectCanvas() {
                       <Input 
                         value={documentForm.fileUrl}
                         onChange={(e) => setDocumentForm(prev => ({ ...prev, fileUrl: e.target.value, documentFile: null }))}
-                        placeholder="https://exemplo.com/documento.pdf"
+                        placeholder={t('project_canvas.document_url_placeholder')}
                         onClick={(e) => e.stopPropagation()}
                       />
                       {documentForm.fileUrl && (
                         <Input 
                           value={documentForm.fileName}
                           onChange={(e) => setDocumentForm(prev => ({ ...prev, fileName: e.target.value }))}
-                          placeholder="Nome do arquivo"
+                          placeholder={t('project_canvas.file_name')}
                           onClick={(e) => e.stopPropagation()}
                         />
                       )}
@@ -1545,7 +1547,7 @@ export default function ProjectCanvas() {
                     <Textarea 
                       value={documentForm.description}
                       onChange={(e) => setDocumentForm(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Descrição do documento..."
+                      placeholder={t('project_canvas.document_description')}
                       rows={3}
                       onClick={(e) => e.stopPropagation()}
                     />
@@ -1558,7 +1560,7 @@ export default function ProjectCanvas() {
                         handleSaveItem(item);
                       }}
                     >
-                      Salvar
+{t('common.save')}
                     </Button>
                     <Button 
                       size="sm" 
@@ -1568,13 +1570,13 @@ export default function ProjectCanvas() {
                         setEditingItem(null);
                       }}
                     >
-                      Cancelar
+{t('common.cancel')}
                     </Button>
                   </div>
                 </>
               ) : (
                 <div>
-                  <h4 className="font-medium">{item.data.title || "Novo Documento"}</h4>
+                  <h4 className="font-medium">{item.data.title || t('project_canvas.new_document')}</h4>
                   {item.data.fileName && (
                     <div className="mt-2 p-3 bg-muted/20 rounded border">
                       <div className="flex items-center gap-2">
@@ -1600,7 +1602,7 @@ export default function ProjectCanvas() {
                             window.open(item.data.fileUrl, '_blank');
                           }}
                         >
-                          Abrir Documento
+                          {t('project_canvas.open_document')}
                         </Button>
                       )}
                     </div>
@@ -1609,7 +1611,7 @@ export default function ProjectCanvas() {
                     <p className="text-sm text-muted-foreground mt-2">{item.data.description}</p>
                   )}
                   {item.data.saved && (
-                    <Badge variant="secondary" className="mt-2">Salvo</Badge>
+                    <Badge variant="secondary" className="mt-2">{t('project_canvas.saved')}</Badge>
                   )}
                 </div>
               )}
@@ -1621,7 +1623,7 @@ export default function ProjectCanvas() {
         return (
           <Card className="w-80 shadow-lg">
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">Tipo de item não suportado</p>
+              <p className="text-muted-foreground">{t('project_canvas.unsupported_item_type')}</p>
             </CardContent>
           </Card>
         );
@@ -1635,11 +1637,11 @@ export default function ProjectCanvas() {
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => navigate('/projects')}>
-              <ChevronLeft className="w-4 h-4 mr-2" /> Voltar
+              <ChevronLeft className="w-4 h-4 mr-2" /> {t('common.back')}
             </Button>
             <div>
               <h1 className="text-xl font-bold">{project.name}</h1>
-              <p className="text-sm text-muted-foreground">Canvas do Projeto</p>
+              <p className="text-sm text-muted-foreground">{t('project_canvas.title')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -1750,7 +1752,7 @@ export default function ProjectCanvas() {
           <div className="absolute right-0 top-0 h-full w-80 bg-background dark:bg-gray-900 border-l dark:border-gray-800 shadow-xl">
             <div className="p-4 border-b">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Adicionar Item</h2>
+                <h2 className="text-lg font-semibold">{t('project_canvas.add_item')}</h2>
                 <Button 
                   variant="ghost" 
                   size="sm"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,8 @@ export default function Network() {
     updateContactGroup,
     deleteContactGroup
   } = useAppContext();
+  
+  const { t } = useTranslation();
 
   const [isContactDialogOpen, setIsContactDialogOpen] = useState(false);
   const [isGroupDialogOpen, setIsGroupDialogOpen] = useState(false);
@@ -168,13 +171,13 @@ export default function Network() {
   };
 
   const handleDeleteContact = (contactId: string) => {
-    if (confirm('Tem certeza que deseja excluir este contato?')) {
+    if (confirm(t('network.confirm_delete_contact'))) {
       deleteContact(contactId);
     }
   };
 
   const handleDeleteGroup = (groupId: string) => {
-    if (confirm('Tem certeza que deseja excluir este grupo?')) {
+    if (confirm(t('network.confirm_delete_group'))) {
       deleteContactGroup(groupId);
     }
   };
@@ -197,19 +200,19 @@ export default function Network() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Network</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('network.title')}</h1>
           <p className="text-muted-foreground">
-            Gerencie seus contatos e grupos
+            {t('network.manage_contacts')}
           </p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={handleCreateGroup}>
             <Plus className="w-4 h-4 mr-2" />
-            Novo Grupo
+{t('network.new_group')}
           </Button>
           <Button variant="gradient" onClick={handleCreateContact} className="animate-glow">
             <Plus className="w-4 h-4 mr-2" />
-            Novo Contato
+{t('network.new_contact')}
           </Button>
         </div>
       </div>
@@ -218,7 +221,7 @@ export default function Network() {
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
         <Input
-          placeholder="Buscar contatos por nome ou habilidades..."
+          placeholder={t('network.search_placeholder')}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-10"
@@ -227,8 +230,8 @@ export default function Network() {
 
       <Tabs defaultValue="contacts" className="space-y-6">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="contacts">Contatos ({contacts.length})</TabsTrigger>
-          <TabsTrigger value="groups">Grupos ({contactGroups.length})</TabsTrigger>
+          <TabsTrigger value="contacts">{t('network.contacts')} ({contacts.length})</TabsTrigger>
+          <TabsTrigger value="groups">{t('network.groups_label')} ({contactGroups.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="contacts">
@@ -239,18 +242,18 @@ export default function Network() {
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <Users className="w-16 h-16 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-semibold text-foreground mb-2">
-                      {searchTerm ? "Nenhum contato encontrado" : "Nenhum contato criado"}
+                      {searchTerm ? t('network.no_contacts_found') : t('network.no_contacts_created')}
                     </h3>
                     <p className="text-muted-foreground text-center mb-6">
                       {searchTerm 
-                        ? "Tente buscar por outros termos" 
-                        : "Comece adicionando seus primeiros contatos"
+                        ? t('network.try_other_terms') 
+                        : t('network.start_adding_contacts')
                       }
                     </p>
                     {!searchTerm && (
                       <Button onClick={handleCreateContact}>
                         <Plus className="w-4 h-4 mr-2" />
-                        Adicionar Contato
+                        {t('network.add_contact')}
                       </Button>
                     )}
                   </CardContent>
@@ -327,7 +330,7 @@ export default function Network() {
                       {Array.isArray(contact.skills) && contact.skills.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                            Habilidades
+                            {t('network.contact_form.skills')}
                           </h4>
                           <div className="flex flex-wrap gap-1">
                             {contact.skills.slice(0, 3).map((skill, index) => (
@@ -337,7 +340,7 @@ export default function Network() {
                             ))}
                             {contact.skills.length > 3 && (
                               <Badge variant="outline" className="text-xs">
-                                +{contact.skills.length - 3} mais
+                                +{contact.skills.length - 3} {t('common.more')}
                               </Badge>
                             )}
                           </div>
@@ -348,7 +351,7 @@ export default function Network() {
                       {Array.isArray(contact.projectIds) && contact.projectIds.length > 0 && (
                         <div>
                           <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                            Projetos
+                            {t('projects.title')}
                           </h4>
                           <div className="flex flex-wrap gap-1">
                             {contact.projectIds.slice(0, 2).map((projectId) => {
@@ -366,7 +369,7 @@ export default function Network() {
                             })}
                             {contact.projectIds.length > 2 && (
                               <Badge variant="outline" className="text-xs">
-                                +{contact.projectIds.length - 2} mais
+                                +{contact.projectIds.length - 2} {t('common.more')}
                               </Badge>
                             )}
                           </div>
@@ -388,14 +391,14 @@ export default function Network() {
                   <CardContent className="flex flex-col items-center justify-center py-12">
                     <Users className="w-16 h-16 text-muted-foreground mb-4" />
                     <h3 className="text-xl font-semibold text-foreground mb-2">
-                      Nenhum grupo criado
+                      {t('network.no_contacts_created')}
                     </h3>
                     <p className="text-muted-foreground text-center mb-6">
-                      Organize seus contatos em grupos para melhor gestão
+                      {t('network.manage_contacts')}
                     </p>
                     <Button onClick={handleCreateGroup}>
                       <Plus className="w-4 h-4 mr-2" />
-                      Criar Primeiro Grupo
+                      {t('network.new_group')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -437,7 +440,7 @@ export default function Network() {
                   <CardContent>
                     <div className="space-y-4">
                       <div className="text-sm text-muted-foreground">
-                        {group.memberIds.length} membro{group.memberIds.length !== 1 ? 's' : ''}
+                        {group.memberIds.length} {group.memberIds.length === 1 ? t('network.member') : t('network.members')}
                       </div>
                       
                       {group.memberIds.length > 0 && (
@@ -458,7 +461,7 @@ export default function Network() {
                           })}
                           {group.memberIds.length > 3 && (
                             <div className="text-xs text-muted-foreground">
-                              +{group.memberIds.length - 3} outros membros
+                              +{group.memberIds.length - 3} {t('network.other_members')}
                             </div>
                           )}
                         </div>
@@ -467,7 +470,7 @@ export default function Network() {
                       <Dialog>
                         <Button variant="outline" size="sm" className="w-full" onClick={() => handleEditGroup(group)}>
                           <UserPlus className="w-4 h-4 mr-2" />
-                          Gerenciar Membros
+                          {t('network.groups.manage_members')}
                         </Button>
                       </Dialog>
                     </div>
@@ -484,12 +487,12 @@ export default function Network() {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
-              {editingContact ? 'Editar Contato' : 'Novo Contato'}
+              {editingContact ? t('network.contact_form.edit_contact') : t('network.new_contact')}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 max-h-[500px] overflow-y-auto">
             <div>
-              <Label htmlFor="contactAvatar">Foto do Perfil</Label>
+              <Label htmlFor="contactAvatar">{t('network.contact_form.photo')}</Label>
               <div className="flex items-center gap-4 mt-2">
                 <Avatar className="h-14 w-14">
                   <AvatarImage src={contactForm.avatarUrl} alt={contactForm.name} />
@@ -519,35 +522,35 @@ export default function Network() {
                       variant="outline"
                       onClick={() => setContactForm(prev => ({ ...prev, avatarUrl: "" }))}
                     >
-                      Remover
+                      {t('common.remove')}
                     </Button>
                   )}
                 </div>
               </div>
             </div>
             <div>
-              <Label htmlFor="contactName">Nome Completo *</Label>
+              <Label htmlFor="contactName">{t('network.contact_form.name')} *</Label>
               <Input
                 id="contactName"
                 value={contactForm.name}
                 onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Digite o nome completo"
+                placeholder={t('network.contact_form.name_placeholder')}
               />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contactEmail">E-mail</Label>
+                <Label htmlFor="contactEmail">{t('network.contact_form.email')}</Label>
                 <Input
                   id="contactEmail"
                   type="email"
                   value={contactForm.email}
                   onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="email@exemplo.com"
+                  placeholder={t('network.contact_form.email_placeholder')}
                 />
               </div>
               <div>
-                <Label htmlFor="contactPhone">Telefone</Label>
+                <Label htmlFor="contactPhone">{t('network.contact_form.phone')}</Label>
                 <Input
                   id="contactPhone"
                   value={contactForm.phone}
@@ -559,16 +562,16 @@ export default function Network() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contactLinkedin">LinkedIn</Label>
+                <Label htmlFor="contactLinkedin">{t('network.contact_form.linkedin')}</Label>
                 <Input
                   id="contactLinkedin"
                   value={contactForm.linkedin}
                   onChange={(e) => setContactForm(prev => ({ ...prev, linkedin: e.target.value }))}
-                  placeholder="linkedin.com/in/usuario"
+                  placeholder={t('network.contact_form.linkedin_placeholder')}
                 />
               </div>
               <div>
-                <Label htmlFor="contactWhatsapp">WhatsApp</Label>
+                <Label htmlFor="contactWhatsapp">{t('network.contact_form.whatsapp')}</Label>
                 <Input
                   id="contactWhatsapp"
                   value={contactForm.whatsapp}
@@ -579,28 +582,28 @@ export default function Network() {
             </div>
 
             <div>
-              <Label htmlFor="contactSkills">Habilidades</Label>
+              <Label htmlFor="contactSkills">{t('network.contact_form.skills')}</Label>
               <Input
                 id="contactSkills"
                 value={contactForm.skills}
                 onChange={(e) => setContactForm(prev => ({ ...prev, skills: e.target.value }))}
-                placeholder="Separar por vírgula: React, Node.js, Design"
+                placeholder={t('network.contact_form.skills_placeholder')}
               />
             </div>
 
             <div>
-              <Label htmlFor="contactNotes">Notas</Label>
+              <Label htmlFor="contactNotes">{t('network.contact_form.notes')}</Label>
               <Textarea
                 id="contactNotes"
                 value={contactForm.notes}
                 onChange={(e) => setContactForm(prev => ({ ...prev, notes: e.target.value }))}
-                placeholder="Anotações sobre o contato..."
+                placeholder={t('network.contact_form.notes_placeholder')}
                 rows={3}
               />
             </div>
 
             <div>
-              <Label htmlFor="contactAttachments">Anexos (imagens, vídeos, documentos)</Label>
+              <Label htmlFor="contactAttachments">{t('network.contact_form.attachments')}</Label>
               <Input
                 id="contactAttachments"
                 type="file"
@@ -624,7 +627,8 @@ export default function Network() {
                   {contactForm.attachments.map((att, idx) => (
                     <div key={`${att.name}-${idx}`} className="flex items-center justify-between p-2 rounded border text-xs">
                       <span className="truncate mr-2" title={att.name}>{att.name}</span>
-                      <Button variant="ghost" size="sm" onClick={() => setContactForm(prev => ({ ...prev, attachments: prev.attachments.filter((_,i)=>i!==idx) }))}>Remover</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setContactForm(prev => ({ ...prev, attachments: prev.attachments.filter((_,i)=>i!==idx) }))}>                        {t('common.remove')}
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -633,10 +637,10 @@ export default function Network() {
 
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveContact} className="flex-1">
-                {editingContact ? 'Salvar Alterações' : 'Criar Contato'}
+                {editingContact ? t('common.save_changes') : t('network.contact_form.create_contact')}
               </Button>
               <Button variant="outline" onClick={() => setIsContactDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>
@@ -648,38 +652,38 @@ export default function Network() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingGroup ? 'Editar Grupo' : 'Novo Grupo'}
+              {editingGroup ? t('network.groups.edit_group') : t('network.new_group')}
             </DialogTitle>
             <DialogDescription>
               {editingGroup 
-                ? 'Edite as informações do grupo selecionado.' 
-                : 'Crie um novo grupo para organizar seus contatos.'}
+                ? t('network.groups.edit_group_description') 
+                : t('network.groups.create_group_description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="groupName">Nome do Grupo *</Label>
+              <Label htmlFor="groupName">{t('network.groups.group_name_required')}</Label>
               <Input
                 id="groupName"
                 value={groupForm.name}
                 onChange={(e) => setGroupForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Digite o nome do grupo"
+                placeholder={t('network.groups.group_name_placeholder')}
               />
             </div>
             
             <div>
-              <Label htmlFor="groupDescription">Descrição</Label>
+              <Label htmlFor="groupDescription">{t('network.groups.description')}</Label>
               <Textarea
                 id="groupDescription"
                 value={groupForm.description}
                 onChange={(e) => setGroupForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição opcional do grupo"
+                placeholder={t('network.groups.description_placeholder')}
                 rows={3}
               />
             </div>
 
             <div>
-              <Label>Membros do Grupo</Label>
+              <Label>{t('network.groups.group_members')}</Label>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2 max-h-48 overflow-y-auto">
                 {contacts.map((c) => {
                   const isSelected = groupForm.memberIds.includes(c.id);
@@ -698,22 +702,22 @@ export default function Network() {
                       }}
                     >
                       <span>{c.name}</span>
-                      {isSelected && <span className="text-xs">Selecionado</span>}
+                      {isSelected && <span className="text-xs">{t('common.selected')}</span>}
                     </button>
                   );
                 })}
                 {contacts.length === 0 && (
-                  <p className="text-sm text-muted-foreground col-span-full">Nenhum contato para adicionar</p>
+                  <p className="text-sm text-muted-foreground col-span-full">{t('network.groups.no_contacts_to_add')}</p>
                 )}
               </div>
             </div>
 
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveGroup} className="flex-1">
-                {editingGroup ? 'Salvar Alterações' : 'Criar Grupo'}
+                {editingGroup ? t('common.save_changes') : t('network.groups.create_group')}
               </Button>
               <Button variant="outline" onClick={() => setIsGroupDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>

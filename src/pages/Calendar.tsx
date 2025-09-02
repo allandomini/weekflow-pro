@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo } from "react";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { useRoutinesOptimized } from "@/hooks/useRoutinesOptimized";
+import { useTranslation } from "@/hooks/useTranslation";
 import { format as formatDate } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +36,7 @@ import { Task } from "@/types";
 export default function Calendar() {
   const { tasks, projects, addTask, updateTask, deleteTask } = useAppContext();
   const { routines, routineCompletions, completeRoutine, getRoutineProgress } = useRoutinesOptimized();
+  const { t } = useTranslation();
   const [currentWeekDate, setCurrentWeekDate] = useState(new Date());
   const [currentMonthDate, setCurrentMonthDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -241,21 +243,21 @@ export default function Calendar() {
     deleteTask(taskId);
   };
 
-  const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+  const dayNames = [t('calendar.days.mon'), t('calendar.days.tue'), t('calendar.days.wed'), t('calendar.days.thu'), t('calendar.days.fri'), t('calendar.days.sat'), t('calendar.days.sun')];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Calendário</h1>
+          <h1 className="text-3xl font-bold text-foreground">{t('calendar.title')}</h1>
           <p className="text-muted-foreground">
-            Gerencie suas tarefas e eventos
+{t('calendar.manage_tasks_events')}
           </p>
         </div>
         <Button variant="gradient" onClick={handleCreateTask} className="animate-glow">
           <Plus className="w-4 h-4 mr-2" />
-          Nova Tarefa
+{t('tasks.create_task')}
         </Button>
       </div>
 
@@ -267,10 +269,10 @@ export default function Calendar() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarDays className="w-5 h-5 text-primary" />
-                  Visão Semanal
+{t('calendar.week')}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {format(weekStart, "d MMM", { locale: ptBR })} - {format(weekEnd, "d MMM yyyy", { locale: ptBR })}
+                  {format(weekStart, "d MMM")} - {format(weekEnd, "d MMM yyyy")}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -337,7 +339,7 @@ export default function Calendar() {
                           ))}
                           {dayTasks.length > 2 && (
                             <div className="text-xs text-muted-foreground">
-                              +{dayTasks.length - 2} mais
+                              +{dayTasks.length - 2} {t('common.more')}
                             </div>
                           )}
                         </div>
@@ -357,10 +359,10 @@ export default function Calendar() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <CalendarDays className="w-5 h-5 text-accent" />
-                  Visão Mensal
+                  {t('calendar.navigation.month_view')}
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                   {format(currentMonthDate, "MMMM yyyy", { locale: ptBR })}
+                   {format(currentMonthDate, "MMMM yyyy")}
                 </p>
               </div>
               <div className="flex gap-2">
@@ -437,14 +439,14 @@ export default function Calendar() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CheckSquare className="w-5 h-5 text-success" />
-              Tarefas de {format(selectedDate, "d 'de' MMMM", { locale: ptBR })}
+              {t('tasks.title')} {t('common.of')} {format(selectedDate, "d MMMM yyyy")}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {getTasksForDay(selectedDate).length === 0 ? (
                 <p className="text-muted-foreground text-center py-4">
-                  Nenhuma tarefa para este dia
+                  {t('dashboard.no_tasks_for_day')}
                 </p>
               ) : (
                 getTasksForDay(selectedDate).map((task) => {
@@ -469,7 +471,7 @@ export default function Calendar() {
                            {task.title}
                            {task.isOverdue && !task.completed && (
                              <Badge variant="destructive" className="text-xs">
-                               ATRASADA
+                               {t('tasks.overdue')}
                              </Badge>
                            )}
                          </div>
@@ -494,7 +496,7 @@ export default function Calendar() {
                           )}
                           {task.isRoutine && (
                             <Badge variant="outline" className="text-xs">
-                              Rotina
+                              {t('routines.title')}
                             </Badge>
                           )}
                         </div>
@@ -529,44 +531,44 @@ export default function Calendar() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}
+              {editingTask ? t('tasks.edit_task') : t('tasks.new_task')}
             </DialogTitle>
             <DialogDescription>
               {editingTask 
-                ? 'Edite as informações da tarefa selecionada.' 
-                : 'Crie uma nova tarefa para o calendário.'}
+                ? t('calendar.edit_task_description') 
+                : t('calendar.create_task_description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="title">Título</Label>
+              <Label htmlFor="title">{t('tasks.title')}</Label>
               <Input
                 id="title"
                 value={taskForm.title}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, title: e.target.value }))}
-                placeholder="Digite o título da tarefa"
+                placeholder={t('tasks.title_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="description">Descrição</Label>
+              <Label htmlFor="description">{t('tasks.description')}</Label>
               <Textarea
                 id="description"
                 value={taskForm.description}
                 onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Descrição opcional"
+                placeholder={t('tasks.description_placeholder')}
               />
             </div>
             <div>
-              <Label htmlFor="project">Projeto</Label>
+              <Label htmlFor="project">{t('projects.project')}</Label>
               <Select
                 value={taskForm.projectId}
                 onValueChange={(value) => setTaskForm(prev => ({ ...prev, projectId: value === "none" ? "" : value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um projeto" />
+                  <SelectValue placeholder={t('projects.select_project')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Nenhum projeto</SelectItem>
+                  <SelectItem value="none">{t('projects.no_project')}</SelectItem>
                   {projects.map((project) => (
                     <SelectItem key={project.id} value={project.id}>
                       {project.name}
@@ -577,7 +579,7 @@ export default function Calendar() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="startTime">Hora de Início</Label>
+                <Label htmlFor="startTime">{t('tasks.start_time')}</Label>
                 <Input
                   id="startTime"
                   type="time"
@@ -586,7 +588,7 @@ export default function Calendar() {
                 />
               </div>
               <div>
-                <Label htmlFor="endTime">Hora de Fim</Label>
+                <Label htmlFor="endTime">{t('tasks.end_time')}</Label>
                 <Input
                   id="endTime"
                   type="time"
@@ -601,12 +603,12 @@ export default function Calendar() {
                 checked={taskForm.isRoutine}
                 onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, isRoutine: !!checked }))}
               />
-              <Label htmlFor="isRoutine">Tarefa de rotina</Label>
+              <Label htmlFor="isRoutine">{t('tasks.routine_task')}</Label>
             </div>
             {taskForm.isRoutine && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label className="block mb-1">Frequência</Label>
+                  <Label className="block mb-1">{t('routines.frequency')}</Label>
                   <Select
                     value={taskForm.repeatUnit}
                     onValueChange={(value) => setTaskForm(prev => ({ ...prev, repeatUnit: value as any }))}
@@ -615,15 +617,15 @@ export default function Calendar() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="day">Dia</SelectItem>
-                      <SelectItem value="week">Semana</SelectItem>
-                      <SelectItem value="month">Mês</SelectItem>
-                      <SelectItem value="year">Ano</SelectItem>
+                      <SelectItem value="day">{t('time.day')}</SelectItem>
+                      <SelectItem value="week">{t('time.week')}</SelectItem>
+                      <SelectItem value="month">{t('time.month')}</SelectItem>
+                      <SelectItem value="year">{t('time.year')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="block mb-1">Quantidade</Label>
+                  <Label className="block mb-1">{t('common.quantity')}</Label>
                   <Input
                     type="number"
                     min={1}
@@ -638,16 +640,16 @@ export default function Calendar() {
                     checked={taskForm.repeatAlways}
                     onCheckedChange={(checked) => setTaskForm(prev => ({ ...prev, repeatAlways: !!checked }))}
                   />
-                  <Label htmlFor="repeatAlways">Sempre</Label>
+                  <Label htmlFor="repeatAlways">{t('common.always')}</Label>
                 </div>
               </div>
             )}
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveTask} className="flex-1">
-                {editingTask ? 'Salvar Alterações' : 'Criar Tarefa'}
+                {editingTask ? t('common.save_changes') : t('tasks.create_task')}
               </Button>
               <Button variant="outline" onClick={() => setIsTaskDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>

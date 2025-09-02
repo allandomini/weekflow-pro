@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
+import { useTranslation } from "@/hooks/useTranslation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -13,6 +14,7 @@ import { Project } from "@/types";
 export default function Projects() {
   const navigate = useNavigate();
   const { projects, addProject, updateProject, deleteProject } = useAppContext();
+  const { t } = useTranslation();
   const [isProjectDialogOpen, setIsProjectDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [projectForm, setProjectForm] = useState({ name: "", color: "#3B82F6", icon: "folder" });
@@ -39,7 +41,7 @@ export default function Projects() {
   };
 
   const handleDeleteProject = (projectId: string) => {
-    if (confirm('Tem certeza que deseja excluir este projeto? Todas as tarefas e notas relacionadas também serão excluídas.')) {
+    if (confirm(t('projects.delete_project') + '? ' + t('projects.delete_project_warning'))) {
       deleteProject(projectId);
     }
   };
@@ -68,8 +70,8 @@ export default function Projects() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Projetos</h1>
-          <p className="text-muted-foreground">Organize suas tarefas em projetos</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('projects.title')}</h1>
+          <p className="text-muted-foreground">{t('projects.manage_description')}</p>
         </div>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 min-w-[200px]">
@@ -86,7 +88,7 @@ export default function Projects() {
           </div>
           <Button variant="gradient" onClick={handleCreateProject} className="animate-glow">
             <Plus className="w-4 h-4 mr-2" />
-            Novo Projeto
+{t('projects.create_project')}
           </Button>
         </div>
       </div>
@@ -102,9 +104,9 @@ export default function Projects() {
             <Card className="shadow-elegant">
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <FolderOpen className="w-16 h-16 text-muted-foreground mb-4" />
-                <h3 className="text-xl font-semibold text-foreground mb-2">Nenhum projeto criado</h3>
-                <p className="text-muted-foreground text-center mb-6">Comece criando seu primeiro projeto para organizar suas tarefas</p>
-                <Button onClick={handleCreateProject}><Plus className="w-4 h-4 mr-2" />Criar Primeiro Projeto</Button>
+                <h3 className="text-xl font-semibold text-foreground mb-2">{t('projects.no_projects')}</h3>
+                <p className="text-muted-foreground text-center mb-6">{t('projects.create_first_project')}</p>
+                <Button onClick={handleCreateProject}><Plus className="w-4 h-4 mr-2" />{t('projects.create_project')}</Button>
               </CardContent>
             </Card>
           </div>
@@ -162,26 +164,26 @@ export default function Projects() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingProject ? 'Editar Projeto' : 'Novo Projeto'}
+              {editingProject ? t('projects.edit_project') : t('projects.create_project')}
             </DialogTitle>
             <DialogDescription>
               {editingProject 
-                ? 'Edite as informações do projeto selecionado.' 
-                : 'Crie um novo projeto para organizar suas tarefas e atividades.'}
+                ? t('projects.edit_project_description') 
+                : t('projects.create_project_description')}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="name">Nome do Projeto</Label>
+              <Label htmlFor="name">{t('projects.project_name')}</Label>
               <Input
                 id="name"
                 value={projectForm.name}
                 onChange={(e) => setProjectForm(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Digite o nome do projeto"
+                placeholder={t('projects.project_name')}
               />
             </div>
             <div>
-              <Label htmlFor="color">Cor do Projeto</Label>
+              <Label htmlFor="color">{t('projects.project_color')}</Label>
               <div className="flex gap-2 mt-2 flex-wrap">
                 {colorOptions.map((color) => (
                   <button
@@ -199,7 +201,7 @@ export default function Projects() {
               </div>
             </div>
             <div>
-              <Label htmlFor="icon">Ícone do Projeto</Label>
+              <Label htmlFor="icon">{t('projects.project_icon')}</Label>
               <div className="flex gap-2 mt-2 flex-wrap">
                 {iconOptions.map(({ icon: Icon, name }) => (
                   <button
@@ -219,10 +221,10 @@ export default function Projects() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button onClick={handleSaveProject} className="flex-1">
-                {editingProject ? 'Salvar Alterações' : 'Criar Projeto'}
+                {editingProject ? t('common.save_changes') : t('projects.create_project')}
               </Button>
               <Button variant="outline" onClick={() => setIsProjectDialogOpen(false)}>
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           </div>

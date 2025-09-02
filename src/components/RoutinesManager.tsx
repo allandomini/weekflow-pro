@@ -14,6 +14,7 @@ import { Routine } from '@/types';
 import { CalendarDays, Clock, Target, Zap, Calendar as CalendarIcon, Trash2, SkipForward, Pause } from 'lucide-react';
 import { format, addDays, subDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface RoutinesManagerProps {
   routine: Routine;
@@ -23,6 +24,7 @@ interface RoutinesManagerProps {
 export default function RoutinesManager({ routine, onClose }: RoutinesManagerProps) {
   const { bulkDeleteRoutineOccurrences, bulkSkipRoutinePeriod, getRoutineOccurrences } = useAppContext();
   const { animationsEnabled } = useAnimations();
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(true);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [startDate, setStartDate] = useState<Date>(new Date());
@@ -105,10 +107,10 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="w-5 h-5" />
-            Gerenciar Rotina: {routine.name}
+            {t('routines.manage_routine')}: {routine.name}
           </DialogTitle>
           <DialogDescription>
-            Selecione as datas para realizar operações em massa nesta rotina.
+            {t('routines.select_dates_description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -117,7 +119,7 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
           <div>
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Selecionar Datas</CardTitle>
+                <CardTitle className="text-lg">{t('routines.select_dates')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Calendar
@@ -136,10 +138,10 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                       onClick={() => setSelectedDates([])}
                       disabled={selectedDates.length === 0}
                     >
-                      Limpar seleção
+                      {t('routines.clear_selection')}
                     </Button>
                     <span className="text-sm text-muted-foreground">
-                      {selectedDates.length} data(s) selecionada(s)
+                      {t('routines.dates_selected', { count: selectedDates.length })}
                     </span>
                   </div>
                 </div>
@@ -151,11 +153,11 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
           <div className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Operações em Massa</CardTitle>
+                <CardTitle className="text-lg">{t('routines.bulk_operations')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label className="text-foreground block mb-2">Tipo de Operação</Label>
+                  <Label className="text-foreground block mb-2">{t('routines.operation_type')}</Label>
                   <Select
                     value={operationType}
                     onValueChange={(value) => setOperationType(value as 'delete' | 'skip')}
@@ -167,13 +169,13 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                       <SelectItem value="delete">
                         <div className="flex items-center gap-2">
                           <Trash2 className="w-4 h-4" />
-                          Excluir ocorrências
+                          {t('routines.delete_occurrences')}
                         </div>
                       </SelectItem>
                       <SelectItem value="skip">
                         <div className="flex items-center gap-2">
                           <SkipForward className="w-4 h-4" />
-                          Pausar período
+                          {t('routines.pause_period')}
                         </div>
                       </SelectItem>
                     </SelectContent>
@@ -184,10 +186,10 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                   <div className="p-4 bg-red-50 dark:bg-red-950/20 rounded-lg border border-red-200 dark:border-red-800">
                     <div className="flex items-center gap-2 text-red-800 dark:text-red-200">
                       <Trash2 className="w-5 h-5" />
-                      <strong>Atenção:</strong>
+                      <strong>{t('routines.attention')}:</strong>
                     </div>
                     <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                      Esta operação irá excluir permanentemente as ocorrências da rotina nas datas selecionadas.
+                      {t('routines.delete_warning_text')}
                     </p>
                   </div>
                 )}
@@ -196,19 +198,19 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                   <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
                     <div className="flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
                       <Pause className="w-5 h-5" />
-                      <strong>Pausar Período:</strong>
+                      <strong>{t('routines.pause_period')}:</strong>
                     </div>
                     <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                      A rotina será pausada nas datas selecionadas. Você pode reativá-la posteriormente.
+                      {t('routines.pause_warning_text')}
                     </p>
                   </div>
                 )}
 
                 <div className="space-y-2">
-                  <Label className="text-foreground block">Período de Referência</Label>
+                  <Label className="text-foreground block">{t('routines.reference_period')}</Label>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <Label className="text-xs text-muted-foreground">Data Inicial</Label>
+                      <Label className="text-xs text-muted-foreground">{t('routines.start_date')}</Label>
                       <Input
                         type="date"
                         value={startDate.toISOString().split('T')[0]}
@@ -217,7 +219,7 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                       />
                     </div>
                     <div>
-                      <Label className="text-xs text-muted-foreground">Data Final</Label>
+                      <Label className="text-xs text-muted-foreground">{t('routines.end_date')}</Label>
                       <Input
                         type="date"
                         value={endDate.toISOString().split('T')[0]}
@@ -238,16 +240,16 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                   }`}
                 >
                   {isLoading ? (
-                    'Processando...'
+                    t('routines.processing')
                   ) : operationType === 'delete' ? (
                     <>
                       <Trash2 className="w-4 h-4 mr-2" />
-                      Excluir {selectedDates.length} ocorrência(s)
+                      {t('routines.delete_occurrences_count', { count: selectedDates.length })}
                     </>
                   ) : (
                     <>
                       <Pause className="w-4 h-4 mr-2" />
-                      Pausar {selectedDates.length} dia(s)
+                      {t('routines.pause_days_count', { count: selectedDates.length })}
                     </>
                   )}
                 </Button>
@@ -257,7 +259,7 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
             {/* Routine Info */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Informações da Rotina</CardTitle>
+                <CardTitle className="text-lg">{t('routines.routine_info')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-center gap-2">
@@ -275,20 +277,20 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
                 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <span className="text-muted-foreground">Vezes por dia:</span>
+                    <span className="text-muted-foreground">{t('routines.times_per_day')}:</span>
                     <span className="ml-2 font-medium">{routine.timesPerDay}</span>
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Duração:</span>
+                    <span className="text-muted-foreground">{t('routines.duration')}:</span>
                     <span className="ml-2 font-medium">
-                      {routine.durationDays ? `${routine.durationDays} dias` : 'Sempre'}
+                      {routine.durationDays ? `${routine.durationDays} ${t('routines.days')}` : t('routines.always')}
                     </span>
                   </div>
                 </div>
 
                 {routine.specificTimes && routine.specificTimes.length > 0 && (
                   <div>
-                    <span className="text-sm text-muted-foreground">Horários:</span>
+                    <span className="text-sm text-muted-foreground">{t('routines.times')}:</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {routine.specificTimes.map((time, index) => (
                         <Badge key={index} variant="secondary" className="text-xs">
@@ -301,11 +303,11 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
 
                 {routine.weekdays && routine.weekdays.length > 0 && (
                   <div>
-                    <span className="text-sm text-muted-foreground">Dias da semana:</span>
+                    <span className="text-sm text-muted-foreground">{t('dashboard.weekdays.title')}:</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {routine.weekdays.map(day => (
                         <Badge key={day} variant="outline" className="text-xs">
-                          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][day]}
+                          {[t('dashboard.week_days.sun'), t('dashboard.week_days.mon'), t('dashboard.week_days.tue'), t('dashboard.week_days.wed'), t('dashboard.week_days.thu'), t('dashboard.week_days.fri'), t('dashboard.week_days.sat')][day]}
                         </Badge>
                       ))}
                     </div>
@@ -323,31 +325,31 @@ export default function RoutinesManager({ routine, onClose }: RoutinesManagerPro
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {confirmDialog.type === 'delete' ? 'Confirmar Exclusão' : 'Confirmar Pausa'}
+              {confirmDialog.type === 'delete' ? t('routines.confirm_deletion') : t('routines.confirm_pause')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {confirmDialog.type === 'delete' ? (
                 <>
-                  Você está prestes a <strong>excluir permanentemente</strong> {confirmDialog.count} ocorrência(s) da rotina "{routine.name}".
+                  {t('routines.confirm_delete_message', { count: confirmDialog.count, name: routine.name })}
                   <br /><br />
-                  Esta ação não pode ser desfeita. Deseja continuar?
+                  {t('routines.action_cannot_be_undone')}
                 </>
               ) : (
                 <>
-                  Você está prestes a <strong>pausar</strong> a rotina "{routine.name}" por {confirmDialog.count} dia(s).
+                  {t('routines.confirm_pause_message', { count: confirmDialog.count, name: routine.name })}
                   <br /><br />
-                  A rotina não será executada nas datas selecionadas. Deseja continuar?
+                  {t('routines.routine_will_not_execute')}
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmBulkOperation}
               className={confirmDialog.type === 'delete' ? 'bg-red-600 hover:bg-red-700' : 'bg-yellow-600 hover:bg-yellow-700'}
             >
-              {confirmDialog.type === 'delete' ? 'Excluir' : 'Pausar'}
+              {confirmDialog.type === 'delete' ? t('common.delete') : t('routines.pause')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

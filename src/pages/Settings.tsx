@@ -7,12 +7,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { useAnimations } from "@/contexts/AnimationContext";
+import LanguageSelector from "@/components/LanguageSelector";
+import { useTranslation } from "@/hooks/useTranslation";
 
 export default function Settings() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
   const [notifications, setNotifications] = useState<boolean>(() => localStorage.getItem("notifications") !== "false");
   const { aiSettings, updateAISettings, actorName, updateActorName } = useAppContext();
   const { animationsEnabled, toggleAnimations } = useAnimations();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -65,12 +68,12 @@ export default function Settings() {
       location.reload();
     } catch (e) {
       console.error(e);
-      alert('Falha ao importar backup. Verifique o arquivo.');
+      alert(t('settings.import_error'));
     }
   };
 
   const resetData = () => {
-    if (!confirm('Tem certeza que deseja limpar todos os dados? Esta ação é irreversível.')) return;
+    if (!confirm(t('settings.confirm_reset_data'))) return;
     const preserve = ['theme'];
     const toRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
@@ -83,49 +86,51 @@ export default function Settings() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-foreground">Configurações</h1>
+      <h1 className="text-3xl font-bold text-foreground">{t('settings.title')}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <LanguageSelector />
+        
         <Card className="shadow-elegant">
           <CardHeader>
-            <CardTitle>Aparência</CardTitle>
+            <CardTitle>{t('settings.appearance')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <Label>Tema</Label>
+              <Label>{t('settings.theme')}</Label>
               <Select value={theme} onValueChange={setTheme}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="light">Claro</SelectItem>
-                  <SelectItem value="domini-dark">Escuro (Domini)</SelectItem>
+                  <SelectItem value="light">{t('settings.light_mode')}</SelectItem>
+                  <SelectItem value="domini-dark">{t('settings.dark_mode')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-center justify-between">
               <div>
-                <Label>Animações</Label>
-                <p className="text-sm text-muted-foreground">Habilita/Desabilita animações e transições na interface.</p>
+                <Label>{t('settings.animations')}</Label>
+                <p className="text-sm text-muted-foreground">{t('settings.enable_animations')}</p>
               </div>
               <Switch checked={animationsEnabled} onCheckedChange={toggleAnimations} />
             </div>
             <div>
-              <Label>Nome do Ator (Histórico)</Label>
-              <Input className="mt-1" value={actorName} onChange={(e) => updateActorName(e.target.value)} placeholder="Seu nome" />
+              <Label>{t('settings.account')}</Label>
+              <Input className="mt-1" value={actorName} onChange={(e) => updateActorName(e.target.value)} placeholder={t('settings.account')} />
             </div>
           </CardContent>
         </Card>
 
         <Card className="shadow-elegant">
           <CardHeader>
-            <CardTitle>Notificações</CardTitle>
+            <CardTitle>{t('settings.notifications')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Exibir notificações (toasts)</Label>
-                <p className="text-sm text-muted-foreground">Habilita/Desabilita mensagens de alerta rápidas.</p>
+                <Label>{t('settings.notifications')}</Label>
+                <p className="text-sm text-muted-foreground">{t('settings.settings_alerts.notifications_description')}</p>
               </div>
               <Switch checked={notifications} onCheckedChange={setNotifications} />
             </div>
@@ -134,19 +139,19 @@ export default function Settings() {
 
         <Card className="shadow-elegant">
           <CardHeader>
-            <CardTitle>Backup & Dados</CardTitle>
+            <CardTitle>{t('settings.backup_data')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex gap-2">
-              <Button onClick={exportData}>Exportar Backup</Button>
-              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>Importar Backup</Button>
+              <Button onClick={exportData}>{t('settings.export_backup')}</Button>
+              <Button variant="outline" onClick={() => fileInputRef.current?.click()}>{t('settings.import_backup')}</Button>
               <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) importData(f);
               }} />
             </div>
             <div>
-              <Button variant="destructive" onClick={resetData}>Resetar Dados</Button>
+              <Button variant="destructive" onClick={resetData}>{t('settings.reset_data')}</Button>
             </div>
           </CardContent>
         </Card>
@@ -155,13 +160,13 @@ export default function Settings() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="shadow-elegant">
           <CardHeader>
-            <CardTitle>Assistente (Gemini)</CardTitle>
+            <CardTitle>{t('ai.title')} (Gemini)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Habilitar assistente</Label>
-                <p className="text-sm text-muted-foreground">Mostra o botão do assistente e permite enviar mensagens.</p>
+                <Label>{t('settings.settings_alerts.ai_assistant_enabled')}</Label>
+                <p className="text-sm text-muted-foreground">{t('settings.settings_alerts.ai_assistant_description')}</p>
               </div>
               <Switch
                 checked={aiSettings.enabled}
@@ -171,8 +176,8 @@ export default function Settings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <Label>Análise profunda</Label>
-                <p className="text-sm text-muted-foreground">Amplia o contexto analisado (tarefas, projetos, finanças e contatos).</p>
+                <Label>{t('settings.deep_analysis')}</Label>
+                <p className="text-sm text-muted-foreground">{t('settings.deep_analysis_description')}</p>
               </div>
               <Switch
                 checked={aiSettings.deepAnalysis}

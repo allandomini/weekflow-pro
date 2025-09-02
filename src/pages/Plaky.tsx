@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
+import { useTranslation } from '@/hooks/useTranslation';
 import { PlakyBoard, PlakyColumn, PlakyItem } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,7 @@ const getTodayDateString = () => {
 };
 
 export default function Plaky() {
+  const { t } = useTranslation();
   const {
     plakyBoards,
     plakyItems,
@@ -48,14 +50,14 @@ export default function Plaky() {
   // Create a proper board object for the HOJE! board with correct PlakyColumn types
   const hojeBoard = React.useMemo((): PlakyBoard => ({
     id: HOJE_BOARD_ID,
-    name: 'HOJE!',
-    description: 'Tarefas para hoje',
+    name: t('plaky.today_board'),
+    description: t('plaky.today_tasks'),
     color: '#10B981',
     projectId: undefined,
     columns: [
-      { id: 'todo', name: 'A Fazer', type: 'status' as const, options: ['A Fazer', 'Em Progresso', 'Concluído'], order: 1 },
-      { id: 'inprogress', name: 'Em Progresso', type: 'status' as const, options: ['A Fazer', 'Em Progresso', 'Concluído'], order: 2 },
-      { id: 'done', name: 'Concluído', type: 'status' as const, options: ['A Fazer', 'Em Progresso', 'Concluído'], order: 3 }
+      { id: 'todo', name: t('plaky.todo'), type: 'status' as const, options: [t('plaky.todo'), t('plaky.in_progress'), t('plaky.done')], order: 1 },
+      { id: 'inprogress', name: t('plaky.in_progress'), type: 'status' as const, options: [t('plaky.todo'), t('plaky.in_progress'), t('plaky.done')], order: 2 },
+      { id: 'done', name: t('plaky.done'), type: 'status' as const, options: [t('plaky.todo'), t('plaky.in_progress'), t('plaky.done')], order: 3 }
     ],
     createdAt: new Date(),
     updatedAt: new Date()
@@ -304,7 +306,7 @@ export default function Plaky() {
         {/* Add new item */}
         <div className="space-y-2">
           <Input
-            placeholder="Adicionar item..."
+            placeholder={t('plaky.add_item')}
             value={newItem.values[column.id] || ''}
             onChange={(e) => setNewItem({
               ...newItem,
@@ -346,7 +348,7 @@ export default function Plaky() {
             }
           }}>
             <SelectTrigger>
-              <SelectValue placeholder="Adicionar pessoa responsável" />
+              <SelectValue placeholder={t('plaky.add_responsible_person')} />
             </SelectTrigger>
             <SelectContent>
               {contacts.map((contact) => (
@@ -472,43 +474,43 @@ export default function Plaky() {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Plaky</h1>
-          <p className="text-muted-foreground">Quadros Kanban integrados com tarefas e pessoas</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('plaky.title')}</h1>
+          <p className="text-muted-foreground">{t('plaky.description')}</p>
         </div>
         <Dialog>
           <DialogTrigger asChild>
             <Button>
               <Plus className="w-4 h-4 mr-2" />
-              Novo Quadro
+{t('plaky.new_board')}
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Novo Quadro</DialogTitle>
-              <DialogDescription>Crie um novo quadro Kanban</DialogDescription>
+              <DialogTitle>{t('plaky.new_board')}</DialogTitle>
+              <DialogDescription>{t('plaky.create_board_description')}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label htmlFor="board-name">Nome</Label>
+                <Label htmlFor="board-name">{t('common.name')}</Label>
                 <Input
                   id="board-name"
                   value={newBoard.name}
                   onChange={(e) => setNewBoard({ ...newBoard, name: e.target.value })}
-                  placeholder="Nome do quadro"
+                  placeholder={t('plaky.board_name_placeholder')}
                 />
               </div>
               <div>
-                <Label htmlFor="board-description">Descrição</Label>
+                <Label htmlFor="board-description">{t('common.description')}</Label>
                 <Textarea
                   id="board-description"
                   value={newBoard.description}
                   onChange={(e) => setNewBoard({ ...newBoard, description: e.target.value })}
-                  placeholder="Descrição do quadro"
+                  placeholder={t('plaky.board_description_placeholder')}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="board-color">Cor</Label>
+                  <Label htmlFor="board-color">{t('common.color')}</Label>
                   <Input
                     id="board-color"
                     type="color"
@@ -517,13 +519,13 @@ export default function Plaky() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="board-project">Projeto (opcional)</Label>
+                  <Label htmlFor="board-project">{t('plaky.project_optional')}</Label>
                   <Select value={newBoard.projectId} onValueChange={(value) => setNewBoard({ ...newBoard, projectId: value })}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione um projeto" />
+                      <SelectValue placeholder={t('plaky.select_project')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="no-project">Sem projeto</SelectItem>
+                      <SelectItem value="no-project">{t('plaky.no_project')}</SelectItem>
                       {projects.map((project) => (
                         <SelectItem key={project.id} value={project.id}>
                           <div className="flex items-center gap-2">
@@ -540,7 +542,7 @@ export default function Plaky() {
                 </div>
               </div>
               <Button onClick={createBoard} className="w-full">
-                Criar Quadro
+{t('plaky.create_board')}
               </Button>
             </div>
           </DialogContent>
@@ -549,8 +551,8 @@ export default function Plaky() {
 
       <Tabs defaultValue="boards" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="boards">Quadros</TabsTrigger>
-          <TabsTrigger value="kanban">Kanban</TabsTrigger>
+          <TabsTrigger value="boards">{t('plaky.boards')}</TabsTrigger>
+          <TabsTrigger value="kanban">{t('plaky.kanban')}</TabsTrigger>
         </TabsList>
 
         {/* Boards Tab */}
@@ -568,7 +570,7 @@ export default function Plaky() {
                       {board.name}
                       {board.id === HOJE_BOARD_ID && (
                         <span className="ml-2 text-xs px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
-                          {todayTasks.length} tarefas
+                          {todayTasks.length} {t('plaky.tasks')}
                         </span>
                       )}
                     </h3>
@@ -584,11 +586,11 @@ export default function Plaky() {
                   )}
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Trello className="w-4 h-4" />
-                    <span>{board.columns.length} colunas</span>
+                    <span>{board.columns.length} {t('plaky.columns')}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <Hash className="w-4 h-4" />
-                    <span>{plakyItems.filter(item => item.boardId === board.id).length} itens</span>
+                    <span>{plakyItems.filter(item => item.boardId === board.id).length} {t('plaky.items')}</span>
                   </div>
                   <div className="flex items-center gap-2 pt-2">
                     <Button 
@@ -597,7 +599,7 @@ export default function Plaky() {
                       className="flex-1"
                       onClick={() => setSelectedBoard(board)}
                     >
-                      Abrir
+{t('plaky.open')}
                     </Button>
                     <Button variant="outline" size="sm">
                       <Edit className="w-4 h-4" />
