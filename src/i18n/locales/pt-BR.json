@@ -44,7 +44,9 @@
     "quantity": "Quantidade",
     "always": "Sempre",
     "attention": "Atenção",
-    "of": "de"
+    "of": "de",
+    "cancel": "Cancelar",
+    "confirm": "Confirmar"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -56,7 +58,9 @@
     "investments": "Investimentos",
     "clockify": "Clockify",
     "ai_assistant": "Assistente IA",
-    "settings": "Configurações"
+    "settings": "Configurações",
+    "network": "Rede",
+    "plaky": "Plaky"
   },
   "dashboard": {
     "title": "Dashboard",

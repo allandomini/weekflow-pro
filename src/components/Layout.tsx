@@ -5,7 +5,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { Button } from "@/components/ui/button";
 import { Moon, Sun, LogOut } from "lucide-react";
-import logoUrl from "@/assets/images/file.svg";
+// import logoUrl from "@/assets/images/file.svg";
 import FloatingClockify from "./FloatingClockify";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
@@ -69,7 +69,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <header className={`h-14 border-b border-border bg-card/80 backdrop-blur-md flex items-center px-6 shadow-soft transition-all duration-300 ${animationsEnabled ? 'animate-slide-down' : ''}`}>
             <SidebarTrigger className={`mr-4 transition-transform duration-200 ${animationsEnabled ? 'hover:scale-105' : ''}`} />
             <div className={`flex items-center gap-3 ${animationsEnabled ? 'animate-fade-in-left' : ''}`}>
-              <img src={logoUrl} alt="Logo" className="h-8 w-auto drop-shadow-sm dark:invert" />
+              <img src="/domini-logo.png" alt="Logo" className="h-8 w-auto drop-shadow-sm dark:invert" />
               <h1 className="text-xl font-semibold text-foreground transition-colors duration-200">Domini Horus</h1>
             </div>
             <div className={`ml-auto flex items-center gap-2 ${animationsEnabled ? 'animate-fade-in-right' : ''}`}>

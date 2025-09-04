@@ -117,7 +117,7 @@ export default function LoadingScreen({
               }}
             >
               <img 
-                src="src/assets/images/file.svg"
+                src="/domini-logo.png"
                 onError={(e) => {
                   // Fallback to public directory if assets path fails
                   const target = e.target as HTMLImageElement;
