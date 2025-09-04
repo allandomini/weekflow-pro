@@ -1362,18 +1362,67 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     console.warn(`${method} not yet implemented in optimized context`);
   }, []);
 
+  // Clear all data when user logs out or changes
+  const clearAllData = useCallback(() => {
+    setProjects([]);
+    setTasks([]);
+    setNotes([]);
+    setTodoLists([]);
+    setAccounts([]);
+    setTransactions([]);
+    setDebts([]);
+    setGoals([]);
+    setReceivables([]);
+    setContacts([]);
+    setContactGroups([]);
+    setProjectImages([]);
+    setProjectWalletEntries([]);
+    setClockifyTimeEntries([]);
+    setPlakyBoards([]);
+    setPlakyItems([]);
+    setPomodoroSessions([]);
+    setPomodoroSettings({
+      workDuration: 25,
+      shortBreakDuration: 5,
+      longBreakDuration: 15,
+      longBreakInterval: 4,
+      autoStartBreaks: false,
+      autoStartWork: false,
+      soundEnabled: true
+    });
+    setAISettings({
+      enabled: true,
+      deepAnalysis: false,
+      model: 'gemini-1.5-flash',
+      maxContextItems: 100
+    });
+    setActivities([]);
+    setRoutines([]);
+    setRoutineCompletions({});
+    setRoutineExceptions([]);
+    setRoutineBulkOperations([]);
+    
+    // Clear localStorage
+    localStorage.removeItem('domini-app-loaded');
+    localStorage.removeItem('domini-last-load');
+    localStorage.removeItem('aiSettings');
+    localStorage.removeItem('pomodoroSettings');
+    
+    console.log('🧹 All data cleared for account switch');
+  }, []);
+
   // Load data when user is available - FIXED VERSION
   useEffect(() => {
     const userId = user?.id;
     if (!userId) {
+      // Clear all data when no user is present
+      clearAllData();
       setLoading(false);
       return;
     }
 
-    // Check if we have actual data loaded (not just session flag)
-    const hasActualData = projects.length > 0 || tasks.length > 0 || accounts.length > 0;
-    
-    if (!hasActualData && !isLoadingData) {
+    // Only load data if we're not already loading and don't have a previous user session
+    if (!isLoadingData) {
       console.log('🔄 Loading data for user:', userId);
       
       // Set AI settings
@@ -1391,11 +1440,8 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
         setLoading(false);
         console.log('✅ Data load complete');
       });
-    } else if (hasActualData) {
-      console.log('✅ Data already present, skipping load');
-      setLoading(false);
     }
-  }, [user?.id, projects.length, tasks.length, accounts.length, isLoadingData]);
+  }, [user?.id]);
 
 
   const value: AppContextType = {
