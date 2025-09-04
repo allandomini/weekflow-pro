@@ -117,11 +117,11 @@ export default function LoadingScreen({
               }}
             >
               <img 
-                src="/domini-logo.png"
+                src="/logo.svg"
                 onError={(e) => {
-                  // Fallback to public directory if assets path fails
+                  // Fallback to favicon if logo.svg fails
                   const target = e.target as HTMLImageElement;
-                  target.src = "/domini-logo.png";
+                  target.src = "/favicon.ico";
                 }} 
                 alt="Domini Horus" 
                 className="w-full h-full object-contain"

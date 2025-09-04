@@ -69,7 +69,15 @@ export function Layout({ children }: { children: ReactNode }) {
           <header className={`h-14 border-b border-border bg-card/80 backdrop-blur-md flex items-center px-6 shadow-soft transition-all duration-300 ${animationsEnabled ? 'animate-slide-down' : ''}`}>
             <SidebarTrigger className={`mr-4 transition-transform duration-200 ${animationsEnabled ? 'hover:scale-105' : ''}`} />
             <div className={`flex items-center gap-3 ${animationsEnabled ? 'animate-fade-in-left' : ''}`}>
-              <img src="/domini-logo.png" alt="Logo" className="h-8 w-auto drop-shadow-sm dark:invert" />
+              <img 
+                src="/logo.svg" 
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  target.src = "/favicon.ico";
+                }}
+                alt="Logo" 
+                className="h-8 w-auto drop-shadow-sm" 
+              />
               <h1 className="text-xl font-semibold text-foreground transition-colors duration-200">Domini Horus</h1>
             </div>
             <div className={`ml-auto flex items-center gap-2 ${animationsEnabled ? 'animate-fade-in-right' : ''}`}>
