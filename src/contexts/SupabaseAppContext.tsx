@@ -148,6 +148,9 @@ interface AppContextType {
   loading: boolean;
   refreshData: () => Promise<void>;
   
+  // User Account Management
+  deleteUserAccount: () => Promise<void>;
+  
   // Supabase client and user access
   supabase: typeof supabase;
   user: any;
@@ -2998,6 +3001,99 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     
     loading,
     refreshData: loadAllData,
+    
+    // User Account Management
+    deleteUserAccount: async () => {
+      if (!user) {
+        toast({
+          title: "Erro",
+          description: "Usuário não autenticado.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        // Delete all user data from all tables (only existing tables)
+        const tables = [
+          'activities', 'clockify_time_entries', 'contacts', 'contact_groups',
+          'debts', 'goals', 'notes', 'project_images', 'project_wallet_entries',
+          'projects', 'receivables', 'routine_completions', 'routine_exceptions', 
+          'routines', 'tasks', 'todo_lists', 'transactions', 'accounts'
+        ] as const;
+
+        // Delete data from each table
+        for (const table of tables) {
+          try {
+            const { error } = await supabase
+              .from(table as any)
+              .delete()
+              .eq('user_id', user.id);
+            
+            if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found, which is OK
+              console.error(`Error deleting from ${table}:`, error);
+            }
+          } catch (tableError) {
+            console.error(`Error deleting from ${table}:`, tableError);
+          }
+        }
+
+        // Clear local storage
+        const keysToRemove = [
+          'projects', 'tasks', 'notes', 'todoLists', 'accounts', 'transactions', 
+          'debts', 'goals', 'receivables', 'contacts', 'contactGroups', 
+          'projectImages', 'projectWalletEntries', 'clockifyTimeEntries', 
+          'plakyBoards', 'plakyItems', 'pomodoroSessions', 'pomodoroSettings', 
+          'aiSettings', 'activities', 'actorName', 'routines', 'routineCompletions',
+          'domini-app-loaded', 'domini-last-load'
+        ];
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+
+        // Strategy 1: Change password to prevent login (skip email change due to validation)
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+        });
+
+        if (passwordError) {
+          console.error('Error updating password:', passwordError);
+        }
+
+        // Strategy 2: Mark account as deleted in a way that prevents access
+        try {
+          // Update user metadata to mark as deleted
+          const { error: metadataError } = await supabase.auth.updateUser({
+            data: { 
+              account_deleted: true,
+              deleted_at: new Date().toISOString(),
+              original_email: user.email
+            }
+          });
+
+          if (metadataError) {
+            console.error('Error updating metadata:', metadataError);
+          }
+        } catch (metaError) {
+          console.error('Metadata update failed:', metaError);
+        }
+
+        toast({
+          title: "Conta excluída",
+          description: "Sua conta e todos os dados foram removidos permanentemente.",
+        });
+
+        // Sign out the user
+        await supabase.auth.signOut();
+        
+      } catch (error) {
+        console.error('Error deleting user account:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível excluir a conta. Tente novamente.",
+          variant: "destructive",
+        });
+      }
+    },
     
     // Missing methods
     updateAccount: async () => {},

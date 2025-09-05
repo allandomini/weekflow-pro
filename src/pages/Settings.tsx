@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { useAnimations } from "@/contexts/AnimationContext";
 import LanguageSelector from "@/components/LanguageSelector";
@@ -13,7 +14,8 @@ import { useTranslation } from "@/hooks/useTranslation";
 export default function Settings() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
   const [notifications, setNotifications] = useState<boolean>(() => localStorage.getItem("notifications") !== "false");
-  const { aiSettings, updateAISettings, actorName, updateActorName } = useAppContext();
+  const [deleteConfirmText, setDeleteConfirmText] = useState<string>("");
+  const { aiSettings, updateAISettings, actorName, updateActorName, deleteUserAccount } = useAppContext();
   const { animationsEnabled, toggleAnimations } = useAnimations();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -82,6 +84,11 @@ export default function Settings() {
     }
     toRemove.forEach(k => localStorage.removeItem(k));
     location.reload();
+  };
+
+  const handleDeleteAccount = async () => {
+    await deleteUserAccount();
+    setDeleteConfirmText("");
   };
 
   return (
@@ -188,6 +195,74 @@ export default function Settings() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Account Management */}
+      <Card className="shadow-elegant">
+        <CardHeader>
+          <CardTitle>{t('settings.account_management')}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="font-semibold">{t('settings.delete_account')}</Label>
+            <p className="text-sm text-muted-foreground mt-1">{t('settings.delete_account_description')}</p>
+          </div>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" className="w-full border-muted-foreground/20 hover:bg-muted">
+                {t('settings.delete_account')}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="max-w-md">
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  {t('settings.confirm_delete_account')}
+                </AlertDialogTitle>
+                <AlertDialogDescription asChild>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="font-medium">{t('settings.delete_account_warning')}</div>
+                      <div className="mt-2 text-sm whitespace-pre-line">
+                        {t('settings.delete_account_items')}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-muted p-3 rounded-md border">
+                      <div className="font-medium text-sm">
+                        {t('settings.delete_account_final_warning')}
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium">
+                        {t('settings.type_delete_to_confirm')}
+                      </Label>
+                      <Input
+                        value={deleteConfirmText}
+                        onChange={(e) => setDeleteConfirmText(e.target.value)}
+                        placeholder="EXCLUIR"
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setDeleteConfirmText("")}>
+                  {t('common.cancel')}
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleDeleteAccount}
+                  disabled={deleteConfirmText !== 'EXCLUIR'}
+                  className="bg-foreground text-background hover:bg-foreground/90"
+                >
+                  {t('settings.delete_account')}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
     </div>
   );
 }

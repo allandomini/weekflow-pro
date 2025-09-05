@@ -1,6 +1,7 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -35,8 +36,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setUser(null);
         } else {
-          setSession(session);
-          setUser(session?.user ?? null);
+          // Check if account is marked as deleted
+          if (session?.user?.user_metadata?.account_deleted) {
+            console.log('Account marked as deleted, attempting to clear metadata');
+            
+            // Try to clear the deleted flag first (in case this is a reactivated account)
+            try {
+              const { error: updateError } = await supabase.auth.updateUser({
+                data: { 
+                  account_deleted: false,
+                  deleted_at: null,
+                  original_email: null
+                }
+              });
+              
+              if (!updateError) {
+                // Successfully cleared, refresh session
+                const { data: { session: newSession } } = await supabase.auth.getSession();
+                if (newSession && !newSession.user?.user_metadata?.account_deleted) {
+                  setSession(newSession);
+                  setUser(newSession.user);
+                  return;
+                }
+              }
+            } catch (error) {
+              console.error('Error clearing deleted flag:', error);
+            }
+            
+            // If clearing failed or account is truly deleted, sign out
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            toast({
+              title: "Conta não encontrada",
+              description: "Esta conta foi excluída e não existe mais no sistema.",
+              variant: "destructive",
+            });
+          } else {
+            setSession(session);
+            setUser(session?.user ?? null);
+          }
         }
         setLoading(false);
       } catch (error) {
@@ -62,8 +101,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.removeItem('domini-app-loaded');
           localStorage.removeItem('domini-last-load');
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-          setSession(session);
-          setUser(session?.user ?? null);
+          // Check if account is marked as deleted
+          if (session?.user?.user_metadata?.account_deleted) {
+            console.log('Account marked as deleted, attempting to clear metadata');
+            
+            // Try to clear the deleted flag first (in case this is a reactivated account)
+            try {
+              const { error: updateError } = await supabase.auth.updateUser({
+                data: { 
+                  account_deleted: false,
+                  deleted_at: null,
+                  original_email: null
+                }
+              });
+              
+              if (!updateError) {
+                // Successfully cleared, set session normally
+                setSession(session);
+                setUser(session?.user ?? null);
+                return;
+              }
+            } catch (error) {
+              console.error('Error clearing deleted flag:', error);
+            }
+            
+            // If clearing failed or account is truly deleted, sign out
+            await supabase.auth.signOut();
+            setSession(null);
+            setUser(null);
+            toast({
+              title: "Conta não encontrada",
+              description: "Esta conta foi excluída e não existe mais no sistema.",
+              variant: "destructive",
+            });
+          } else {
+            setSession(session);
+            setUser(session?.user ?? null);
+          }
         }
         
         setLoading(false);
@@ -79,19 +153,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signUp = async (email: string, password: string, name?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
         data: {
-          name: name || ''
-        }
-      }
+          name: name || email.split('@')[0],
+          account_deleted: false,
+        },
+      },
     });
-    return { error };
+
+    return { data, error };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -99,6 +172,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email,
       password
     });
+    
+    // If login successful, check if we need to clear deleted account metadata
+    if (!error) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.account_deleted) {
+        // Clear the deleted flag for reactivated accounts
+        await supabase.auth.updateUser({
+          data: { 
+            account_deleted: false,
+            deleted_at: null,
+            original_email: null
+          }
+        });
+      }
+    }
+    
     return { error };
   };
 

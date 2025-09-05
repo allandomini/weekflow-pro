@@ -27,11 +27,17 @@ export default function Auth() {
       const { error } = await signIn(email, password);
       
       if (error) {
+        let errorMessage = error.message;
+        
+        if (error.message === "Invalid login credentials") {
+          errorMessage = "Email ou senha incorretos";
+        } else if (error.message.includes("deleted") || error.message.includes("account_deleted")) {
+          errorMessage = "Esta conta foi excluída e não existe mais no sistema";
+        }
+        
         toast({
           title: "Erro no login",
-          description: error.message === "Invalid login credentials" 
-            ? "Email ou senha incorretos" 
-            : error.message,
+          description: errorMessage,
           variant: "destructive",
         });
       } else {
