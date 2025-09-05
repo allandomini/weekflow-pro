@@ -502,12 +502,12 @@ export default function Clockify() {
                                 </DialogTrigger>
                                 <DialogContent>
                                   <DialogHeader>
-                                    <DialogTitle>Editar Entrada</DialogTitle>
-                                    <DialogDescription>Edite os detalhes da entrada de tempo</DialogDescription>
+                                    <DialogTitle>{t('clockify.edit_entry')}</DialogTitle>
+                                    <DialogDescription>{t('clockify.edit_entry_description')}</DialogDescription>
                                   </DialogHeader>
                                   <div className="space-y-4">
                                     <div>
-                                      <Label htmlFor="edit-description">Descrição</Label>
+                                      <Label htmlFor="edit-description">{t('common.description')}</Label>
                                       <Input
                                         id="edit-description"
                                         value={entry.description}
@@ -637,12 +637,12 @@ export default function Clockify() {
                                 </DialogTrigger>
                                 <DialogContent>
                                   <DialogHeader>
-                                    <DialogTitle>Editar Entrada</DialogTitle>
-                                    <DialogDescription>Edite os detalhes da entrada de tempo</DialogDescription>
+                                    <DialogTitle>{t('clockify.edit_entry')}</DialogTitle>
+                                    <DialogDescription>{t('clockify.edit_entry_description')}</DialogDescription>
                                   </DialogHeader>
                                   <div className="space-y-4">
                                     <div>
-                                      <Label htmlFor="edit-description">Descrição</Label>
+                                      <Label htmlFor="edit-description">{t('common.description')}</Label>
                                       <Input
                                         id="edit-description"
                                         value={entry.description}

@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { useTranslation } from '@/hooks/useTranslation';
+import { useTranslation } from "@/hooks/useTranslation";
+import { useCurrency } from "@/hooks/useCurrency";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,6 +73,7 @@ export default function Finances() {
   } = useAppContext();
   
   const { t, getCurrentLanguage } = useTranslation();
+  const { formatAmount } = useCurrency();
   
   // Get appropriate locale for date formatting
   const getDateLocale = () => {
@@ -468,7 +470,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success">
-              {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(totalBalance)}
             </div>
             <p className="text-xs text-muted-foreground">
               {accounts.length} {accounts.length === 1 ? t('finances.labels.account') : t('finances.labels.accounts')}
@@ -483,7 +485,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {totalActiveDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(totalActiveDebts)}
             </div>
             <p className="text-xs text-muted-foreground">
               {activeDebts.length} {activeDebts.length === 1 ? t('finances.labels.active') : t('finances.labels.actives')}
@@ -501,7 +503,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold ${netWorth >= 0 ? 'text-success' : 'text-destructive'}`}>
-              {netWorth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(netWorth)}
             </div>
             <p className="text-xs text-muted-foreground">
               {netWorth >= 0 ? t('finances.positive_situation') : t('finances.needs_attention')}
@@ -516,7 +518,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-warning">
-              {totalGoals.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(totalGoals)}
             </div>
             <p className="text-xs text-muted-foreground">
               {goals.length} {goals.length === 1 ? t('finances.labels.goal') : t('finances.labels.goals')}
@@ -531,7 +533,7 @@ export default function Finances() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-accent">
-              {totalReceivablesPending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(totalReceivablesPending)}
             </div>
             <p className="text-xs text-muted-foreground">
               {receivables.filter(r => r.status === 'pending').length} {t('finances.labels.pendings')}
@@ -569,7 +571,7 @@ export default function Finances() {
                 <CardContent>
                   <div className="space-y-4">
                     <div className="text-2xl font-bold text-primary">
-                      {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {formatAmount(account.balance)}
                     </div>
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => {
@@ -607,7 +609,7 @@ export default function Finances() {
                         transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
                       }`}>
                         {transaction.type === 'deposit' ? '+' : '-'}
-                        {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        {formatAmount(transaction.amount)}
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -673,7 +675,7 @@ export default function Finances() {
                             transaction.type === 'deposit' ? 'text-success' : 'text-destructive'
                           }`}>
                             {transaction.type === 'deposit' ? '+' : '-'}
-                            {transaction.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {formatAmount(transaction.amount)}
                           </div>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
@@ -802,10 +804,10 @@ export default function Finances() {
                             <span className="font-medium">{progress.toFixed(0)}% {t('finances.labels.paid_percentage')}</span>
                           </div>
                           <div className="text-xl font-bold text-destructive mb-2">
-                            {debt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {formatAmount(debt.remainingAmount)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {t('finances.labels.of')} {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {t('finances.labels.of')} {formatAmount(debt.totalAmount)}
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 mt-2">
                             <div 
@@ -819,7 +821,7 @@ export default function Finances() {
                             <span>{t('finances.labels.projected_remaining')}</span>
                           </div>
                           <div className="text-xl font-bold text-destructive mb-2">
-                            {projectedRemaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {formatAmount(projectedRemaining)}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -867,7 +869,7 @@ export default function Finances() {
                   {paidDebts.map((debt) => {
                     const paidDate = debt.paidAt || debt.updatedAt;
                     return (
-                      <Card key={debt.id} className="shadow-elegant border-green-200 bg-green-50">
+                      <Card key={debt.id} className="shadow-elegant border-green-200 bg-transparent">
                         <CardHeader>
                           <CardTitle className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -882,7 +884,7 @@ export default function Finances() {
                         <CardContent>
                           <div className="space-y-3">
                             <div className="text-xl font-bold text-green-700">
-                              {debt.totalAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {formatAmount(debt.totalAmount)}
                             </div>
                             <div className="text-sm text-green-600">
                               {t('finances.labels.total_paid')}
@@ -932,10 +934,10 @@ export default function Finances() {
                             <span className="font-medium">{progress.toFixed(0)}%</span>
                           </div>
                           <div className="text-xl font-bold text-warning mb-2">
-                            {goal.currentAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {formatAmount(goal.currentAmount)}
                           </div>
                           <div className="text-sm text-muted-foreground">
-                            {t('finances.labels.of')} {goal.targetAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                            {t('finances.labels.of')} {formatAmount(goal.targetAmount)}
                           </div>
                           <div className="w-full bg-muted rounded-full h-2 mt-2">
                             <div 
@@ -994,7 +996,7 @@ export default function Finances() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className={`text-xl font-bold ${r.status === 'received' ? 'text-success' : 'text-accent'}`}>
-                          {r.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatAmount(r.amount)}
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {t('finances.labels.due_date_short')}: {format(r.dueDate, "d MMM yyyy", { locale: getDateLocale() })}
@@ -1047,10 +1049,10 @@ export default function Finances() {
               </CardHeader>
               <CardContent>
                 <p className="text-2xl font-bold">
-                  {(
+                  {formatAmount(
                     transactions.filter(t=>Date.now()-t.date.getTime()<=30*24*60*60*1000)
                       .reduce((sum,t)=>sum + (t.type==='deposit'? t.amount : -t.amount),0)
-                  ).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}
+                  )}
                 </p>
                 <p className="text-sm text-muted-foreground">{t('finances.labels.income_minus_expenses')}</p>
               </CardContent>
@@ -1063,7 +1065,7 @@ export default function Finances() {
                 <p className="text-2xl font-bold">
                   {(() => {
                     const w = transactions.filter(t=>t.type==='withdrawal').sort((a,b)=>b.amount-a.amount)[0]
-                    return w ? w.amount.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}) : '—'
+                    return w ? formatAmount(w.amount) : '—'
                   })()}
                 </p>
                 <p className="text-sm text-muted-foreground">{t('finances.labels.cost_reduction_focus')}</p>
@@ -1074,7 +1076,7 @@ export default function Finances() {
                 <CardTitle>{t('finances.labels.pending_receivables')}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-2xl font-bold">{totalReceivablesPending.toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</p>
+                <p className="text-2xl font-bold">{formatAmount(totalReceivablesPending)}</p>
                 <p className="text-sm text-muted-foreground">{t('finances.labels.cash_flow_planning')}</p>
               </CardContent>
             </Card>
@@ -1466,7 +1468,7 @@ export default function Finances() {
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name} - {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {account.name} - {formatAmount(account.balance)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1474,7 +1476,7 @@ export default function Finances() {
             </div>
             {selectedReceivable && (
               <p className="text-sm text-muted-foreground">
-                {t('finances.dialogs.receivable_amount')}: {selectedReceivable.amount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                {t('finances.dialogs.receivable_amount')}: {formatAmount(selectedReceivable.amount)}
               </p>
             )}
             <div className="flex gap-3 pt-4">
@@ -1508,7 +1510,7 @@ export default function Finances() {
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name} - {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {account.name} - {formatAmount(account.balance)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1527,7 +1529,7 @@ export default function Finances() {
               />
               {selectedDebt && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t('finances.dialogs.remaining_amount')}: {selectedDebt.remainingAmount.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {t('finances.dialogs.remaining_amount')}: {formatAmount(selectedDebt.remainingAmount)}
                 </p>
               )}
             </div>
@@ -1562,7 +1564,7 @@ export default function Finances() {
                 <SelectContent>
                   {accounts.map((account) => (
                     <SelectItem key={account.id} value={account.id}>
-                      {account.name} - {account.balance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {account.name} - {formatAmount(account.balance)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -1580,7 +1582,7 @@ export default function Finances() {
               />
               {selectedGoal && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  {t('finances.dialogs.missing_amount')}: {(selectedGoal.targetAmount - selectedGoal.currentAmount).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {t('finances.dialogs.missing_amount')}: {formatAmount(selectedGoal.targetAmount - selectedGoal.currentAmount)}
                 </p>
               )}
             </div>

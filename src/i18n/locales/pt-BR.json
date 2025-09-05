@@ -499,6 +499,22 @@
       "employee": "funcionário"
     }
   },
+  "floating_clockify": {
+    "title": "Clockify",
+    "status": {
+      "active": "Ativo",
+      "paused": "Pausado"
+    },
+    "default_task": "Tarefa em andamento",
+    "buttons": {
+      "continue": "Continuar",
+      "pause": "Pausar",
+      "stop": "Parar",
+      "expand": "Expandir Clockify",
+      "minimize": "Minimizar",
+      "close": "Fechar"
+    }
+  },
   "ai": {
     "title": "Assistente IA",
     "chat": "Chat",
@@ -540,6 +556,9 @@
     "import_error": "Falha ao importar backup. Verifique o arquivo.",
     "deep_analysis": "Análise profunda",
     "deep_analysis_description": "Amplia o contexto analisado (tarefas, projetos, finanças e contatos).",
+    "currency": "Moeda",
+    "select_currency": "Selecionar moeda",
+    "currency_description": "Escolha a moeda para exibição de valores financeiros.",
     "account_management": "Gerenciamento de Conta",
     "delete_account": "Excluir Conta",
     "delete_account_description": "Excluir permanentemente sua conta e todos os dados associados.",
@@ -552,7 +571,7 @@
       "ai_assistant_enabled": "Habilitar assistente",
       "ai_assistant_description": "Mostra o botão do assistente e permite enviar mensagens.",
       "notifications_enabled": "Notificações ativadas",
-      "notifications_description": "Habilita/Desabilita mensagens de alerta rápidas.",
+      "notifications_description": "Receba alertas sobre tarefas e eventos importantes.",
       "data_sync_enabled": "Sincronização automática ativada",
       "data_sync_description": "Mantenha seus dados sempre atualizados em todos os dispositivos",
       "backup_enabled": "Backup automático ativado",

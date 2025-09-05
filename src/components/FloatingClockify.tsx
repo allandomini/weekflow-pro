@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Pause, Play, Square, Minimize2, Maximize2, X, Clock } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { useLocation } from 'react-router-dom';
 
 export default function FloatingClockify() {
+  const { t } = useTranslation();
   const {
     clockifyTimeEntries,
     pauseClockifyTimer,
@@ -83,7 +85,7 @@ export default function FloatingClockify() {
         <Button
           onClick={() => setIsMinimized(false)}
           className="rounded-full w-12 h-12 shadow-lg bg-primary hover:bg-primary/90"
-          aria-label="Expandir Clockify"
+          aria-label={t('common.expand')}
         >
           <Maximize2 className="w-5 h-5" />
         </Button>
@@ -98,9 +100,9 @@ export default function FloatingClockify() {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Clockify
+              {t('clockify.title')}
               <Badge variant="outline" className="text-xs">
-                {activeOrPaused.status === 'active' ? 'Ativo' : 'Pausado'}
+                {activeOrPaused.status === 'active' ? t('clockify.active') : t('clockify.paused')}
               </Badge>
             </CardTitle>
             <div className="flex items-center gap-1">
@@ -109,7 +111,7 @@ export default function FloatingClockify() {
                 size="sm"
                 onClick={() => setIsMinimized(true)}
                 className="h-8 w-8 p-0"
-                aria-label="Minimizar"
+                aria-label={t('common.minimize')}
               >
                 <Minimize2 className="w-4 h-4" />
               </Button>
@@ -118,7 +120,7 @@ export default function FloatingClockify() {
                 size="sm"
                 onClick={() => setIsOpen(false)}
                 className="h-8 w-8 p-0"
-                aria-label="Fechar"
+                aria-label={t('common.close')}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -128,7 +130,7 @@ export default function FloatingClockify() {
         <CardContent className="space-y-4">
           <div className="space-y-1">
             <div className="text-sm font-medium line-clamp-2" title={activeOrPaused.description}>
-              {activeOrPaused.description || 'Tarefa em andamento'}
+              {activeOrPaused.description || t('clockify.task_in_progress')}
             </div>
             <div className="text-3xl font-mono font-bold text-primary">
               {formatDuration(getCurrentDuration(activeOrPaused))}
@@ -139,17 +141,17 @@ export default function FloatingClockify() {
             {activeOrPaused.status === 'paused' ? (
               <Button onClick={handleResume} className="flex-1">
                 <Play className="w-4 h-4 mr-2" />
-                Continuar
+                {t('common.continue')}
               </Button>
             ) : (
               <Button onClick={handlePause} variant="outline" className="flex-1">
                 <Pause className="w-4 h-4 mr-2" />
-                Pausar
+                {t('clockify.pause_timer')}
               </Button>
             )}
             <Button onClick={handleStop} variant="outline" className="flex-1">
               <Square className="w-4 h-4 mr-2" />
-              Parar
+              {t('clockify.stop_timer')}
             </Button>
           </div>
         </CardContent>

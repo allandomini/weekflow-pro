@@ -137,6 +137,8 @@ interface AppContextType {
   // User Settings
   actorName: string;
   updateActorName: (name: string) => Promise<void>;
+  currency: string;
+  updateCurrency: (currency: string) => Promise<void>;
 
   // Activity Tracking
   activities: Activity[];
@@ -212,6 +214,7 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     enabled: true,
     deepAnalysis: false,
   });
+  const [currency, setCurrency] = useState<string>(() => localStorage.getItem('currency') || 'BRL');
   const [activities, setActivities] = useState<Activity[]>([]);
 
   // Transform database task to app task
@@ -1105,6 +1108,11 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [user, aiSettings]);
 
+  const updateCurrency = useCallback(async (newCurrency: string) => {
+    setCurrency(newCurrency);
+    localStorage.setItem('currency', newCurrency);
+  }, []);
+
   // Placeholder implementations for missing methods
   const updateNote = useCallback(async (id: string, updates: Partial<Note>) => {
     console.warn('updateNote not fully implemented');
@@ -1410,6 +1418,7 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     localStorage.removeItem('domini-last-load');
     localStorage.removeItem('aiSettings');
     localStorage.removeItem('pomodoroSettings');
+    localStorage.removeItem('currency');
     
     console.log('🧹 All data cleared for account switch');
   }, []);
@@ -2993,6 +3002,10 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
     // AI / Assistant
     aiSettings,
     updateAISettings,
+
+    // Currency
+    currency,
+    updateCurrency,
 
     // Activity log
     activities,

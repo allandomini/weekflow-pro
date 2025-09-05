@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useAppContext } from '@/contexts/SupabaseAppContext';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCurrency } from '@/hooks/useCurrency';
 import { 
   Calculator, 
   TrendingUp, 
@@ -55,6 +56,7 @@ interface DebtPaymentRecommendation {
 
 export default function FinancialCalculator() {
   const { t } = useTranslation();
+  const { formatAmount } = useCurrency();
   const { accounts, debts, receivables } = useAppContext();
   const [isOpen, setIsOpen] = useState(false);
   const [calculation, setCalculation] = useState<SpendingCalculation | null>(null);
@@ -263,21 +265,21 @@ export default function FinancialCalculator() {
                       <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
                         <span className="text-sm font-medium">{t('financial_calculator.fields.available_today')}</span>
                         <span className="font-bold text-blue-600">
-                          {calculation.availableToday.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatAmount(calculation.availableToday)}
                         </span>
                       </div>
                       
                       <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
                         <span className="text-sm font-medium">{t('financial_calculator.fields.after_debts')}</span>
                         <span className="font-bold text-purple-600">
-                          {calculation.availableAfterDebts.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatAmount(calculation.availableAfterDebts)}
                         </span>
                       </div>
                       
                       <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
                         <span className="text-sm font-medium">{t('financial_calculator.fields.recommended_spending')}</span>
                         <span className="font-bold text-green-600">
-                          {calculation.recommendedSpending.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          {formatAmount(calculation.recommendedSpending)}
                         </span>
                       </div>
                     </div>

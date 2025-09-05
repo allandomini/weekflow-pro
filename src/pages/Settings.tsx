@@ -9,13 +9,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useAppContext } from "@/contexts/SupabaseAppContext";
 import { useAnimations } from "@/contexts/AnimationContext";
 import LanguageSelector from "@/components/LanguageSelector";
+import CurrencySelector from "@/components/CurrencySelector";
 import { useTranslation } from "@/hooks/useTranslation";
 
 export default function Settings() {
   const [theme, setTheme] = useState<string>(() => localStorage.getItem("theme") || "light");
   const [notifications, setNotifications] = useState<boolean>(() => localStorage.getItem("notifications") !== "false");
   const [deleteConfirmText, setDeleteConfirmText] = useState<string>("");
-  const { aiSettings, updateAISettings, actorName, updateActorName, deleteUserAccount } = useAppContext();
+  const { aiSettings, updateAISettings, actorName, updateActorName, currency, updateCurrency, deleteUserAccount } = useAppContext();
   const { animationsEnabled, toggleAnimations } = useAnimations();
   const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -97,6 +98,8 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <LanguageSelector />
+        
+        <CurrencySelector value={currency} onValueChange={updateCurrency} />
         
         <Card className="shadow-elegant">
           <CardHeader>

@@ -603,6 +603,9 @@
     "import_error": "Error al importar respaldo. Verifica el archivo.",
     "deep_analysis": "Análisis profundo",
     "deep_analysis_description": "Amplia el contexto analizado (tareas, proyectos, finanzas y contactos).",
+    "currency": "Moneda",
+    "select_currency": "Seleccionar moneda",
+    "currency_description": "Elige la moneda para mostrar valores financieros.",
     "settings_alerts": {
       "ai_assistant_enabled": "Habilitar asistente",
       "ai_assistant_description": "Muestra el botón del asistente y permite enviar mensajes.",
