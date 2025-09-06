@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Progress } from '@/components/ui/progress';
 import { useAnimations } from '@/contexts/AnimationContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // CSS-in-JS for 3D rotation animation
 const spin3DStyles = `
@@ -27,10 +28,13 @@ interface LoadingScreenProps {
 export default function LoadingScreen({ 
   isLoading, 
   progress = 0, 
-  message = "Carregando Domini Horus..." 
+  message 
 }: LoadingScreenProps) {
   const { animationsEnabled } = useAnimations();
+  const { t } = useTranslation();
   const [displayProgress, setDisplayProgress] = useState(0);
+  
+  const defaultMessage = message || t('loading.initializing_domini_horus');
   const [currentMessage, setCurrentMessage] = useState(message);
 
   // Simulate smooth progress animation
@@ -48,11 +52,11 @@ export default function LoadingScreen({
     if (!isLoading) return;
 
     const messages = [
-      "Inicializando Domini Horus...",
-      "Carregando projetos...",
-      "Sincronizando rotinas...",
-      "Preparando dashboard...",
-      "Quase pronto..."
+      t('loading.initializing_domini_horus'),
+      t('loading.loading_projects'),
+      t('loading.syncing_routines'),
+      t('loading.preparing_dashboard'),
+      t('loading.almost_ready')
     ];
 
     let messageIndex = 0;
@@ -163,9 +167,9 @@ export default function LoadingScreen({
 
           {/* Progress Text */}
           <div className="flex justify-between items-center text-sm">
-            <span className="text-muted-foreground">
-              {currentMessage}
-            </span>
+            <p className="text-sm text-muted-foreground mb-4">
+              {defaultMessage}
+            </p>
             <span className="text-primary font-medium">
               {Math.round(displayProgress)}%
             </span>

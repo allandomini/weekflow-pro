@@ -48,8 +48,8 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TranslationProvider>
+    <TranslationProvider>
+      <AuthProvider>
         <AnimationProvider>
           <SupabaseAppProvider>
             <TooltipProvider>
@@ -88,8 +88,8 @@ const App = () => (
           </TooltipProvider>
         </SupabaseAppProvider>
       </AnimationProvider>
-    </TranslationProvider>
-  </AuthProvider>
+    </AuthProvider>
+  </TranslationProvider>
 </QueryClientProvider>
 );
 

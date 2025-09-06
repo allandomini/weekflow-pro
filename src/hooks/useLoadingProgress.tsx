@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useTranslation } from './useTranslation';
 
 interface LoadingStep {
   id: string;
@@ -8,14 +9,16 @@ interface LoadingStep {
 }
 
 export function useLoadingProgress() {
+  const { t } = useTranslation();
+  
   const [steps, setSteps] = useState<LoadingStep[]>([
-    { id: 'auth', name: 'Autenticando usuário...', weight: 15, completed: false },
-    { id: 'projects', name: 'Carregando projetos...', weight: 20, completed: false },
-    { id: 'tasks', name: 'Sincronizando tarefas...', weight: 15, completed: false },
-    { id: 'routines', name: 'Preparando rotinas...', weight: 20, completed: false },
-    { id: 'finances', name: 'Carregando finanças...', weight: 15, completed: false },
-    { id: 'settings', name: 'Configurando preferências...', weight: 10, completed: false },
-    { id: 'finalize', name: 'Finalizando...', weight: 5, completed: false }
+    { id: 'auth', name: t('loading.authenticating_user'), weight: 15, completed: false },
+    { id: 'projects', name: t('loading.loading_projects'), weight: 20, completed: false },
+    { id: 'tasks', name: t('loading.syncing_tasks'), weight: 15, completed: false },
+    { id: 'routines', name: t('loading.preparing_routines'), weight: 20, completed: false },
+    { id: 'finances', name: t('loading.loading_finances'), weight: 15, completed: false },
+    { id: 'settings', name: t('loading.configuring_preferences'), weight: 10, completed: false },
+    { id: 'finalize', name: t('loading.finalizing'), weight: 5, completed: false }
   ]);
 
   const [currentStep, setCurrentStep] = useState(0);

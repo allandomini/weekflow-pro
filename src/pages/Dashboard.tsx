@@ -6,6 +6,7 @@ import { useOffline } from '../hooks/useOffline';
 import { useAnimations } from '../contexts/AnimationContext';
 import { useToast } from '@/hooks/use-toast';
 import { useTranslation } from '@/hooks/useTranslation';
+import { useCurrency } from '@/hooks/useCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -42,6 +43,7 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { animationsEnabled } = useAnimations();
   const { t } = useTranslation();
+  const { formatAmount } = useCurrency();
 
   // Stephany's AI Recommendations
   const [recommendations, setRecommendations] = useState<Array<{
@@ -424,7 +426,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-success transition-colors duration-200">
-              {totalBalance.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              {formatAmount(totalBalance)}
             </div>
             <p className="text-xs text-muted-foreground transition-colors duration-200">
               {accounts.length} {accounts.length === 1 ? t('dashboard.account') : t('dashboard.accounts')}

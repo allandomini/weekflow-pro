@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import i18n from '@/i18n';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -2852,8 +2853,8 @@ export const SupabaseAppProvider: React.FC<{ children: React.ReactNode }> = ({ c
           };
           
           const taskData = {
-            title: entry.description || 'Tarefa do Clockify',
-            description: `Registrado automaticamente do Clockify. Duração: ${hours}h ${minutes}m ${seconds}s`,
+            title: entry.description || i18n.t('clockify.default_task_title'),
+            description: i18n.t('clockify.auto_registered_description', { hours, minutes, seconds }),
             completed: true,
             projectId: entry.projectId,
             date: entryDate, // Use the entry's date

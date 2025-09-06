@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Clock, Play, Square, Plus, Edit, Trash2, DollarSign, Tag, User, FolderOpen, Pause, Users } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
+import { useCurrency } from '@/hooks/useCurrency';
 import { ptBR } from 'date-fns/locale';
 
 export default function Clockify() {
@@ -31,6 +32,7 @@ export default function Clockify() {
   } = useAppContext();
   
   const { t } = useTranslation();
+  const { formatAmount, getSymbol } = useCurrency();
 
   const [activeTimer, setActiveTimer] = useState<string | null>(null);
   const [timerStart, setTimerStart] = useState<Date | null>(null);
@@ -188,7 +190,7 @@ export default function Clockify() {
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-sm">
             <DollarSign className="w-3 h-3 mr-1" />
-            R$ {getTotalBillable().toFixed(2)}
+            {formatAmount(getTotalBillable())}
           </Badge>
         </div>
       </div>
@@ -424,7 +426,7 @@ export default function Clockify() {
                                 {entry.billable && (
                                   <Badge variant="secondary" className="text-xs">
                                     <DollarSign className="w-3 h-3 mr-1" />
-                                    R$ {entry.hourlyRate}/h
+                                    {formatAmount(entry.hourlyRate || 0)}/h
                                   </Badge>
                                 )}
                                 <Badge variant={entry.status === 'active' ? 'default' : 'outline'}>
@@ -582,7 +584,7 @@ export default function Clockify() {
                                 {entry.billable && (
                                   <Badge variant="secondary" className="text-xs">
                                     <DollarSign className="w-3 h-3 mr-1" />
-                                    R$ {entry.hourlyRate}/h
+                                    {formatAmount(entry.hourlyRate || 0)}/h
                                   </Badge>
                                 )}
                                 <Badge variant="outline">{t('clockify.completed')}</Badge>
@@ -740,7 +742,7 @@ export default function Clockify() {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-green-600">
-                  R$ {getTotalBillable().toFixed(2)}
+                  {formatAmount(getTotalBillable())}
                 </div>
               </CardContent>
             </Card>
